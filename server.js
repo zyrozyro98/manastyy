@@ -210,7 +210,46 @@ app.post('/api/auth/register', async (req, res) => {
         res.status(500).json({ message: 'خطأ في الخادم' });
     }
 });
+// رد المدير على محادثة محددة
+app.post('/api/admin/reply-to-conversation', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const { userId, text } = req.body;
 
+        if (!userId || !text || text.trim().length === 0) {
+            return res.status(400).json({ message: 'معرف المستخدم والنص مطلوبان' });
+        }
+
+        const users = readLocalFile('local-users.json');
+        const user = users.find(u => u._id === userId);
+        
+        if (!user) {
+            return res.status(404).json({ message: 'المستخدم غير موجود' });
+        }
+
+        const messages = readLocalFile('local-messages.json');
+        const replyMessage = {
+            _id: crypto.randomBytes(16).toString('hex'),
+            senderId: 'admin',
+            senderName: 'مدير النظام',
+            receiverId: userId,
+            text: text.trim(),
+            timestamp: new Date().toISOString(),
+            read: false,
+            isReply: true
+        };
+
+        messages.push(replyMessage);
+        writeLocalFile('local-messages.json', messages);
+
+        res.json({ 
+            message: 'تم إرسال الرد بنجاح',
+            messageId: replyMessage._id
+        });
+    } catch (error) {
+        console.error('خطأ في الرد على المحادثة:', error);
+        res.status(500).json({ message: 'خطأ في الخادم' });
+    }
+});
 app.post('/api/auth/login', checkLoginAttempts, async (req, res) => {
     try {
         const { phone, password } = req.body;
@@ -803,44 +842,4 @@ app.listen(PORT, '0.0.0.0', () => {
     console.log(`📁 ميزة إرسال المجلدات: مفعلة`);
     
     setTimeout(createAdminUser, 2000);
-});
-// رد المدير على محادثة محددة
-app.post('/api/admin/reply-to-conversation', authenticateToken, requireAdmin, async (req, res) => {
-    try {
-        const { userId, text } = req.body;
-
-        if (!userId || !text || text.trim().length === 0) {
-            return res.status(400).json({ message: 'معرف المستخدم والنص مطلوبان' });
-        }
-
-        const users = readLocalFile('local-users.json');
-        const user = users.find(u => u._id === userId);
-        
-        if (!user) {
-            return res.status(404).json({ message: 'المستخدم غير موجود' });
-        }
-
-        const messages = readLocalFile('local-messages.json');
-        const replyMessage = {
-            _id: crypto.randomBytes(16).toString('hex'),
-            senderId: 'admin',
-            senderName: 'مدير النظام',
-            receiverId: userId,
-            text: text.trim(),
-            timestamp: new Date().toISOString(),
-            read: false,
-            isReply: true
-        };
-
-        messages.push(replyMessage);
-        writeLocalFile('local-messages.json', messages);
-
-        res.json({ 
-            message: 'تم إرسال الرد بنجاح',
-            messageId: replyMessage._id
-        });
-    } catch (error) {
-        console.error('خطأ في الرد على المحادثة:', error);
-        res.status(500).json({ message: 'خطأ في الخادم' });
-    }
 });
