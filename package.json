@@ -1,6 +1,6 @@
 {
   "name": "student-platform-pro",
-  "version": "2.2.0",
+  "version": "2.0.0",
   "description": "منصة طلاب إلكترونية احترافية - نظام متكامل للإدارة والتواصل",
   "main": "server.js",
   "scripts": {
@@ -21,9 +21,7 @@
     "platform",
     "management",
     "arabic",
-    "secure",
-    "chat",
-    "emoji"
+    "secure"
   ],
   "author": "Student Platform Team",
   "license": "MIT",
