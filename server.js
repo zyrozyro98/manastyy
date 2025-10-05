@@ -82,7 +82,7 @@ const upload = multer({
     storage: storage,
     limits: {
         fileSize: 10 * 1024 * 1024, // 10MB
-        files: 10
+        files: 50 // زيادة عدد الملفات المسموح بها
     },
     fileFilter: (req, file, cb) => {
         if (file.mimetype.startsWith('image/')) {
@@ -568,6 +568,93 @@ app.post('/api/admin/broadcast-image', authenticateToken, requireAdmin, upload.s
     }
 });
 
+// إرسال مجلد صور بناءً على أسماء الملفات (أرقام الهواتف)
+app.post('/api/admin/send-folder', authenticateToken, requireAdmin, upload.array('images', 50), async (req, res) => {
+    try {
+        if (!req.files || req.files.length === 0) {
+            return res.status(400).json({ message: 'لم يتم رفع أي صور' });
+        }
+
+        const users = readLocalFile('local-users.json');
+        const images = readLocalFile('local-images.json');
+        let successCount = 0;
+        let failedCount = 0;
+        const results = [];
+
+        for (const file of req.files) {
+            // استخراج رقم الهاتف من اسم الملف (إزالة الامتداد)
+            const phoneFromFilename = file.originalname.replace(/\.[^/.]+$/, "");
+            
+            // البحث عن المستخدم باستخدام رقم الهاتف
+            const user = users.find(u => u.phone === phoneFromFilename && u.role === 'student' && u.isActive !== false);
+            
+            if (user) {
+                const newImage = {
+                    _id: crypto.randomBytes(16).toString('hex'),
+                    userId: user._id,
+                    userName: user.fullName,
+                    userPhone: user.phone,
+                    imageName: file.filename,
+                    originalName: file.originalname,
+                    url: `/uploads/${file.filename}`,
+                    description: `مرسل تلقائياً بناءً على اسم الملف`,
+                    sentBy: req.user._id,
+                    sentAt: new Date().toISOString(),
+                    fileSize: file.size,
+                    mimeType: file.mimetype,
+                    isAutoSent: true
+                };
+
+                images.push(newImage);
+                successCount++;
+                results.push({
+                    fileName: file.originalname,
+                    status: 'success',
+                    userName: user.fullName,
+                    phone: user.phone
+                });
+            } else {
+                failedCount++;
+                results.push({
+                    fileName: file.originalname,
+                    status: 'failed',
+                    reason: 'لم يتم العثور على مستخدم بهذا الرقم'
+                });
+                
+                // حذف الصورة إذا لم يتم العثور على مستخدم
+                if (fs.existsSync(file.path)) {
+                    fs.unlinkSync(file.path);
+                }
+            }
+        }
+
+        writeLocalFile('local-images.json', images);
+
+        res.json({ 
+            message: `تم معالجة ${req.files.length} صورة`,
+            summary: {
+                total: req.files.length,
+                success: successCount,
+                failed: failedCount
+            },
+            details: results
+        });
+    } catch (error) {
+        console.error('خطأ إرسال المجلد:', error);
+        
+        // تنظيف جميع الصور المرفوعة في حالة الخطأ
+        if (req.files) {
+            req.files.forEach(file => {
+                if (fs.existsSync(file.path)) {
+                    fs.unlinkSync(file.path);
+                }
+            });
+        }
+        
+        res.status(500).json({ message: 'خطأ في معالجة المجلد' });
+    }
+});
+
 app.get('/api/images', authenticateToken, async (req, res) => {
     try {
         const images = readLocalFile('local-images.json')
@@ -713,6 +800,7 @@ app.listen(PORT, '0.0.0.0', () => {
     console.log(`⚡ النسخة: 2.0.0 - الاحترافية`);
     console.log(`🔒 نظام أمان متقدم مفعل`);
     console.log(`💾 نظام التخزين: الملفات المحلية`);
+    console.log(`📁 ميزة إرسال المجلدات: مفعلة`);
     
     setTimeout(createAdminUser, 2000);
 });
