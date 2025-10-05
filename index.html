@@ -1055,6 +1055,210 @@ body {
         background: white !important;
     }
 }
+        /* أنماط أزرار المحادثة والإيموجي */
+.chat-controls {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.conversation-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.emoji-picker {
+    position: relative;
+    display: inline-block;
+}
+
+.emoji-button {
+    background: var(--light);
+    border: 2px solid var(--border);
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-size: 1.2rem;
+}
+
+.emoji-button:hover {
+    background: var(--primary-light);
+    color: white;
+    border-color: var(--primary);
+}
+
+.emoji-panel {
+    position: absolute;
+    bottom: 100%;
+    left: 0;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 15px;
+    padding: 1rem;
+    box-shadow: var(--shadow-lg);
+    z-index: 1000;
+    display: none;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 0.5rem;
+    max-width: 300px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.emoji-panel.active {
+    display: grid;
+    animation: fadeIn 0.3s ease;
+}
+
+.emoji-item {
+    font-size: 1.5rem;
+    cursor: pointer;
+    padding: 0.25rem;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+    text-align: center;
+}
+
+.emoji-item:hover {
+    background: var(--primary-light);
+    transform: scale(1.2);
+}
+
+.quick-reply-buttons {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+}
+
+.quick-reply-btn {
+    background: var(--light);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 0.5rem 1rem;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    white-space: nowrap;
+}
+
+.quick-reply-btn:hover {
+    background: var(--primary);
+    color: white;
+    transform: translateY(-2px);
+}
+
+.conversation-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.conversation-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.admin-reply-section {
+    background: var(--light);
+    padding: 1rem;
+    border-radius: 10px;
+    margin-top: 1rem;
+    border-right: 3px solid var(--primary);
+}
+
+.reply-input-group {
+    display: flex;
+    gap: 0.5rem;
+    align-items: flex-start;
+}
+
+.reply-textarea {
+    flex: 1;
+    min-height: 80px;
+    resize: vertical;
+}
+
+.message-emoji {
+    font-size: 1.2em;
+    margin: 0 2px;
+}
+
+.message-content {
+    line-height: 1.5;
+}
+
+/* تحسينات للجوال */
+@media (max-width: 768px) {
+    .emoji-panel {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        top: auto;
+        max-height: 40vh;
+        border-radius: 15px 15px 0 0;
+    }
+    
+    .conversation-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .conversation-actions {
+        width: 100%;
+        justify-content: space-between;
+    }
+    
+    .reply-input-group {
+        flex-direction: column;
+    }
+    
+    .quick-reply-buttons {
+        justify-content: center;
+    }
+    
+    .quick-reply-btn {
+        flex: 1;
+        min-width: 120px;
+        text-align: center;
+    }
+}
+
+/* أنماط خاصة بالمدير */
+.admin-message-indicator {
+    background: var(--warning);
+    color: var(--dark);
+    padding: 0.2rem 0.5rem;
+    border-radius: 10px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    margin-right: 0.5rem;
+}
+
+.conversation-stats {
+    display: flex;
+    gap: 1rem;
+    font-size: 0.8rem;
+    color: var(--gray);
+    margin-top: 0.5rem;
+}
+
+.stat-badge {
+    background: var(--light);
+    padding: 0.2rem 0.5rem;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+}
     </style>
 </head>
 <body>
@@ -1313,6 +1517,13 @@ body {
             </div>
 
             <!-- Chat Page -->
+            <div class="conversation-header">
+    <div>
+        <h3 id="chatWithName">مدير النظام</h3>
+        <small id="chatStatus">متصل الآن</small>
+    </div>
+    <input type="hidden" id="currentUserId">
+</div>
             <div class="page" id="chatPage">
                 <div class="chat-container">
                     <!-- Conversations Sidebar (for admin) -->
@@ -1421,6 +1632,18 @@ body {
                             <button class="btn btn-primary" id="sendBroadcast">
                                 <i class="fas fa-paper-plane"></i> إرسال للجميع
                             </button>
+                            <div class="chat-input">
+    <div class="emoji-picker">
+        <button type="button" class="emoji-button" id="emojiButton">
+            <i class="far fa-smile"></i>
+        </button>
+        <div class="emoji-panel" id="emojiPanel"></div>
+    </div>
+    <input type="text" id="messageInput" placeholder="اكتب رسالتك هنا...">
+    <button class="btn btn-primary" id="sendMessage">
+        <i class="fas fa-paper-plane"></i> إرسال
+    </button>
+</div>
                         </div>
                     </div>
 
@@ -1497,7 +1720,7 @@ body {
     </div>
 
 <script>
-    // التهيئة الأساسية
+// التهيئة الأساسية
 const API_BASE = window.location.origin + '/api';
 let currentUser = null;
 let currentConversation = null;
@@ -1505,6 +1728,46 @@ let uploadedFiles = [];
 let conversations = [];
 let users = [];
 let isMobileChatOpen = false;
+let isEmojiPickerOpen = false;
+
+// قائمة الإيموجيات الشائعة
+const commonEmojis = [
+    '😀', '😃', '😄', '😁', '😆', '😅', '😂', '🤣', '😊', '😇',
+    '🙂', '🙃', '😉', '😌', '😍', '🥰', '😘', '😗', '😙', '😚',
+    '😋', '😛', '😝', '😜', '🤪', '🤨', '🧐', '🤓', '😎', '🤩',
+    '🥳', '😏', '😒', '😞', '😔', '😟', '😕', '🙁', '☹️', '😣',
+    '😖', '😫', '😩', '🥺', '😢', '😭', '😤', '😠', '😡', '🤬',
+    '🤯', '😳', '🥵', '🥶', '😱', '😨', '😰', '😥', '😓', '🤗',
+    '🤔', '🤭', '🤫', '🤥', '😶', '😐', '😑', '😬', '🙄', '😯',
+    '😦', '😧', '😮', '😲', '🥱', '😴', '🤤', '😪', '😵', '🤐',
+    '🥴', '🤢', '🤮', '🤧', '😷', '🤒', '🤕', '🤑', '🤠', '😈',
+    '👿', '👹', '👺', '🤡', '💩', '👻', '💀', '☠️', '👽', '👾',
+    '🤖', '🎃', '😺', '😸', '😹', '😻', '😼', '😽', '🙀', '😿',
+    '😾', '👋', '🤚', '🖐️', '✋', '🖖', '👌', '🤏', '✌️', '🤞',
+    '🤟', '🤘', '🤙', '👈', '👉', '👆', '🖕', '👇', '☝️', '👍',
+    '👎', '✊', '👊', '🤛', '🤜', '👏', '🙌', '👐', '🤲', '🤝',
+    '🙏', '✍️', '💅', '🤳', '💪', '🦾', '🦵', '🦿', '🦶', '👣',
+    '👂', '🦻', '👃', '🧠', '🦷', '🦴', '👀', '👁️', '👅', '👄',
+    '💋', '🩸', '❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍',
+    '🤎', '💔', '❣️', '💕', '💞', '💓', '💗', '💖', '💘', '💝',
+    '💟', '☮️', '✝️', '☪️', '🕉️', '☸️', '✡️', '🔯', '🕎', '☯️',
+    '☦️', '🛐', '⛎', '♈', '♉', '♊', '♋', '♌', '♍', '♎',
+    '♏', '♐', '♑', '♒', '♓', '🆔', '⚛️', '🉑', '☢️', '☣️'
+];
+
+// الردود السريعة للمدير
+const quickReplies = [
+    "شكراً لتواصلك معنا",
+    "سنقوم بالرد عليك قريباً",
+    "هل تحتاج إلى مساعدة إضافية؟",
+    "تم استلام رسالتك بنجاح",
+    "نقدر تعاونك معنا",
+    "سنحاول مساعدتك بأسرع وقت",
+    "هل يمكنك توضيح استفسارك أكثر؟",
+    "تم حل المشكلة بنجاح",
+    "نأمل أن تكون راضياً عن الخدمة",
+    "هل هناك شيء آخر يمكننا مساعدتك فيه؟"
+];
 
 // تهيئة التطبيق
 document.addEventListener('DOMContentLoaded', function() {
@@ -1517,10 +1780,11 @@ function initializeApp() {
     setupAdminTabs();
     setupFileUploads();
     setupMobileChat();
+    setupEmojiPicker();
 }
 
 function setupEventListeners() {
-    // روابط التنقل
+    // الروابط والأزرار الأساسية (نفس الكود السابق)
     document.getElementById('homeLink').addEventListener('click', (e) => { e.preventDefault(); showHome(); });
     document.getElementById('loginLink').addEventListener('click', (e) => { e.preventDefault(); showLogin(); });
     document.getElementById('registerLink').addEventListener('click', (e) => { e.preventDefault(); showRegister(); });
@@ -1530,28 +1794,429 @@ function setupEventListeners() {
     document.getElementById('adminLink').addEventListener('click', (e) => { e.preventDefault(); showAdminPanel(); });
     document.getElementById('logoutLink').addEventListener('click', (e) => { e.preventDefault(); logout(); });
 
-    // أزرار الصفحة الرئيسية
     document.getElementById('homeLoginBtn').addEventListener('click', showLogin);
     document.getElementById('homeRegisterBtn').addEventListener('click', showRegister);
 
-    // نماذج
     document.getElementById('loginForm').addEventListener('submit', handleLogin);
     document.getElementById('registerForm').addEventListener('submit', handleRegister);
 
-    // روابط التنقل بين النماذج
     document.getElementById('toLogin').addEventListener('click', (e) => { e.preventDefault(); showLogin(); });
     document.getElementById('toRegister').addEventListener('click', (e) => { e.preventDefault(); showRegister(); });
 
-    // أزرار لوحة التحكم
     document.getElementById('goToChat').addEventListener('click', showChat);
     document.getElementById('goToImages').addEventListener('click', showImages);
 
-    // نظام الدردشة
     document.getElementById('sendMessage').addEventListener('click', sendMessage);
     document.getElementById('messageInput').addEventListener('keypress', function(e) {
         if (e.key === 'Enter') sendMessage();
     });
 
+    document.getElementById('sendBroadcast').addEventListener('click', sendBroadcastMessage);
+    document.getElementById('sendSingleImage').addEventListener('click', sendSingleImage);
+    document.getElementById('sendBroadcastImage').addEventListener('click', sendBroadcastImage);
+    document.getElementById('sendFolderImages').addEventListener('click', sendFolderImages);
+    
+    // الأزرار الجديدة
+    document.getElementById('viewConversations').addEventListener('click', loadConversations);
+    document.getElementById('sendAdminReply').addEventListener('click', sendAdminReply);
+}
+
+function setupEmojiPicker() {
+    // إنشاء منتقي الإيموجي
+    const emojiButton = document.getElementById('emojiButton');
+    const emojiPanel = document.getElementById('emojiPanel');
+    const messageInput = document.getElementById('messageInput');
+    
+    if (emojiButton && emojiPanel) {
+        // تعبئة منتقي الإيموجي
+        emojiPanel.innerHTML = commonEmojis.map(emoji => 
+            `<div class="emoji-item" data-emoji="${emoji}">${emoji}</div>`
+        ).join('');
+        
+        // فتح/إغلاق منتقي الإيموجي
+        emojiButton.addEventListener('click', (e) => {
+            e.stopPropagation();
+            isEmojiPickerOpen = !isEmojiPickerOpen;
+            emojiPanel.classList.toggle('active', isEmojiPickerOpen);
+        });
+        
+        // إضافة الإيموجي للنص
+        emojiPanel.addEventListener('click', (e) => {
+            if (e.target.classList.contains('emoji-item')) {
+                const emoji = e.target.getAttribute('data-emoji');
+                const start = messageInput.selectionStart;
+                const end = messageInput.selectionEnd;
+                const text = messageInput.value;
+                messageInput.value = text.substring(0, start) + emoji + text.substring(end);
+                messageInput.focus();
+                messageInput.selectionStart = messageInput.selectionEnd = start + emoji.length;
+            }
+        });
+        
+        // إغلاق منتقي الإيموجي عند النقر خارجها
+        document.addEventListener('click', (e) => {
+            if (!emojiButton.contains(e.target) && !emojiPanel.contains(e.target)) {
+                isEmojiPickerOpen = false;
+                emojiPanel.classList.remove('active');
+            }
+        });
+    }
+}
+
+// تحديث وظيفة عرض المحادثات
+function displayConversations() {
+    const container = document.getElementById('conversationsList');
+    container.innerHTML = '';
+
+    if (conversations.length === 0) {
+        container.innerHTML = '<div class="alert alert-info">لا توجد محادثات</div>';
+        return;
+    }
+
+    conversations.forEach(conv => {
+        const convElement = document.createElement('div');
+        convElement.className = `conversation-item ${currentConversation === conv.userId ? 'active' : ''}`;
+        convElement.innerHTML = `
+            <div class="user-avatar">
+                ${conv.userName.charAt(0)}
+            </div>
+            <div class="conversation-info">
+                <div class="conversation-name">${conv.userName}</div>
+                <div class="conversation-preview">${conv.lastMessage}</div>
+                <div class="conversation-stats">
+                    <span class="stat-badge">${formatTime(conv.lastMessageTime)}</span>
+                    ${conv.unreadCount > 0 ? `<span class="stat-badge">${conv.unreadCount} رسالة جديدة</span>` : ''}
+                </div>
+            </div>
+            ${conv.unreadCount > 0 ? `<div class="unread-badge">${conv.unreadCount}</div>` : ''}
+        `;
+        
+        convElement.addEventListener('click', () => {
+            currentConversation = conv.userId;
+            document.getElementById('chatWithName').textContent = conv.userName;
+            document.getElementById('currentUserId').value = conv.userId;
+            loadMessages();
+            displayConversations();
+            
+            if (window.innerWidth <= 768) {
+                toggleMobileChat();
+            }
+        });
+        
+        container.appendChild(convElement);
+    });
+}
+
+// تحديث وظيفة عرض الرسائل
+function displayMessages(messages) {
+    const container = document.getElementById('chatMessages');
+    container.innerHTML = '';
+
+    if (messages.length === 0) {
+        container.innerHTML = '<div class="alert alert-info text-center">لا توجد رسائل بعد</div>';
+        return;
+    }
+
+    messages.forEach(msg => {
+        const messageDiv = document.createElement('div');
+        const isSent = msg.senderId === currentUser._id;
+        const isBroadcast = msg.isBroadcast;
+        const isAdminReply = msg.isReply;
+        
+        messageDiv.classList.add('message');
+        messageDiv.classList.add(isSent ? 'sent' : 'received');
+        if (isBroadcast) messageDiv.classList.add('message-broadcast');
+        if (isAdminReply) messageDiv.classList.add('admin-reply');
+        
+        let messageContent = msg.text;
+        // تحويل النص العادي إلى إيموجي إذا أمكن
+        messageContent = messageContent.replace(/:\w+:/g, match => {
+            const emoji = emojiMap[match] || match;
+            return `<span class="message-emoji">${emoji}</span>`;
+        });
+        
+        messageDiv.innerHTML = `
+            <div class="message-header">
+                <span class="message-sender">
+                    ${isAdminReply ? '<span class="admin-message-indicator">رد مدير</span>' : ''}
+                    ${msg.senderName}
+                </span>
+                <span class="message-time">${formatTime(msg.timestamp)}</span>
+            </div>
+            <div class="message-content">${messageContent}</div>
+        `;
+        
+        container.appendChild(messageDiv);
+    });
+
+    container.scrollTop = container.scrollHeight;
+    
+    // إظهار قسم الرد للمدير إذا كان يشاهد محادثة
+    if (currentUser.role === 'admin' && currentConversation) {
+        showAdminReplySection();
+    }
+}
+
+// إظهار قسم الرد للمدير
+function showAdminReplySection() {
+    let replySection = document.getElementById('adminReplySection');
+    
+    if (!replySection) {
+        replySection = document.createElement('div');
+        replySection.id = 'adminReplySection';
+        replySection.className = 'admin-reply-section';
+        replySection.innerHTML = `
+            <h4><i class="fas fa-reply"></i> الرد على المحادثة</h4>
+            <div class="quick-reply-buttons" id="quickReplyButtons"></div>
+            <div class="reply-input-group">
+                <textarea class="form-control reply-textarea" id="adminReplyText" 
+                         placeholder="اكتب ردك هنا..."></textarea>
+                <button class="btn btn-primary" id="sendAdminReply">
+                    <i class="fas fa-paper-plane"></i> إرسال
+                </button>
+            </div>
+        `;
+        
+        const chatContainer = document.querySelector('.chat-main');
+        chatContainer.appendChild(replySection);
+        
+        // إضافة الردود السريعة
+        const quickReplyContainer = document.getElementById('quickReplyButtons');
+        quickReplies.forEach(reply => {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'quick-reply-btn';
+            button.textContent = reply;
+            button.addEventListener('click', () => {
+                document.getElementById('adminReplyText').value = reply;
+            });
+            quickReplyContainer.appendChild(button);
+        });
+        
+        // إضافة حدث الإرسال
+        document.getElementById('sendAdminReply').addEventListener('click', sendAdminReply);
+    }
+}
+
+// إرسال رد المدير
+async function sendAdminReply() {
+    const replyText = document.getElementById('adminReplyText');
+    const text = replyText.value.trim();
+    const userId = document.getElementById('currentUserId').value;
+    
+    if (!text) {
+        showAlert('adminReplySection', 'الرد لا يمكن أن يكون فارغاً', 'error');
+        return;
+    }
+
+    if (!userId) {
+        showAlert('adminReplySection', 'لم يتم تحديد محادثة', 'error');
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_BASE}/admin/reply-to-conversation`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+            },
+            body: JSON.stringify({ 
+                userId: userId,
+                text: text
+            })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            replyText.value = '';
+            showAlert('adminReplySection', 'تم إرسال الرد بنجاح', 'success');
+            loadMessages();
+        } else {
+            showAlert('adminReplySection', data.message, 'error');
+        }
+    } catch (error) {
+        console.error('Error sending admin reply:', error);
+        showAlert('adminReplySection', 'خطأ في إرسال الرد', 'error');
+    }
+}
+
+// تحديث وظيفة عرض الدردشة للمدير
+function showChat() {
+    if (!currentUser) {
+        showLogin();
+        return;
+    }
+
+    showPage('chatPage');
+    updateNavigation(true, currentUser.role === 'admin');
+    
+    const sidebar = document.getElementById('conversationsSidebar');
+    const mobileToggle = document.querySelector('.mobile-chat-toggle');
+    
+    if (currentUser.role === 'admin') {
+        sidebar.classList.remove('hidden');
+        if (window.innerWidth <= 768) {
+            mobileToggle.style.display = 'flex';
+        }
+        
+        // إضافة أزرار التحكم للمدير
+        addAdminChatControls();
+        loadConversations();
+    } else {
+        sidebar.classList.add('hidden');
+        mobileToggle.style.display = 'none';
+        document.getElementById('chatWithName').textContent = 'مدير النظام';
+    }
+    
+    loadMessages();
+    
+    if (window.chatInterval) clearInterval(window.chatInterval);
+    window.chatInterval = setInterval(loadMessages, 5000);
+}
+
+// إضافة أزرار التحكم للمدير
+function addAdminChatControls() {
+    const chatHeader = document.querySelector('.chat-header');
+    let controls = document.getElementById('adminChatControls');
+    
+    if (!controls && chatHeader) {
+        controls = document.createElement('div');
+        controls.id = 'adminChatControls';
+        controls.className = 'chat-controls';
+        controls.innerHTML = `
+            <div class="conversation-actions">
+                <button class="btn btn-outline btn-sm" id="viewConversations">
+                    <i class="fas fa-sync-alt"></i> تحديث المحادثات
+                </button>
+                <button class="btn btn-outline btn-sm" id="markAllRead">
+                    <i class="fas fa-check-double"></i> تعيين الكل كمقروء
+                </button>
+            </div>
+        `;
+        
+        chatHeader.appendChild(controls);
+        
+        // أحداث الأزرار
+        document.getElementById('viewConversations').addEventListener('click', loadConversations);
+        document.getElementById('markAllRead').addEventListener('click', markAllAsRead);
+    }
+}
+
+// تعيين جميع الرسائل كمقروءة
+async function markAllAsRead() {
+    try {
+        const messages = readLocalFile('local-messages.json');
+        let updated = false;
+        
+        messages.forEach(msg => {
+            if (msg.receiverId === 'admin' && !msg.read) {
+                msg.read = true;
+                updated = true;
+            }
+        });
+        
+        if (updated) {
+            writeLocalFile('local-messages.json', messages);
+            showAlert('adminChatControls', 'تم تعيين جميع الرسائل كمقروءة', 'success');
+            loadConversations();
+        }
+    } catch (error) {
+        console.error('Error marking messages as read:', error);
+        showAlert('adminChatControls', 'خطأ في تعيين الرسائل كمقروءة', 'error');
+    }
+}
+
+// خريطة الإيموجيات النصية
+const emojiMap = {
+    ':smile:': '😊',
+    ':laughing:': '😆',
+    ':heart:': '❤️',
+    ':thumbsup:': '👍',
+    ':thumbsdown:': '👎',
+    ':clap:': '👏',
+    ':pray:': '🙏',
+    ':fire:': '🔥',
+    ':star:': '⭐',
+    ':rocket:': '🚀',
+    ':tada:': '🎉',
+    ':warning:': '⚠️',
+    ':question:': '❓',
+    ':exclamation:': '❗',
+    ':check:': '✅',
+    ':cross:': '❌',
+    ':clock:': '⏰',
+    ':calendar:': '📅',
+    ':email:': '📧',
+    ':phone:': '📱',
+    ':computer:': '💻',
+    ':book:': '📖',
+    ':pencil:': '✏️',
+    ':money:': '💰',
+    ':gift:': '🎁',
+    ':camera:': '📷',
+    ':music:': '🎵',
+    ':video:': '🎬',
+    ':game:': '🎮',
+    ':football:': '⚽',
+    ':basketball:': '🏀',
+    ':car:': '🚗',
+    ':plane:': '✈️',
+    ':ship:': '🚢',
+    ':train:': '🚆',
+    ':hospital:': '🏥',
+    ':school:': '🏫',
+    ':hotel:': '🏨',
+    ':bank:': '🏦',
+    ':store:': '🏪',
+    ':house:': '🏠',
+    ':sun:': '☀️',
+    ':moon:': '🌙',
+    ':cloud:': '☁️',
+    ':rain:': '🌧️',
+    ':snow:': '❄️',
+    ':cat:': '🐱',
+    ':dog:': '🐶',
+    ':lion:': '🦁',
+    ':tiger:': '🐯',
+    ':bear:': '🐻',
+    ':rabbit:': '🐰',
+    ':fox:': '🦊',
+    ':panda:': '🐼',
+    ':koala:': '🐨',
+    ':penguin:': '🐧',
+    ':bird:': '🐦',
+    ':chicken:': '🐔',
+    ':cow:': '🐄',
+    ':pig:': '🐷',
+    ':frog:': '🐸',
+    ':fish:': '🐟',
+    ':dolphin:': '🐬',
+    ':whale:': '🐳',
+    ':snake:': '🐍',
+    ':turtle:': '🐢',
+    ':bug:': '🐛',
+    ':bee:': '🐝',
+    ':butterfly:': '🦋',
+    ':snail:': '🐌',
+    ':spider:': '🕷️',
+    ':scorpion:': '🦂'
+};
+
+
+
+
+
+
+
+
+
+
+
+
+
+   
     // نظام الإدارة
     document.getElementById('sendBroadcast').addEventListener('click', sendBroadcastMessage);
     document.getElementById('sendSingleImage').addEventListener('click', sendSingleImage);
