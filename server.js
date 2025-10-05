@@ -1,5 +1,4 @@
 const express = require('express');
-const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const multer = require('multer');
@@ -11,23 +10,16 @@ require('dotenv').config();
 
 const app = express();
 
-// Middleware الأمان
+// Middleware
 app.use(cors({
     origin: process.env.ALLOWED_ORIGINS || true,
     credentials: true
 }));
 app.use(express.json({ limit: '10mb' }));
-app.use(express.static(__dirname, {
-    setHeaders: (res, path) => {
-        if (path.endsWith('.html')) {
-            res.setHeader('X-Content-Type-Options', 'nosniff');
-        }
-    }
-}));
+app.use(express.static(__dirname));
 
 // معدلات الأمان
 app.disable('x-powered-by');
-app.use(helmet());
 
 // تهيئة الملفات والمجلدات
 function initializeApp() {
@@ -54,10 +46,11 @@ initializeApp();
 // مفتاح JWT آمن
 const JWT_SECRET = process.env.JWT_SECRET || crypto.randomBytes(64).toString('hex');
 
-// نماذج البيانات المحسنة
+// دوال مساعدة للتخزين المحلي
 function readLocalFile(filename) {
     try {
-        return JSON.parse(fs.readFileSync(filename, 'utf8'));
+        const data = fs.readFileSync(filename, 'utf8');
+        return JSON.parse(data);
     } catch (error) {
         return [];
     }
@@ -141,6 +134,23 @@ const checkLoginAttempts = (req, res, next) => {
     }
     next();
 };
+
+function updateLoginAttempts(ip, success) {
+    const attempts = loginAttempts.get(ip) || { count: 0, lastAttempt: Date.now() };
+    
+    if (success) {
+        loginAttempts.delete(ip);
+    } else {
+        attempts.count++;
+        attempts.lastAttempt = Date.now();
+        loginAttempts.set(ip, attempts);
+        
+        // تنظيف المحاولات القديمة
+        setTimeout(() => {
+            loginAttempts.delete(ip);
+        }, LOCKOUT_TIME);
+    }
+}
 
 // المسارات
 app.post('/api/auth/register', async (req, res) => {
@@ -260,23 +270,6 @@ app.post('/api/auth/login', checkLoginAttempts, async (req, res) => {
     }
 });
 
-function updateLoginAttempts(ip, success) {
-    const attempts = loginAttempts.get(ip) || { count: 0, lastAttempt: Date.now() };
-    
-    if (success) {
-        loginAttempts.delete(ip);
-    } else {
-        attempts.count++;
-        attempts.lastAttempt = Date.now();
-        loginAttempts.set(ip, attempts);
-        
-        // تنظيف المحاولات القديمة
-        setTimeout(() => {
-            loginAttempts.delete(ip);
-        }, LOCKOUT_TIME);
-    }
-}
-
 // نظام الدردشة المتقدم
 app.post('/api/chat/send', authenticateToken, async (req, res) => {
     try {
@@ -389,20 +382,28 @@ app.get('/api/chat/conversations', authenticateToken, async (req, res) => {
             
             messages.forEach(msg => {
                 const otherUserId = msg.senderId === 'admin' ? msg.receiverId : msg.senderId;
-                if (!userConversations[otherUserId]) {
+                if (otherUserId !== 'admin' && !userConversations[otherUserId]) {
                     const user = users.find(u => u._id === otherUserId);
                     if (user) {
+                        const userMessages = messages.filter(m => 
+                            (m.senderId === 'admin' && m.receiverId === otherUserId) ||
+                            (m.senderId === otherUserId && m.receiverId === 'admin')
+                        );
+                        
+                        const lastMessage = userMessages[userMessages.length - 1];
+                        const unreadCount = userMessages.filter(m => 
+                            m.receiverId === 'admin' && 
+                            m.senderId === otherUserId && 
+                            !m.read
+                        ).length;
+
                         userConversations[otherUserId] = {
                             userId: user._id,
                             userName: user.fullName,
                             userPhone: user.phone,
-                            lastMessage: msg.text,
-                            lastMessageTime: msg.timestamp,
-                            unreadCount: messages.filter(m => 
-                                m.receiverId === 'admin' && 
-                                m.senderId === otherUserId && 
-                                !m.read
-                            ).length
+                            lastMessage: lastMessage?.text || 'لا توجد رسائل',
+                            lastMessageTime: lastMessage?.timestamp || new Date().toISOString(),
+                            unreadCount: unreadCount
                         };
                     }
                 }
@@ -423,13 +424,13 @@ app.get('/api/chat/conversations', authenticateToken, async (req, res) => {
 });
 
 // الحصول على رسائل محادثة محددة
-app.get('/api/chat/messages/:userId', authenticateToken, async (req, res) => {
+app.get('/api/chat/messages/:userId?', authenticateToken, async (req, res) => {
     try {
         const { userId } = req.params;
         const messages = readLocalFile('local-messages.json');
         
         let conversationMessages;
-        if (req.user.role === 'admin') {
+        if (req.user.role === 'admin' && userId) {
             conversationMessages = messages.filter(msg => 
                 (msg.senderId === 'admin' && msg.receiverId === userId) ||
                 (msg.senderId === userId && msg.receiverId === 'admin')
@@ -474,7 +475,9 @@ app.post('/api/admin/send-image', authenticateToken, requireAdmin, upload.single
         
         if (!receiver) {
             // حذف الصورة المرفوعة إذا فشل الإرسال
-            fs.unlinkSync(req.file.path);
+            if (fs.existsSync(req.file.path)) {
+                fs.unlinkSync(req.file.path);
+            }
             return res.status(404).json({ message: 'المستخدم غير موجود' });
         }
 
@@ -509,7 +512,7 @@ app.post('/api/admin/send-image', authenticateToken, requireAdmin, upload.single
     } catch (error) {
         console.error('خطأ إرسال الصورة:', error);
         // تنظيف الصورة المرفوعة في حالة الخطأ
-        if (req.file) {
+        if (req.file && fs.existsSync(req.file.path)) {
             fs.unlinkSync(req.file.path);
         }
         res.status(500).json({ message: 'خطأ في الخادم' });
@@ -558,7 +561,7 @@ app.post('/api/admin/broadcast-image', authenticateToken, requireAdmin, upload.s
         });
     } catch (error) {
         console.error('خطأ الإرسال الجماعي:', error);
-        if (req.file) {
+        if (req.file && fs.existsSync(req.file.path)) {
             fs.unlinkSync(req.file.path);
         }
         res.status(500).json({ message: 'خطأ في الخادم' });
@@ -681,7 +684,7 @@ app.get('/health', (req, res) => {
     });
 });
 
-// Middleware للوقاية من Helmet (بديل)
+// Middleware للأمان
 app.use((req, res, next) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('X-Frame-Options', 'DENY');
@@ -709,6 +712,7 @@ app.listen(PORT, '0.0.0.0', () => {
     console.log(`🌐 الرابط: http://localhost:${PORT}`);
     console.log(`⚡ النسخة: 2.0.0 - الاحترافية`);
     console.log(`🔒 نظام أمان متقدم مفعل`);
+    console.log(`💾 نظام التخزين: الملفات المحلية`);
     
     setTimeout(createAdminUser, 2000);
 });
