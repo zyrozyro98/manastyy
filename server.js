@@ -335,7 +335,194 @@ app.post('/api/auth/login', checkLoginAttempts, async (req, res) => {
         res.status(500).json({ message: 'خطأ في الخادم' });
     }
 });
+// تحميل المحادثات للمدير
+async function loadConversations() {
+    if (currentUser.role !== 'admin') return;
 
+    try {
+        const response = await fetch(`${API_BASE}/admin/conversations`, {
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+        });
+
+        if (response.ok) {
+            conversations = await response.json();
+            displayConversations();
+            updateConversationsBadge();
+        } else {
+            console.error('Failed to load conversations');
+        }
+    } catch (error) {
+        console.error('Error loading conversations:', error);
+        showAlert('chatPage', 'خطأ في تحميل المحادثات', 'error');
+    }
+}
+
+// عرض المحادثات
+function displayConversations() {
+    const container = document.getElementById('conversationsList');
+    if (!container) return;
+
+    container.innerHTML = '';
+
+    if (conversations.length === 0) {
+        container.innerHTML = `
+            <div class="alert alert-info" style="margin: 1rem;">
+                <i class="fas fa-info-circle"></i>
+                لا توجد محادثات بعد
+            </div>
+        `;
+        return;
+    }
+
+    conversations.forEach(conv => {
+        const convElement = document.createElement('div');
+        convElement.className = `conversation-item ${currentConversation === conv.userId ? 'active' : ''}`;
+        
+        // تقليم النص الطويل
+        const previewText = conv.lastMessage && conv.lastMessage.length > 30 
+            ? conv.lastMessage.substring(0, 30) + '...' 
+            : conv.lastMessage || 'لا توجد رسائل';
+
+        convElement.innerHTML = `
+            <div class="user-avatar">
+                ${conv.userName ? conv.userName.charAt(0) : '?'}
+            </div>
+            <div class="conversation-info">
+                <div class="conversation-name">${conv.userName || 'مستخدم غير معروف'}</div>
+                <div class="conversation-preview">${previewText}</div>
+                <div class="conversation-stats">
+                    <span class="stat-badge">${conv.lastActivity ? formatTime(conv.lastActivity) : 'لا نشاط'}</span>
+                    <span class="stat-badge">${conv.totalMessages || 0} رسالة</span>
+                </div>
+            </div>
+            ${conv.unreadCount > 0 ? `
+                <div class="unread-badge" title="${conv.unreadCount} رسالة جديدة">
+                    ${conv.unreadCount}
+                </div>
+            ` : ''}
+        `;
+        
+        convElement.addEventListener('click', () => {
+            selectConversation(conv.userId, conv.userName);
+        });
+        
+        container.appendChild(convElement);
+    });
+}
+
+// تحديد محادثة
+function selectConversation(userId, userName) {
+    currentConversation = userId;
+    document.getElementById('chatWithName').textContent = userName || 'مستخدم';
+    document.getElementById('currentUserId').value = userId;
+    
+    // إعادة تحميل الرسائل
+    loadMessages();
+    
+    // تحديث عرض المحادثات
+    displayConversations();
+    
+    // إغلاق قائمة المحادثات على الجوال
+    if (window.innerWidth <= 768) {
+        toggleMobileChat();
+    }
+}
+
+// تحديث بادج المحادثات في الشريط العلوي
+function updateConversationsBadge() {
+    const totalUnread = conversations.reduce((total, conv) => total + (conv.unreadCount || 0), 0);
+    const badgeElement = document.getElementById('conversationsBadge');
+    
+    if (badgeElement) {
+        if (totalUnread > 0) {
+            badgeElement.textContent = totalUnread;
+            badgeElement.style.display = 'flex';
+        } else {
+            badgeElement.style.display = 'none';
+        }
+    }
+}
+
+// تحميل الرسائل لمحادثة محددة
+async function loadMessages() {
+    if (!currentUser) return;
+
+    try {
+        let url;
+        if (currentUser.role === 'admin' && currentConversation) {
+            url = `${API_BASE}/chat/messages/${currentConversation}`;
+        } else {
+            url = `${API_BASE}/chat/messages`;
+        }
+
+        const response = await fetch(url, {
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+        });
+
+        if (response.ok) {
+            const messages = await response.json();
+            displayMessages(messages);
+            
+            // إذا كان مديراً وشاهد محادثة، إعادة تحميل قائمة المحادثات لتحديث العداد
+            if (currentUser.role === 'admin' && currentConversation) {
+                setTimeout(loadConversations, 1000);
+            }
+        }
+    } catch (error) {
+        console.error('Error loading messages:', error);
+    }
+}
+
+// إرسال رسالة جديدة
+async function sendMessage() {
+    const messageInput = document.getElementById('messageInput');
+    const text = messageInput.value.trim();
+    
+    if (!text) {
+        showAlert('chatPage', 'الرسالة لا يمكن أن تكون فارغة', 'error');
+        return;
+    }
+
+    try {
+        const receiverId = currentUser.role === 'admin' ? currentConversation : 'admin';
+        const response = await fetch(`${API_BASE}/chat/send`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+            },
+            body: JSON.stringify({ 
+                text,
+                receiverId: currentUser.role === 'admin' ? currentConversation : undefined
+            })
+        });
+
+        if (response.ok) {
+            messageInput.value = '';
+            loadMessages();
+            
+            // إعادة تحميل المحادثات لتحديث القائمة
+            if (currentUser.role === 'admin') {
+                setTimeout(loadConversations, 500);
+            }
+            
+            // إغلاق قائمة المحادثات على الجوال بعد الإرسال
+            if (window.innerWidth <= 768) {
+                toggleMobileChat();
+            }
+        } else {
+            const data = await response.json();
+            showAlert('chatPage', data.message, 'error');
+        }
+    } catch (error) {
+        console.error('Error sending message:', error);
+        showAlert('chatPage', 'خطأ في إرسال الرسالة', 'error');
+    }
+}
 // نظام الدردشة المتقدم
 app.post('/api/chat/send', authenticateToken, async (req, res) => {
     try {
@@ -1016,3 +1203,66 @@ app.listen(PORT, '0.0.0.0', () => {
     
     setTimeout(createAdminUser, 2000);
 });
+// تحديث تلقائي للمحادثات كل 10 ثواني
+function startConversationsAutoRefresh() {
+    if (currentUser && currentUser.role === 'admin') {
+        // تحديث كل 10 ثواني
+        setInterval(() => {
+            if (document.getElementById('chatPage').classList.contains('active') || 
+                document.getElementById('adminPage').classList.contains('active')) {
+                loadConversations();
+            }
+        }, 10000);
+    }
+}
+
+// تحديث عند تبديل الصفحات
+function showChat() {
+    if (!currentUser) {
+        showLogin();
+        return;
+    }
+
+    showPage('chatPage');
+    updateNavigation(true, currentUser.role === 'admin');
+    
+    const sidebar = document.getElementById('conversationsSidebar');
+    const mobileToggle = document.querySelector('.mobile-chat-toggle');
+    
+    if (currentUser.role === 'admin') {
+        sidebar.classList.remove('hidden');
+        if (window.innerWidth <= 768) {
+            mobileToggle.style.display = 'flex';
+        }
+        
+        // تحميل المحادثات فوراً
+        loadConversations();
+        addAdminChatControls();
+    } else {
+        sidebar.classList.add('hidden');
+        mobileToggle.style.display = 'none';
+        document.getElementById('chatWithName').textContent = 'مدير النظام';
+    }
+    
+    loadMessages();
+    
+    // بدء التحديث التلقائي
+    startConversationsAutoRefresh();
+}
+
+// تحديث عند فتح لوحة الإدارة
+function showAdminPanel() {
+    if (!currentUser || currentUser.role !== 'admin') {
+        showLogin();
+        return;
+    }
+
+    showPage('adminPage');
+    updateNavigation(true, true);
+    loadAdminStats();
+    loadUsersList();
+    
+    // تحميل المحادثات أيضاً في لوحة الإدارة
+    loadConversations();
+    startConversationsAutoRefresh();
+}
