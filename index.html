@@ -1,923 +1,1049 @@
-<script>
-    // التهيئة الأساسية
-    const API_BASE = window.location.origin + '/api';
-    let currentUser = null;
-    let currentConversation = null;
-    let uploadedFiles = [];
-    let conversations = [];
-    let users = [];
+:root {
+    --primary: #2c5aa0;
+    --primary-dark: #1e3d72;
+    --primary-light: #4a7bc8;
+    --secondary: #00b4d8;
+    --accent: #ff6b6b;
+    --success: #28a745;
+    --warning: #ffc107;
+    --danger: #dc3545;
+    --dark: #2d3748;
+    --light: #f8f9fa;
+    --gray: #6c757d;
+    --border: #e2e8f0;
+    --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
 
-    // تهيئة التطبيق
-    document.addEventListener('DOMContentLoaded', function() {
-        initializeApp();
-    });
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Segoe UI', 'Tahoma', 'Geneva', 'Verdana', sans-serif;
+}
 
-    function initializeApp() {
-        setupEventListeners();
-        checkAuthStatus();
-        setupAdminTabs();
-        setupFileUploads();
+body {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: var(--dark);
+    line-height: 1.6;
+    min-height: 100vh;
+    font-size: 14px;
+}
+
+.app-container {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Header Styles */
+.header {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    box-shadow: var(--shadow);
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+}
+
+.header-content {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.logo {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-shrink: 0;
+}
+
+.logo-icon {
+    width: 40px;
+    height: 40px;
+    background: linear-gradient(135deg, var(--primary), var(--secondary));
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 1.2rem;
+}
+
+.logo-text {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--primary);
+}
+
+.nav {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.nav-item {
+    color: var(--dark);
+    text-decoration: none;
+    font-weight: 500;
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+    white-space: nowrap;
+}
+
+.nav-item:hover {
+    background: var(--primary-light);
+    color: white;
+}
+
+.nav-item.hidden {
+    display: none;
+}
+
+.user-info {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.5rem 1rem;
+    background: var(--light);
+    border-radius: 8px;
+    font-weight: 500;
+    flex-wrap: wrap;
+}
+
+/* Main Content */
+.main-content {
+    flex: 1;
+    padding: 1rem;
+    max-width: 1400px;
+    margin: 0 auto;
+    width: 100%;
+}
+
+/* Page Styles */
+.page {
+    display: none;
+    animation: fadeIn 0.5s ease-in;
+    min-height: calc(100vh - 120px);
+}
+
+.page.active {
+    display: block;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Auth Pages */
+.auth-container {
+    max-width: 500px;
+    margin: 1rem auto;
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 20px;
+    box-shadow: var(--shadow-lg);
+    overflow: hidden;
+    backdrop-filter: blur(10px);
+}
+
+.auth-header {
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    color: white;
+    padding: 1.5rem;
+    text-align: center;
+}
+
+.auth-header h1 {
+    font-size: 1.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.auth-body {
+    padding: 1.5rem;
+}
+
+.form-group {
+    margin-bottom: 1.2rem;
+}
+
+.form-label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+    color: var(--dark);
+    font-size: 0.9rem;
+}
+
+.form-control {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border: 2px solid var(--border);
+    border-radius: 10px;
+    font-size: 0.9rem;
+    transition: all 0.3s ease;
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(44, 90, 160, 0.1);
+}
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 10px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, var(--primary), var(--primary-light));
+    color: white;
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+}
+
+.btn-block {
+    width: 100%;
+}
+
+.btn-success {
+    background: linear-gradient(135deg, var(--success), #20c997);
+    color: white;
+}
+
+.btn-danger {
+    background: linear-gradient(135deg, var(--danger), #e35d6a);
+    color: white;
+}
+
+.btn-outline {
+    background: transparent;
+    border: 2px solid var(--primary);
+    color: var(--primary);
+}
+
+.btn-sm {
+    padding: 0.5rem 1rem;
+    font-size: 0.8rem;
+}
+
+/* Dashboard */
+.dashboard {
+    padding: 1rem 0;
+}
+
+.welcome-section {
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 20px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    box-shadow: var(--shadow);
+    backdrop-filter: blur(10px);
+}
+
+.welcome-section h1 {
+    color: var(--primary);
+    margin-bottom: 0.5rem;
+    font-size: 1.5rem;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.stat-card {
+    background: rgba(255, 255, 255, 0.95);
+    padding: 1.2rem;
+    border-radius: 15px;
+    box-shadow: var(--shadow);
+    backdrop-filter: blur(10px);
+    text-align: center;
+    transition: transform 0.3s ease;
+}
+
+.stat-card:hover {
+    transform: translateY(-5px);
+}
+
+.stat-icon {
+    width: 50px;
+    height: 50px;
+    margin: 0 auto 0.8rem;
+    background: linear-gradient(135deg, var(--primary), var(--secondary));
+    border-radius: 15px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 1.2rem;
+}
+
+.stat-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--primary);
+    margin-bottom: 0.3rem;
+}
+
+.stat-label {
+    color: var(--gray);
+    font-weight: 500;
+    font-size: 0.8rem;
+}
+
+.features-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.2rem;
+}
+
+.feature-card {
+    background: rgba(255, 255, 255, 0.95);
+    padding: 1.5rem;
+    border-radius: 15px;
+    box-shadow: var(--shadow);
+    backdrop-filter: blur(10px);
+    text-align: center;
+    transition: all 0.3s ease;
+    border: 1px solid transparent;
+}
+
+.feature-card:hover {
+    transform: translateY(-5px);
+    border-color: var(--primary);
+    box-shadow: var(--shadow-lg);
+}
+
+.feature-icon {
+    width: 70px;
+    height: 70px;
+    margin: 0 auto 1.2rem;
+    background: linear-gradient(135deg, var(--primary), var(--secondary));
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 1.8rem;
+}
+
+.feature-card h3 {
+    color: var(--primary);
+    margin-bottom: 0.8rem;
+    font-size: 1.1rem;
+}
+
+/* Chat System */
+.chat-container {
+    display: grid;
+    grid-template-columns: 350px 1fr;
+    gap: 1rem;
+    height: 70vh;
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 20px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+    backdrop-filter: blur(10px);
+}
+
+.conversations-sidebar {
+    border-left: 1px solid var(--border);
+    background: var(--light);
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+}
+
+.conversations-header {
+    padding: 1.2rem;
+    background: var(--primary);
+    color: white;
+    flex-shrink: 0;
+}
+
+.conversations-header h3 {
+    font-size: 1.1rem;
+}
+
+.conversations-list {
+    flex: 1;
+    overflow-y: auto;
+}
+
+.conversation-item {
+    padding: 1rem;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    transition: background 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+}
+
+.conversation-item:hover {
+    background: rgba(44, 90, 160, 0.1);
+}
+
+.conversation-item.active {
+    background: rgba(44, 90, 160, 0.15);
+    border-right: 3px solid var(--primary);
+}
+
+.user-avatar {
+    width: 40px;
+    height: 40px;
+    background: linear-gradient(135deg, var(--primary), var(--secondary));
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: 600;
+    flex-shrink: 0;
+}
+
+.conversation-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.conversation-name {
+    font-weight: 600;
+    margin-bottom: 0.2rem;
+    font-size: 0.9rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.conversation-preview {
+    color: var(--gray);
+    font-size: 0.8rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.unread-badge {
+    background: var(--accent);
+    color: white;
+    border-radius: 10px;
+    padding: 0.2rem 0.5rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    flex-shrink: 0;
+}
+
+.chat-main {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.chat-header {
+    padding: 1.2rem;
+    background: var(--light);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    flex-shrink: 0;
+}
+
+.chat-header h3 {
+    font-size: 1.1rem;
+}
+
+.chat-messages {
+    flex: 1;
+    padding: 1.2rem;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+    min-height: 0;
+}
+
+.message {
+    max-width: 85%;
+    padding: 0.8rem 1rem;
+    border-radius: 18px;
+    position: relative;
+    animation: messageSlide 0.3s ease-out;
+    word-wrap: break-word;
+}
+
+@keyframes messageSlide {
+    from { opacity: 0; transform: translateX(20px); }
+    to { opacity: 1; transform: translateX(0); }
+}
+
+.message.sent {
+    align-self: flex-end;
+    background: linear-gradient(135deg, var(--primary), var(--primary-light));
+    color: white;
+    border-bottom-right-radius: 5px;
+}
+
+.message.received {
+    align-self: flex-start;
+    background: var(--light);
+    color: var(--dark);
+    border-bottom-left-radius: 5px;
+    border: 1px solid var(--border);
+}
+
+.message-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.3rem;
+}
+
+.message-sender {
+    font-weight: 600;
+    font-size: 0.8rem;
+}
+
+.message-time {
+    font-size: 0.7rem;
+    opacity: 0.7;
+}
+
+.message-broadcast {
+    background: linear-gradient(135deg, var(--warning), #ffd166);
+    color: var(--dark);
+    text-align: center;
+    max-width: 90%;
+    align-self: center;
+    font-size: 0.9rem;
+}
+
+.chat-input {
+    padding: 1.2rem;
+    border-top: 1px solid var(--border);
+    display: flex;
+    gap: 0.8rem;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.chat-input input {
+    flex: 1;
+    padding: 0.75rem 1rem;
+    border: 2px solid var(--border);
+    border-radius: 25px;
+    font-size: 0.9rem;
+    transition: border-color 0.3s ease;
+    min-width: 0;
+}
+
+.chat-input input:focus {
+    outline: none;
+    border-color: var(--primary);
+}
+
+/* Admin Panel */
+.admin-panel {
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 20px;
+    padding: 1.5rem;
+    box-shadow: var(--shadow);
+    backdrop-filter: blur(10px);
+}
+
+.admin-tabs {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+    border-bottom: 2px solid var(--border);
+    flex-wrap: wrap;
+}
+
+.admin-tab {
+    padding: 0.8rem 1.2rem;
+    background: none;
+    border: none;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--gray);
+    cursor: pointer;
+    border-bottom: 3px solid transparent;
+    transition: all 0.3s ease;
+    white-space: nowrap;
+}
+
+.admin-tab.active {
+    color: var(--primary);
+    border-bottom-color: var(--primary);
+}
+
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+    animation: fadeIn 0.5s ease;
+}
+
+.users-grid {
+    display: grid;
+    gap: 0.8rem;
+}
+
+.user-card {
+    background: var(--light);
+    padding: 1.2rem;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    transition: all 0.3s ease;
+    flex-wrap: wrap;
+}
+
+.user-card:hover {
+    transform: translateX(5px);
+    box-shadow: var(--shadow);
+}
+
+.user-card-info {
+    flex: 1;
+    min-width: 200px;
+}
+
+.user-card-name {
+    font-weight: 600;
+    margin-bottom: 0.2rem;
+    font-size: 0.9rem;
+}
+
+.user-card-details {
+    color: var(--gray);
+    font-size: 0.8rem;
+    line-height: 1.4;
+}
+
+.user-card-meta {
+    text-align: left;
+    font-size: 0.7rem;
+    color: var(--gray);
+}
+
+.broadcast-section {
+    background: var(--light);
+    padding: 1.5rem;
+    border-radius: 15px;
+    margin-bottom: 1.5rem;
+}
+
+.upload-area {
+    border: 3px dashed var(--border);
+    border-radius: 15px;
+    padding: 2rem 1.5rem;
+    text-align: center;
+    margin-bottom: 1.2rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.upload-area:hover {
+    border-color: var(--primary);
+    background: rgba(44, 90, 160, 0.05);
+}
+
+.upload-area.dragover {
+    border-color: var(--success);
+    background: rgba(40, 167, 69, 0.1);
+}
+
+.file-list {
+    max-height: 200px;
+    overflow-y: auto;
+    margin-bottom: 1.2rem;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0.5rem;
+}
+
+.file-item {
+    padding: 0.8rem;
+    background: var(--light);
+    border-radius: 8px;
+    margin-bottom: 0.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.8rem;
+}
+
+.folder-results {
+    margin-top: 1.5rem;
+}
+
+.results-summary {
+    background: var(--light);
+    padding: 1rem;
+    border-radius: 10px;
+    margin-bottom: 1rem;
+}
+
+.results-details {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.result-item {
+    padding: 0.8rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.8rem;
+}
+
+.result-item.success {
+    background: rgba(40, 167, 69, 0.1);
+    border-left: 3px solid var(--success);
+}
+
+.result-item.failed {
+    background: rgba(220, 53, 69, 0.1);
+    border-left: 3px solid var(--danger);
+}
+
+.progress-bar {
+    width: 100%;
+    height: 6px;
+    background: var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+    margin: 1rem 0;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(135deg, var(--primary), var(--secondary));
+    transition: width 0.3s ease;
+}
+
+/* Alerts */
+.alert {
+    padding: 0.8rem 1.2rem;
+    border-radius: 10px;
+    margin-bottom: 1rem;
+    font-weight: 500;
+    font-size: 0.9rem;
+}
+
+.alert-success {
+    background: rgba(40, 167, 69, 0.1);
+    color: var(--success);
+    border: 1px solid rgba(40, 167, 69, 0.2);
+}
+
+.alert-error {
+    background: rgba(220, 53, 69, 0.1);
+    color: var(--danger);
+    border: 1px solid rgba(220, 53, 69, 0.2);
+}
+
+.alert-info {
+    background: rgba(0, 180, 216, 0.1);
+    color: var(--secondary);
+    border: 1px solid rgba(0, 180, 216, 0.2);
+}
+
+.alert-warning {
+    background: rgba(255, 193, 7, 0.1);
+    color: #856404;
+    border: 1px solid rgba(255, 193, 7, 0.2);
+}
+
+/* Utility Classes */
+.hidden {
+    display: none !important;
+}
+
+.text-center {
+    text-align: center;
+}
+
+.mt-3 {
+    margin-top: 1rem;
+}
+
+.mb-3 {
+    margin-bottom: 1rem;
+}
+
+.loading {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.mobile-only {
+    display: none;
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+    .chat-container {
+        grid-template-columns: 300px 1fr;
+        height: 65vh;
     }
-
-    function setupEventListeners() {
-        // روابط التنقل
-        document.getElementById('homeLink').addEventListener('click', (e) => { e.preventDefault(); showHome(); });
-        document.getElementById('loginLink').addEventListener('click', (e) => { e.preventDefault(); showLogin(); });
-        document.getElementById('registerLink').addEventListener('click', (e) => { e.preventDefault(); showRegister(); });
-        document.getElementById('dashboardLink').addEventListener('click', (e) => { e.preventDefault(); showDashboard(); });
-        document.getElementById('chatLink').addEventListener('click', (e) => { e.preventDefault(); showChat(); });
-        document.getElementById('imagesLink').addEventListener('click', (e) => { e.preventDefault(); showImages(); });
-        document.getElementById('adminLink').addEventListener('click', (e) => { e.preventDefault(); showAdminPanel(); });
-        document.getElementById('logoutLink').addEventListener('click', (e) => { e.preventDefault(); logout(); });
-
-        // أزرار الصفحة الرئيسية
-        document.getElementById('homeLoginBtn').addEventListener('click', showLogin);
-        document.getElementById('homeRegisterBtn').addEventListener('click', showRegister);
-
-        // نماذج
-        document.getElementById('loginForm').addEventListener('submit', handleLogin);
-        document.getElementById('registerForm').addEventListener('submit', handleRegister);
-
-        // روابط التنقل بين النماذج
-        document.getElementById('toLogin').addEventListener('click', (e) => { e.preventDefault(); showLogin(); });
-        document.getElementById('toRegister').addEventListener('click', (e) => { e.preventDefault(); showRegister(); });
-
-        // أزرار لوحة التحكم
-        document.getElementById('goToChat').addEventListener('click', showChat);
-        document.getElementById('goToImages').addEventListener('click', showImages);
-
-        // نظام الدردشة
-        document.getElementById('sendMessage').addEventListener('click', sendMessage);
-        document.getElementById('messageInput').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') sendMessage();
-        });
-
-        // نظام الإدارة
-        document.getElementById('sendBroadcast').addEventListener('click', sendBroadcastMessage);
-        document.getElementById('sendSingleImage').addEventListener('click', sendSingleImage);
-        document.getElementById('sendBroadcastImage').addEventListener('click', sendBroadcastImage);
+    
+    .stats-grid {
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
     }
-
-    function setupAdminTabs() {
-        const tabs = document.querySelectorAll('.admin-tab');
-        tabs.forEach(tab => {
-            tab.addEventListener('click', () => {
-                // إزالة النشاط من جميع الألسنة
-                tabs.forEach(t => t.classList.remove('active'));
-                document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
-                
-                // إضافة النشاط للسان المحدد
-                tab.classList.add('active');
-                const tabId = tab.getAttribute('data-tab');
-                document.getElementById(tabId + 'Tab').classList.add('active');
-                
-                // تحميل البيانات حسب اللسان
-                switch(tabId) {
-                    case 'users':
-                        loadUsersList();
-                        break;
-                    case 'chat':
-                        loadConversations();
-                        break;
-                    case 'images':
-                        loadUsersForImages();
-                        break;
-                }
-            });
-        });
+    
+    .features-grid {
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
     }
+}
 
-    function setupFileUploads() {
-        // رفع الصور الفردية
-        const uploadArea = document.getElementById('uploadArea');
-        const imageInput = document.getElementById('imageInput');
-        
-        uploadArea.addEventListener('click', () => imageInput.click());
-        uploadArea.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            uploadArea.style.borderColor = 'var(--primary)';
-            uploadArea.style.background = 'rgba(44, 90, 160, 0.05)';
-        });
-        uploadArea.addEventListener('dragleave', () => {
-            uploadArea.style.borderColor = 'var(--border)';
-            uploadArea.style.background = '';
-        });
-        uploadArea.addEventListener('drop', (e) => {
-            e.preventDefault();
-            uploadArea.style.borderColor = 'var(--border)';
-            uploadArea.style.background = '';
-            handleFileUpload(e.dataTransfer.files, 'single');
-        });
-        
-        imageInput.addEventListener('change', (e) => {
-            handleFileUpload(e.target.files, 'single');
-        });
-
-        // رفع الصور الجماعية
-        const broadcastUploadArea = document.getElementById('broadcastUploadArea');
-        const broadcastImageInput = document.getElementById('broadcastImageInput');
-        
-        broadcastUploadArea.addEventListener('click', () => broadcastImageInput.click());
-        broadcastUploadArea.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            broadcastUploadArea.style.borderColor = 'var(--primary)';
-            broadcastUploadArea.style.background = 'rgba(44, 90, 160, 0.05)';
-        });
-        broadcastUploadArea.addEventListener('dragleave', () => {
-            broadcastUploadArea.style.borderColor = 'var(--border)';
-            broadcastUploadArea.style.background = '';
-        });
-        broadcastUploadArea.addEventListener('drop', (e) => {
-            e.preventDefault();
-            broadcastUploadArea.style.borderColor = 'var(--border)';
-            broadcastUploadArea.style.background = '';
-            handleFileUpload(e.dataTransfer.files, 'broadcast');
-        });
-        
-        broadcastImageInput.addEventListener('change', (e) => {
-            handleFileUpload(e.target.files, 'broadcast');
-        });
+@media (max-width: 768px) {
+    body {
+        font-size: 13px;
     }
-
-    function handleFileUpload(files, type) {
-        const imageFiles = Array.from(files).filter(file => file.type.startsWith('image/'));
-        
-        if (imageFiles.length === 0) {
-            showAlert(type === 'single' ? 'imagesTab' : 'broadcastTab', 'لم يتم اختيار أي صور صالحة', 'error');
-            return;
-        }
-
-        if (type === 'single') {
-            uploadedFiles = imageFiles;
-            updateFileList(imageFiles, 'fileList');
-            document.getElementById('sendSingleImage').disabled = false;
-            showAlert('imagesTab', `تم اختيار ${imageFiles.length} صورة`, 'success');
-        } else {
-            uploadedFiles = imageFiles;
-            document.getElementById('sendBroadcastImage').disabled = false;
-            showAlert('broadcastTab', `تم اختيار ${imageFiles.length} صورة للإرسال الجماعي`, 'success');
-        }
+    
+    .header-content {
+        flex-direction: column;
+        gap: 1rem;
+        text-align: center;
     }
-
-    function updateFileList(files, containerId) {
-        const container = document.getElementById(containerId);
-        container.innerHTML = '';
-        
-        files.forEach(file => {
-            const fileItem = document.createElement('div');
-            fileItem.className = 'file-item';
-            fileItem.innerHTML = `
-                <div>
-                    <i class="fas fa-image"></i>
-                    ${file.name}
-                </div>
-                <div>${(file.size / 1024 / 1024).toFixed(2)} MB</div>
-            `;
-            container.appendChild(fileItem);
-        });
+    
+    .nav {
+        gap: 0.5rem;
     }
-
-    // التحقق من حالة المصادقة
-    function checkAuthStatus() {
-        const token = localStorage.getItem('token');
-        const userData = localStorage.getItem('user');
-        
-        if (token && userData) {
-            try {
-                currentUser = JSON.parse(userData);
-                updateNavigation(true, currentUser.role === 'admin');
-                
-                if (currentUser.role === 'admin') {
-                    showAdminPanel();
-                } else {
-                    showDashboard();
-                }
-            } catch (error) {
-                console.error('Error parsing user data:', error);
-                logout();
-            }
-        } else {
-            showHome();
-        }
+    
+    .nav-item {
+        padding: 0.4rem 0.8rem;
+        font-size: 0.8rem;
     }
-
-    // معالجة تسجيل الدخول
-    async function handleLogin(e) {
-        e.preventDefault();
-        const phone = document.getElementById('loginPhone').value;
-        const password = document.getElementById('loginPassword').value;
-
-        if (!phone || !password) {
-            showAlert('loginAlert', 'جميع الحقول مطلوبة', 'error');
-            return;
-        }
-
-        const btn = e.target.querySelector('button[type="submit"]') || e.target;
-        btn.classList.add('loading');
-        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري الدخول...';
-
-        try {
-            const response = await fetch(`${API_BASE}/auth/login`, {
-                method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ phone, password })
-            });
-
-            const data = await response.json();
-
-            if (response.ok) {
-                localStorage.setItem('token', data.token);
-                localStorage.setItem('user', JSON.stringify(data.user));
-                currentUser = data.user;
-                
-                showAlert('loginAlert', 'تم تسجيل الدخول بنجاح', 'success');
-                setTimeout(() => {
-                    if (currentUser.role === 'admin') {
-                        showAdminPanel();
-                    } else {
-                        showDashboard();
-                    }
-                }, 1000);
-            } else {
-                showAlert('loginAlert', data.message, 'error');
-            }
-        } catch (error) {
-            console.error('Login error:', error);
-            showAlert('loginAlert', 'خطأ في الاتصال بالخادم', 'error');
-        } finally {
-            btn.classList.remove('loading');
-            btn.innerHTML = '<i class="fas fa-sign-in-alt"></i> دخول';
-        }
+    
+    .main-content {
+        padding: 0.5rem;
     }
-
-    // معالجة التسجيل
-    async function handleRegister(e) {
-        e.preventDefault();
-        const formData = {
-            fullName: document.getElementById('fullName').value,
-            phone: document.getElementById('phone').value,
-            university: document.getElementById('university').value,
-            major: document.getElementById('major').value,
-            batch: document.getElementById('batch').value,
-            password: document.getElementById('password').value
-        };
-
-        // التحقق من البيانات
-        if (!formData.fullName || !formData.phone || !formData.university || !formData.major || !formData.batch || !formData.password) {
-            showAlert('registerAlert', 'جميع الحقول مطلوبة', 'error');
-            return;
-        }
-
-        if (formData.password !== document.getElementById('confirmPassword').value) {
-            showAlert('registerAlert', 'كلمتا المرور غير متطابقتين', 'error');
-            return;
-        }
-
-        if (formData.password.length < 6) {
-            showAlert('registerAlert', 'كلمة المرور يجب أن تكون 6 أحرف على الأقل', 'error');
-            return;
-        }
-
-        const btn = e.target.querySelector('button[type="submit"]') || e.target;
-        btn.classList.add('loading');
-        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري إنشاء الحساب...';
-
-        try {
-            const response = await fetch(`${API_BASE}/auth/register`, {
-                method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(formData)
-            });
-
-            const data = await response.json();
-
-            if (response.ok) {
-                showAlert('registerAlert', 'تم إنشاء الحساب بنجاح', 'success');
-                setTimeout(() => showLogin(), 2000);
-            } else {
-                showAlert('registerAlert', data.message, 'error');
-            }
-        } catch (error) {
-            console.error('Register error:', error);
-            showAlert('registerAlert', 'خطأ في الاتصال بالخادم', 'error');
-        } finally {
-            btn.classList.remove('loading');
-            btn.innerHTML = '<i class="fas fa-user-plus"></i> إنشاء الحساب';
-        }
+    
+    .auth-container {
+        margin: 0.5rem auto;
     }
-
-    // إرسال رسالة
-    async function sendMessage() {
-        const messageInput = document.getElementById('messageInput');
-        const text = messageInput.value.trim();
-        
-        if (!text) {
-            showAlert('chatPage', 'الرسالة لا يمكن أن تكون فارغة', 'error');
-            return;
-        }
-
-        try {
-            const receiverId = currentUser.role === 'admin' ? currentConversation : 'admin';
-            const response = await fetch(`${API_BASE}/chat/send`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
-                },
-                body: JSON.stringify({ 
-                    text,
-                    receiverId: currentUser.role === 'admin' ? currentConversation : undefined
-                })
-            });
-
-            if (response.ok) {
-                messageInput.value = '';
-                loadMessages();
-            } else {
-                const data = await response.json();
-                showAlert('chatPage', data.message, 'error');
-            }
-        } catch (error) {
-            console.error('Error sending message:', error);
-            showAlert('chatPage', 'خطأ في إرسال الرسالة', 'error');
-        }
+    
+    .auth-header, .auth-body {
+        padding: 1rem;
     }
-
-    // إرسال رسالة جماعية
-    async function sendBroadcastMessage() {
-        const messageInput = document.getElementById('broadcastMessage');
-        const text = messageInput.value.trim();
-        
-        if (!text) {
-            showAlert('chatTab', 'الرسالة لا يمكن أن تكون فارغة', 'error');
-            return;
-        }
-
-        try {
-            const response = await fetch(`${API_BASE}/admin/send-message`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
-                },
-                body: JSON.stringify({ 
-                    text,
-                    isBroadcast: true
-                })
-            });
-
-            const data = await response.json();
-
-            if (response.ok) {
-                messageInput.value = '';
-                showAlert('chatTab', 'تم الإرسال الجماعي بنجاح', 'success');
-            } else {
-                showAlert('chatTab', data.message, 'error');
-            }
-        } catch (error) {
-            console.error('Error sending broadcast:', error);
-            showAlert('chatTab', 'خطأ في الإرسال الجماعي', 'error');
-        }
+    
+    .chat-container {
+        grid-template-columns: 1fr;
+        height: 75vh;
     }
-
-    // إرسال صورة فردية
-    async function sendSingleImage() {
-        if (uploadedFiles.length === 0) {
-            showAlert('imagesTab', 'لم يتم اختيار أي صورة', 'error');
-            return;
-        }
-
-        const receiverId = document.getElementById('imageReceiver').value;
-        if (!receiverId) {
-            showAlert('imagesTab', 'يجب اختيار مستلم للصورة', 'error');
-            return;
-        }
-
-        const description = document.getElementById('imageDescription').value;
-
-        try {
-            const formData = new FormData();
-            formData.append('image', uploadedFiles[0]);
-            formData.append('receiverId', receiverId);
-            formData.append('description', description);
-
-            const response = await fetch(`${API_BASE}/admin/send-image`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
-                },
-                body: formData
-            });
-
-            const data = await response.json();
-
-            if (response.ok) {
-                showAlert('imagesTab', 'تم إرسال الصورة بنجاح', 'success');
-                uploadedFiles = [];
-                document.getElementById('fileList').innerHTML = '';
-                document.getElementById('sendSingleImage').disabled = true;
-                document.getElementById('imageDescription').value = '';
-            } else {
-                showAlert('imagesTab', data.message, 'error');
-            }
-        } catch (error) {
-            console.error('Error sending image:', error);
-            showAlert('imagesTab', 'خطأ في إرسال الصورة', 'error');
-        }
+    
+    .conversations-sidebar {
+        display: none;
     }
-
-    // إرسال صورة جماعية
-    async function sendBroadcastImage() {
-        if (uploadedFiles.length === 0) {
-            showAlert('broadcastTab', 'لم يتم اختيار أي صورة', 'error');
-            return;
-        }
-
-        const description = document.getElementById('broadcastImageDescription').value;
-
-        try {
-            const formData = new FormData();
-            formData.append('image', uploadedFiles[0]);
-            formData.append('description', description);
-
-            const response = await fetch(`${API_BASE}/admin/broadcast-image`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
-                },
-                body: formData
-            });
-
-            const data = await response.json();
-
-            if (response.ok) {
-                showAlert('broadcastTab', `تم إرسال الصورة إلى ${data.successCount} مستخدم`, 'success');
-                uploadedFiles = [];
-                document.getElementById('sendBroadcastImage').disabled = true;
-                document.getElementById('broadcastImageDescription').value = '';
-            } else {
-                showAlert('broadcastTab', data.message, 'error');
-            }
-        } catch (error) {
-            console.error('Error sending broadcast image:', error);
-            showAlert('broadcastTab', 'خطأ في الإرسال الجماعي', 'error');
-        }
+    
+    .conversations-sidebar.mobile-open {
+        display: flex;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 1001;
+        background: white;
     }
-
-    // تحميل المحادثات
-    async function loadConversations() {
-        if (currentUser.role !== 'admin') return;
-
-        try {
-            const response = await fetch(`${API_BASE}/chat/conversations`, {
-                headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
-                }
-            });
-
-            if (response.ok) {
-                conversations = await response.json();
-                displayConversations();
-            }
-        } catch (error) {
-            console.error('Error loading conversations:', error);
-        }
+    
+    .mobile-chat-toggle {
+        display: flex !important;
     }
-
-    function displayConversations() {
-        const container = document.getElementById('conversationsList');
-        container.innerHTML = '';
-
-        conversations.forEach(conv => {
-            const convElement = document.createElement('div');
-            convElement.className = `conversation-item ${currentConversation === conv.userId ? 'active' : ''}`;
-            convElement.innerHTML = `
-                <div class="user-avatar">
-                    ${conv.userName.charAt(0)}
-                </div>
-                <div class="conversation-info">
-                    <div class="conversation-name">${conv.userName}</div>
-                    <div class="conversation-preview">${conv.lastMessage}</div>
-                </div>
-                ${conv.unreadCount > 0 ? `<div class="unread-badge">${conv.unreadCount}</div>` : ''}
-            `;
-            
-            convElement.addEventListener('click', () => {
-                currentConversation = conv.userId;
-                document.getElementById('chatWithName').textContent = conv.userName;
-                loadMessages();
-                displayConversations(); // إعادة التحميل لتحديث النشاط
-            });
-            
-            container.appendChild(convElement);
-        });
+    
+    .message {
+        max-width: 90%;
     }
-
-    // تحميل الرسائل
-    async function loadMessages() {
-        try {
-            const url = currentUser.role === 'admin' && currentConversation 
-                ? `${API_BASE}/chat/messages/${currentConversation}`
-                : `${API_BASE}/chat/messages`;
-
-            const response = await fetch(url, {
-                headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
-                }
-            });
-
-            if (response.ok) {
-                const messages = await response.json();
-                displayMessages(messages);
-            }
-        } catch (error) {
-            console.error('Error loading messages:', error);
-        }
+    
+    .stats-grid {
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 0.8rem;
     }
-
-    function displayMessages(messages) {
-        const container = document.getElementById('chatMessages');
-        container.innerHTML = '';
-
-        messages.forEach(msg => {
-            const messageDiv = document.createElement('div');
-            const isSent = msg.senderId === currentUser._id;
-            const isBroadcast = msg.isBroadcast;
-            
-            messageDiv.classList.add('message');
-            messageDiv.classList.add(isSent ? 'sent' : 'received');
-            if (isBroadcast) messageDiv.classList.add('message-broadcast');
-            
-            messageDiv.innerHTML = `
-                <div class="message-header">
-                    <span class="message-sender">${msg.senderName}</span>
-                    <span class="message-time">${formatTime(msg.timestamp)}</span>
-                </div>
-                <div>${msg.text}</div>
-            `;
-            
-            container.appendChild(messageDiv);
-        });
-
-        container.scrollTop = container.scrollHeight;
+    
+    .stat-card {
+        padding: 1rem;
     }
-
-    // تحميل المستخدمين
-    async function loadUsersList() {
-        try {
-            const response = await fetch(`${API_BASE}/admin/users`, {
-                headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
-                }
-            });
-
-            if (response.ok) {
-                users = await response.json();
-                displayUsers();
-            }
-        } catch (error) {
-            console.error('Error loading users:', error);
-        }
+    
+    .stat-icon {
+        width: 40px;
+        height: 40px;
+        font-size: 1rem;
     }
-
-    function displayUsers() {
-        const container = document.getElementById('usersList');
-        container.innerHTML = '';
-
-        users.forEach(user => {
-            const userElement = document.createElement('div');
-            userElement.className = 'user-card';
-            userElement.innerHTML = `
-                <div class="user-avatar">
-                    ${user.fullName.charAt(0)}
-                </div>
-                <div style="flex: 1;">
-                    <div style="font-weight: 600;">${user.fullName}</div>
-                    <div style="color: var(--gray); font-size: 0.9rem;">
-                        ${user.phone} • ${user.university}
-                    </div>
-                    <div style="color: var(--gray); font-size: 0.8rem;">
-                        ${user.major} - دفعة ${user.batch}
-                    </div>
-                </div>
-                <div style="text-align: left;">
-                    <div style="font-size: 0.8rem; color: var(--gray);">
-                        ${user.lastLogin ? `آخر دخول: ${formatDate(user.lastLogin)}` : 'لم يسجل دخول بعد'}
-                    </div>
-                </div>
-            `;
-            container.appendChild(userElement);
-        });
+    
+    .stat-value {
+        font-size: 1.2rem;
     }
-
-    // تحميل المستخدمين للصور
-    async function loadUsersForImages() {
-        try {
-            const response = await fetch(`${API_BASE}/admin/users`, {
-                headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
-                }
-            });
-
-            if (response.ok) {
-                const users = await response.json();
-                const select = document.getElementById('imageReceiver');
-                select.innerHTML = '<option value="">اختر مستخدم</option>';
-                
-                users.forEach(user => {
-                    const option = document.createElement('option');
-                    option.value = user._id;
-                    option.textContent = `${user.fullName} - ${user.phone}`;
-                    select.appendChild(option);
-                });
-            }
-        } catch (error) {
-            console.error('Error loading users for images:', error);
-        }
+    
+    .features-grid {
+        grid-template-columns: 1fr;
+        gap: 1rem;
     }
-
-    // تحميل الصور
-    async function loadImages() {
-        try {
-            const response = await fetch(`${API_BASE}/images`, {
-                headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
-                }
-            });
-
-            if (response.ok) {
-                const images = await response.json();
-                displayImages(images);
-            }
-        } catch (error) {
-            console.error('Error loading images:', error);
-        }
+    
+    .feature-card {
+        padding: 1.2rem;
     }
-
-    function displayImages(images) {
-        const container = document.getElementById('imagesContainer');
-        
-        if (images.length === 0) {
-            container.innerHTML = `
-                <div class="alert alert-info">
-                    <i class="fas fa-info-circle"></i>
-                    لا توجد صور مرسلة لك حتى الآن
-                </div>
-            `;
-            return;
-        }
-
-        container.innerHTML = '';
-        images.forEach(img => {
-            const imageCard = document.createElement('div');
-            imageCard.className = 'feature-card';
-            imageCard.innerHTML = `
-                <div class="feature-icon">
-                    <i class="fas fa-image"></i>
-                </div>
-                <img src="${img.url}" alt="${img.description}" 
-                     style="width: 100%; height: 200px; object-fit: cover; border-radius: 10px; margin-bottom: 1rem;"
-                     onerror="this.src='https://via.placeholder.com/300x200/667eea/ffffff?text=صورة+غير+متوفرة'">
-                <h3>${img.description || 'صورة مرسلة'}</h3>
-                <p style="color: var(--gray); font-size: 0.9rem;">
-                    <i class="fas fa-calendar"></i> ${formatDate(img.sentAt)}
-                    ${img.fileSize ? ` • ${(img.fileSize / 1024 / 1024).toFixed(2)} MB` : ''}
-                </p>
-            `;
-            container.appendChild(imageCard);
-        });
+    
+    .feature-icon {
+        width: 60px;
+        height: 60px;
+        font-size: 1.5rem;
     }
-
-    // تحميل إحصائيات المدير
-    async function loadAdminStats() {
-        try {
-            const response = await fetch(`${API_BASE}/admin/stats`, {
-                headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
-                }
-            });
-
-            if (response.ok) {
-                const stats = await response.json();
-                displayAdminStats(stats);
-            }
-        } catch (error) {
-            console.error('Error loading admin stats:', error);
-        }
+    
+    .admin-tabs {
+        gap: 0.3rem;
     }
-
-    function displayAdminStats(stats) {
-        const container = document.getElementById('adminStats');
-        container.innerHTML = `
-            <div class="stat-card">
-                <div class="stat-icon">
-                    <i class="fas fa-users"></i>
-                </div>
-                <div class="stat-value">${stats.totalUsers}</div>
-                <div class="stat-label">إجمالي المستخدمين</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon">
-                    <i class="fas fa-user-check"></i>
-                </div>
-                <div class="stat-value">${stats.activeUsers}</div>
-                <div class="stat-label">مستخدمين نشطين</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon">
-                    <i class="fas fa-comments"></i>
-                </div>
-                <div class="stat-value">${stats.totalMessages}</div>
-                <div class="stat-label">رسائل</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon">
-                    <i class="fas fa-envelope"></i>
-                </div>
-                <div class="stat-value">${stats.unreadMessages}</div>
-                <div class="stat-label">رسائل غير مقروءة</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon">
-                    <i class="fas fa-images"></i>
-                </div>
-                <div class="stat-value">${stats.totalImages}</div>
-                <div class="stat-label">صورة مرسلة</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon">
-                    <i class="fas fa-hdd"></i>
-                </div>
-                <div class="stat-value">${(stats.storageUsed / 1024 / 1024).toFixed(1)}</div>
-                <div class="stat-label">ميجابايت مستخدمة</div>
-            </div>
-        `;
+    
+    .admin-tab {
+        padding: 0.6rem 0.8rem;
+        font-size: 0.8rem;
     }
-
-    // دوال مساعدة
-    function formatTime(timestamp) {
-        return new Date(timestamp).toLocaleTimeString('ar-SA', { 
-            hour: '2-digit', 
-            minute: '2-digit' 
-        });
+    
+    .user-card {
+        flex-direction: column;
+        text-align: center;
+        gap: 0.5rem;
     }
-
-    function formatDate(timestamp) {
-        return new Date(timestamp).toLocaleDateString('ar-SA');
+    
+    .user-card-info {
+        min-width: auto;
     }
-
-    function showAlert(containerId, message, type) {
-        let container;
-        if (typeof containerId === 'string') {
-            container = document.getElementById(containerId);
-        } else {
-            container = containerId;
-        }
-        
-        const alertDiv = document.createElement('div');
-        alertDiv.className = `alert alert-${type}`;
-        alertDiv.innerHTML = `<i class="fas fa-${getAlertIcon(type)}"></i> ${message}`;
-        
-        // إزالة أي تنبيهات سابقة
-        const existingAlerts = container.querySelectorAll('.alert');
-        existingAlerts.forEach(alert => alert.remove());
-        
-        container.insertBefore(alertDiv, container.firstChild);
-        
-        // إزالة التنبيه تلقائياً بعد 5 ثواني
-        setTimeout(() => {
-            alertDiv.remove();
-        }, 5000);
+    
+    .mobile-only {
+        display: block;
     }
-
-    function getAlertIcon(type) {
-        const icons = {
-            success: 'check-circle',
-            error: 'exclamation-circle',
-            info: 'info-circle',
-            warning: 'exclamation-triangle'
-        };
-        return icons[type] || 'info-circle';
+    
+    .desktop-only {
+        display: none;
     }
+}
 
-    function updateNavigation(isLoggedIn, isAdmin = false) {
-        document.getElementById('homeLink').classList.remove('hidden');
-        document.getElementById('loginLink').classList.toggle('hidden', isLoggedIn);
-        document.getElementById('registerLink').classList.toggle('hidden', isLoggedIn);
-        document.getElementById('dashboardLink').classList.toggle('hidden', !isLoggedIn || isAdmin);
-        document.getElementById('chatLink').classList.toggle('hidden', !isLoggedIn || isAdmin);
-        document.getElementById('imagesLink').classList.toggle('hidden', !isLoggedIn || isAdmin);
-        document.getElementById('adminLink').classList.toggle('hidden', !isAdmin);
-        document.getElementById('userInfo').classList.toggle('hidden', !isLoggedIn);
-        
-        if (isLoggedIn && currentUser) {
-            document.getElementById('userName').textContent = currentUser.fullName;
-        }
+@media (max-width: 480px) {
+    body {
+        font-size: 12px;
     }
-
-    // دوال عرض الصفحات
-    function showPage(pageId) {
-        document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
-        document.getElementById(pageId).classList.add('active');
+    
+    .logo-text {
+        font-size: 1.1rem;
     }
-
-    function showHome() { 
-        showPage('homePage'); 
-        updateNavigation(false); 
+    
+    .nav {
+        justify-content: space-around;
+        width: 100%;
     }
-
-    function showLogin() { 
-        showPage('loginPage'); 
-        updateNavigation(false); 
+    
+    .nav-item {
+        flex: 1;
+        justify-content: center;
+        padding: 0.4rem;
     }
-
-    function showRegister() { 
-        showPage('registerPage'); 
-        updateNavigation(false); 
+    
+    .user-info {
+        flex-direction: column;
+        gap: 0.5rem;
+        width: 100%;
+        text-align: center;
     }
-
-    function showDashboard() {
-        if (!currentUser) {
-            showLogin();
-            return;
-        }
-
-        showPage('dashboardPage');
-        updateNavigation(true);
-        
-        // تحديث بيانات المستخدم
-        document.getElementById('dashboardUserName').textContent = currentUser.fullName;
-        document.getElementById('userUniversity').textContent = currentUser.university;
-        document.getElementById('userMajor').textContent = currentUser.major;
-        document.getElementById('userBatch').textContent = currentUser.batch;
+    
+    .auth-header h1 {
+        font-size: 1.3rem;
     }
-
-    function showChat() {
-        if (!currentUser) {
-            showLogin();
-            return;
-        }
-
-        showPage('chatPage');
-        updateNavigation(true, currentUser.role === 'admin');
-        
-        // إظهار/إخفاء قائمة المحادثات للمدير
-        const sidebar = document.getElementById('conversationsSidebar');
-        if (currentUser.role === 'admin') {
-            sidebar.classList.remove('hidden');
-            loadConversations();
-        } else {
-            sidebar.classList.add('hidden');
-            document.getElementById('chatWithName').textContent = 'مدير النظام';
-        }
-        
-        loadMessages();
-        
-        // تحديث الرسائل كل 5 ثواني
-        if (window.chatInterval) clearInterval(window.chatInterval);
-        window.chatInterval = setInterval(loadMessages, 5000);
+    
+    .welcome-section h1 {
+        font-size: 1.3rem;
     }
-
-    function showImages() {
-        if (!currentUser) {
-            showLogin();
-            return;
-        }
-
-        showPage('imagesPage');
-        updateNavigation(true, currentUser.role === 'admin');
-        loadImages();
+    
+    .stats-grid {
+        grid-template-columns: 1fr 1fr;
     }
-
-    function showAdminPanel() {
-        if (!currentUser || currentUser.role !== 'admin') {
-            showLogin();
-            return;
-        }
-
-        showPage('adminPage');
-        updateNavigation(true, true);
-        loadAdminStats();
-        loadUsersList();
+    
+    .chat-input {
+        flex-direction: column;
+        gap: 0.5rem;
     }
-
-    function logout() {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        currentUser = null;
-        
-        if (window.chatInterval) {
-            clearInterval(window.chatInterval);
-        }
-        
-        showHome();
-        showAlert('homePage', 'تم تسجيل الخروج بنجاح', 'success');
+    
+    .chat-input input {
+        width: 100%;
     }
+    
+    .admin-tabs {
+        flex-direction: column;
+    }
+    
+    .admin-tab {
+        text-align: center;
+    }
+}
 
-    // جعل الدوال متاحة globally للاستخدام في onerror
-    window.formatDate = formatDate;
-</script>
+@media (max-width: 360px) {
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .feature-card {
+        padding: 1rem;
+    }
+    
+    .btn {
+        padding: 0.6rem 1rem;
+        font-size: 0.8rem;
+    }
+}
+
+/* Print Styles */
+@media print {
+    .header, .chat-input, .admin-tabs, .btn {
+        display: none !important;
+    }
+    
+    .page {
+        display: block !important;
+    }
+    
+    body {
+        background: white !important;
+        color: black !important;
+    }
+    
+    .auth-container, .admin-panel, .chat-container {
+        box-shadow: none !important;
+        background: white !important;
+    }
+}
