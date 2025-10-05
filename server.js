@@ -210,7 +210,73 @@ app.post('/api/auth/register', async (req, res) => {
         res.status(500).json({ message: 'خطأ في الخادم' });
     }
 });
+// مسار محسن للحصول على المحادثات مع الرسائل الجديدة
+app.get('/api/admin/conversations', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const messages = readLocalFile('local-messages.json');
+        const users = readLocalFile('local-users.json');
+        
+        const userConversations = {};
+        
+        // تجميع جميع الرسائل مع المستخدمين
+        messages.forEach(msg => {
+            const otherUserId = msg.senderId === 'admin' ? msg.receiverId : msg.senderId;
+            
+            // تجاهل الرسائل الذاتية والمجموعات
+            if (otherUserId !== 'admin' && otherUserId !== 'broadcast') {
+                if (!userConversations[otherUserId]) {
+                    const user = users.find(u => u._id === otherUserId);
+                    if (user) {
+                        userConversations[otherUserId] = {
+                            userId: user._id,
+                            userName: user.fullName,
+                            userPhone: user.phone,
+                            userUniversity: user.university,
+                            userMajor: user.major,
+                            lastMessage: '',
+                            lastMessageTime: null,
+                            unreadCount: 0,
+                            totalMessages: 0,
+                            lastActivity: null
+                        };
+                    }
+                }
+                
+                if (userConversations[otherUserId]) {
+                    // تحديث آخر رسالة
+                    if (!userConversations[otherUserId].lastMessageTime || 
+                        new Date(msg.timestamp) > new Date(userConversations[otherUserId].lastMessageTime)) {
+                        userConversations[otherUserId].lastMessage = msg.text;
+                        userConversations[otherUserId].lastMessageTime = msg.timestamp;
+                    }
+                    
+                    // حساب الرسائل غير المقروءة
+                    if (msg.receiverId === 'admin' && !msg.read) {
+                        userConversations[otherUserId].unreadCount++;
+                    }
+                    
+                    // حساب إجمالي الرسائل
+                    userConversations[otherUserId].totalMessages++;
+                    
+                    // تحديث آخر نشاط
+                    if (!userConversations[otherUserId].lastActivity || 
+                        new Date(msg.timestamp) > new Date(userConversations[otherUserId].lastActivity)) {
+                        userConversations[otherUserId].lastActivity = msg.timestamp;
+                    }
+                }
+            }
+        });
 
+        // تحويل إلى مصفوفة وترتيب حسب آخر نشاط
+        const conversations = Object.values(userConversations)
+            .sort((a, b) => new Date(b.lastActivity) - new Date(a.lastActivity));
+
+        res.json(conversations);
+    } catch (error) {
+        console.error('خطأ جلب المحادثات:', error);
+        res.status(500).json({ message: 'خطأ في الخادم' });
+    }
+});
 app.post('/api/auth/login', checkLoginAttempts, async (req, res) => {
     try {
         const { phone, password } = req.body;
