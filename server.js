@@ -153,6 +153,8 @@ function updateLoginAttempts(ip, success) {
 }
 
 // المسارات
+
+// تسجيل مستخدم جديد
 app.post('/api/auth/register', async (req, res) => {
     try {
         const { fullName, phone, university, major, batch, password } = req.body;
@@ -169,7 +171,7 @@ app.post('/api/auth/register', async (req, res) => {
         const saudiPhoneRegex = /^5\d{8}$/;
         if (!saudiPhoneRegex.test(phone)) {
             return res.status(400).json({ 
-                message: 'رقم الهاتف غير صحيح' 
+                message: 'رقم الهاتف غير صحيح. يجب أن يبدأ بـ 5 ويتكون من 9 أرقام' 
             });
         }
 
@@ -210,73 +212,8 @@ app.post('/api/auth/register', async (req, res) => {
         res.status(500).json({ message: 'خطأ في الخادم' });
     }
 });
-// مسار محسن للحصول على المحادثات مع الرسائل الجديدة
-app.get('/api/admin/conversations', authenticateToken, requireAdmin, async (req, res) => {
-    try {
-        const messages = readLocalFile('local-messages.json');
-        const users = readLocalFile('local-users.json');
-        
-        const userConversations = {};
-        
-        // تجميع جميع الرسائل مع المستخدمين
-        messages.forEach(msg => {
-            const otherUserId = msg.senderId === 'admin' ? msg.receiverId : msg.senderId;
-            
-            // تجاهل الرسائل الذاتية والمجموعات
-            if (otherUserId !== 'admin' && otherUserId !== 'broadcast') {
-                if (!userConversations[otherUserId]) {
-                    const user = users.find(u => u._id === otherUserId);
-                    if (user) {
-                        userConversations[otherUserId] = {
-                            userId: user._id,
-                            userName: user.fullName,
-                            userPhone: user.phone,
-                            userUniversity: user.university,
-                            userMajor: user.major,
-                            lastMessage: '',
-                            lastMessageTime: null,
-                            unreadCount: 0,
-                            totalMessages: 0,
-                            lastActivity: null
-                        };
-                    }
-                }
-                
-                if (userConversations[otherUserId]) {
-                    // تحديث آخر رسالة
-                    if (!userConversations[otherUserId].lastMessageTime || 
-                        new Date(msg.timestamp) > new Date(userConversations[otherUserId].lastMessageTime)) {
-                        userConversations[otherUserId].lastMessage = msg.text;
-                        userConversations[otherUserId].lastMessageTime = msg.timestamp;
-                    }
-                    
-                    // حساب الرسائل غير المقروءة
-                    if (msg.receiverId === 'admin' && !msg.read) {
-                        userConversations[otherUserId].unreadCount++;
-                    }
-                    
-                    // حساب إجمالي الرسائل
-                    userConversations[otherUserId].totalMessages++;
-                    
-                    // تحديث آخر نشاط
-                    if (!userConversations[otherUserId].lastActivity || 
-                        new Date(msg.timestamp) > new Date(userConversations[otherUserId].lastActivity)) {
-                        userConversations[otherUserId].lastActivity = msg.timestamp;
-                    }
-                }
-            }
-        });
 
-        // تحويل إلى مصفوفة وترتيب حسب آخر نشاط
-        const conversations = Object.values(userConversations)
-            .sort((a, b) => new Date(b.lastActivity) - new Date(a.lastActivity));
-
-        res.json(conversations);
-    } catch (error) {
-        console.error('خطأ جلب المحادثات:', error);
-        res.status(500).json({ message: 'خطأ في الخادم' });
-    }
-});
+// تسجيل الدخول
 app.post('/api/auth/login', checkLoginAttempts, async (req, res) => {
     try {
         const { phone, password } = req.body;
@@ -335,195 +272,8 @@ app.post('/api/auth/login', checkLoginAttempts, async (req, res) => {
         res.status(500).json({ message: 'خطأ في الخادم' });
     }
 });
-// تحميل المحادثات للمدير
-async function loadConversations() {
-    if (currentUser.role !== 'admin') return;
 
-    try {
-        const response = await fetch(`${API_BASE}/admin/conversations`, {
-            headers: {
-                'Authorization': `Bearer ${localStorage.getItem('token')}`
-            }
-        });
-
-        if (response.ok) {
-            conversations = await response.json();
-            displayConversations();
-            updateConversationsBadge();
-        } else {
-            console.error('Failed to load conversations');
-        }
-    } catch (error) {
-        console.error('Error loading conversations:', error);
-        showAlert('chatPage', 'خطأ في تحميل المحادثات', 'error');
-    }
-}
-
-// عرض المحادثات
-function displayConversations() {
-    const container = document.getElementById('conversationsList');
-    if (!container) return;
-
-    container.innerHTML = '';
-
-    if (conversations.length === 0) {
-        container.innerHTML = `
-            <div class="alert alert-info" style="margin: 1rem;">
-                <i class="fas fa-info-circle"></i>
-                لا توجد محادثات بعد
-            </div>
-        `;
-        return;
-    }
-
-    conversations.forEach(conv => {
-        const convElement = document.createElement('div');
-        convElement.className = `conversation-item ${currentConversation === conv.userId ? 'active' : ''}`;
-        
-        // تقليم النص الطويل
-        const previewText = conv.lastMessage && conv.lastMessage.length > 30 
-            ? conv.lastMessage.substring(0, 30) + '...' 
-            : conv.lastMessage || 'لا توجد رسائل';
-
-        convElement.innerHTML = `
-            <div class="user-avatar">
-                ${conv.userName ? conv.userName.charAt(0) : '?'}
-            </div>
-            <div class="conversation-info">
-                <div class="conversation-name">${conv.userName || 'مستخدم غير معروف'}</div>
-                <div class="conversation-preview">${previewText}</div>
-                <div class="conversation-stats">
-                    <span class="stat-badge">${conv.lastActivity ? formatTime(conv.lastActivity) : 'لا نشاط'}</span>
-                    <span class="stat-badge">${conv.totalMessages || 0} رسالة</span>
-                </div>
-            </div>
-            ${conv.unreadCount > 0 ? `
-                <div class="unread-badge" title="${conv.unreadCount} رسالة جديدة">
-                    ${conv.unreadCount}
-                </div>
-            ` : ''}
-        `;
-        
-        convElement.addEventListener('click', () => {
-            selectConversation(conv.userId, conv.userName);
-        });
-        
-        container.appendChild(convElement);
-    });
-}
-
-// تحديد محادثة
-function selectConversation(userId, userName) {
-    currentConversation = userId;
-    document.getElementById('chatWithName').textContent = userName || 'مستخدم';
-    document.getElementById('currentUserId').value = userId;
-    
-    // إعادة تحميل الرسائل
-    loadMessages();
-    
-    // تحديث عرض المحادثات
-    displayConversations();
-    
-    // إغلاق قائمة المحادثات على الجوال
-    if (window.innerWidth <= 768) {
-        toggleMobileChat();
-    }
-}
-
-// تحديث بادج المحادثات في الشريط العلوي
-function updateConversationsBadge() {
-    const totalUnread = conversations.reduce((total, conv) => total + (conv.unreadCount || 0), 0);
-    const badgeElement = document.getElementById('conversationsBadge');
-    
-    if (badgeElement) {
-        if (totalUnread > 0) {
-            badgeElement.textContent = totalUnread;
-            badgeElement.style.display = 'flex';
-        } else {
-            badgeElement.style.display = 'none';
-        }
-    }
-}
-
-// تحميل الرسائل لمحادثة محددة
-async function loadMessages() {
-    if (!currentUser) return;
-
-    try {
-        let url;
-        if (currentUser.role === 'admin' && currentConversation) {
-            url = `${API_BASE}/chat/messages/${currentConversation}`;
-        } else {
-            url = `${API_BASE}/chat/messages`;
-        }
-
-        const response = await fetch(url, {
-            headers: {
-                'Authorization': `Bearer ${localStorage.getItem('token')}`
-            }
-        });
-
-        if (response.ok) {
-            const messages = await response.json();
-            displayMessages(messages);
-            
-            // إذا كان مديراً وشاهد محادثة، إعادة تحميل قائمة المحادثات لتحديث العداد
-            if (currentUser.role === 'admin' && currentConversation) {
-                setTimeout(loadConversations, 1000);
-            }
-        }
-    } catch (error) {
-        console.error('Error loading messages:', error);
-    }
-}
-
-// إرسال رسالة جديدة
-async function sendMessage() {
-    const messageInput = document.getElementById('messageInput');
-    const text = messageInput.value.trim();
-    
-    if (!text) {
-        showAlert('chatPage', 'الرسالة لا يمكن أن تكون فارغة', 'error');
-        return;
-    }
-
-    try {
-        const receiverId = currentUser.role === 'admin' ? currentConversation : 'admin';
-        const response = await fetch(`${API_BASE}/chat/send`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('token')}`
-            },
-            body: JSON.stringify({ 
-                text,
-                receiverId: currentUser.role === 'admin' ? currentConversation : undefined
-            })
-        });
-
-        if (response.ok) {
-            messageInput.value = '';
-            loadMessages();
-            
-            // إعادة تحميل المحادثات لتحديث القائمة
-            if (currentUser.role === 'admin') {
-                setTimeout(loadConversations, 500);
-            }
-            
-            // إغلاق قائمة المحادثات على الجوال بعد الإرسال
-            if (window.innerWidth <= 768) {
-                toggleMobileChat();
-            }
-        } else {
-            const data = await response.json();
-            showAlert('chatPage', data.message, 'error');
-        }
-    } catch (error) {
-        console.error('Error sending message:', error);
-        showAlert('chatPage', 'خطأ في إرسال الرسالة', 'error');
-    }
-}
-// نظام الدردشة المتقدم
+// إرسال رسالة
 app.post('/api/chat/send', authenticateToken, async (req, res) => {
     try {
         const { text, receiverId } = req.body;
@@ -664,53 +414,68 @@ app.post('/api/admin/reply-to-conversation', authenticateToken, requireAdmin, as
     }
 });
 
-// الحصول على المحادثات
-app.get('/api/chat/conversations', authenticateToken, async (req, res) => {
+// الحصول على المحادثات للمدير (محسّن)
+app.get('/api/admin/conversations', authenticateToken, requireAdmin, async (req, res) => {
     try {
         const messages = readLocalFile('local-messages.json');
         const users = readLocalFile('local-users.json');
         
-        if (req.user.role === 'admin') {
-            // للمدير: جميع المحادثات مع المستخدمين
-            const userConversations = {};
+        const userConversations = {};
+        
+        // تجميع جميع الرسائل مع المستخدمين
+        messages.forEach(msg => {
+            const otherUserId = msg.senderId === 'admin' ? msg.receiverId : msg.senderId;
             
-            messages.forEach(msg => {
-                const otherUserId = msg.senderId === 'admin' ? msg.receiverId : msg.senderId;
-                if (otherUserId !== 'admin' && !userConversations[otherUserId]) {
+            // تجاهل الرسائل الذاتية والمجموعات
+            if (otherUserId !== 'admin' && otherUserId !== 'broadcast') {
+                if (!userConversations[otherUserId]) {
                     const user = users.find(u => u._id === otherUserId);
                     if (user) {
-                        const userMessages = messages.filter(m => 
-                            (m.senderId === 'admin' && m.receiverId === otherUserId) ||
-                            (m.senderId === otherUserId && m.receiverId === 'admin')
-                        );
-                        
-                        const lastMessage = userMessages[userMessages.length - 1];
-                        const unreadCount = userMessages.filter(m => 
-                            m.receiverId === 'admin' && 
-                            m.senderId === otherUserId && 
-                            !m.read
-                        ).length;
-
                         userConversations[otherUserId] = {
                             userId: user._id,
                             userName: user.fullName,
                             userPhone: user.phone,
-                            lastMessage: lastMessage?.text || 'لا توجد رسائل',
-                            lastMessageTime: lastMessage?.timestamp || new Date().toISOString(),
-                            unreadCount: unreadCount
+                            userUniversity: user.university,
+                            userMajor: user.major,
+                            lastMessage: '',
+                            lastMessageTime: null,
+                            unreadCount: 0,
+                            totalMessages: 0,
+                            lastActivity: null
                         };
                     }
                 }
-            });
-            
-            res.json(Object.values(userConversations));
-        } else {
-            // للطالب: المحادثة مع المدير فقط
-            const userMessages = messages.filter(msg => 
-                msg.senderId === req.user._id || msg.receiverId === req.user._id
-            );
-            res.json(userMessages);
-        }
+                
+                if (userConversations[otherUserId]) {
+                    // تحديث آخر رسالة
+                    if (!userConversations[otherUserId].lastMessageTime || 
+                        new Date(msg.timestamp) > new Date(userConversations[otherUserId].lastMessageTime)) {
+                        userConversations[otherUserId].lastMessage = msg.text;
+                        userConversations[otherUserId].lastMessageTime = msg.timestamp;
+                    }
+                    
+                    // حساب الرسائل غير المقروءة
+                    if (msg.receiverId === 'admin' && !msg.read) {
+                        userConversations[otherUserId].unreadCount++;
+                    }
+                    
+                    // حساب إجمالي الرسائل
+                    userConversations[otherUserId].totalMessages++;
+                    
+                    // تحديث آخر نشاط
+                    if (!userConversations[otherUserId].lastActivity || 
+                        new Date(msg.timestamp) > new Date(userConversations[otherUserId].lastActivity)) {
+                        userConversations[otherUserId].lastActivity = msg.timestamp;
+                    }
+                }
+            }
+        });
+
+        // تحويل إلى مصفوفة وترتيب حسب آخر نشاط
+        const conversations = Object.values(userConversations)
+            .sort((a, b) => new Date(b.lastActivity) - new Date(a.lastActivity));
+
+        res.json(conversations);
     } catch (error) {
         console.error('خطأ جلب المحادثات:', error);
         res.status(500).json({ message: 'خطأ في الخادم' });
@@ -736,13 +501,18 @@ app.get('/api/chat/messages/:userId?', authenticateToken, async (req, res) => {
             );
         }
         
-        // تحديث حالة القراءة
+        // تحديث حالة القراءة للمستخدم الحالي
+        let updatedCount = 0;
         conversationMessages.forEach(msg => {
             if (msg.receiverId === req.user._id && !msg.read) {
                 msg.read = true;
+                updatedCount++;
             }
         });
-        writeLocalFile('local-messages.json', messages);
+        
+        if (updatedCount > 0) {
+            writeLocalFile('local-messages.json', messages);
+        }
         
         res.json(conversationMessages.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)));
     } catch (error) {
@@ -776,7 +546,7 @@ app.post('/api/chat/mark-all-read', authenticateToken, requireAdmin, async (req,
     }
 });
 
-// إدارة الصور المتقدمة
+// إرسال صورة فردية
 app.post('/api/admin/send-image', authenticateToken, requireAdmin, upload.single('image'), async (req, res) => {
     try {
         const { receiverId, description } = req.body;
@@ -974,6 +744,7 @@ app.post('/api/admin/send-folder', authenticateToken, requireAdmin, upload.array
     }
 });
 
+// الحصول على الصور للمستخدم
 app.get('/api/images', authenticateToken, async (req, res) => {
     try {
         const images = readLocalFile('local-images.json')
@@ -1047,6 +818,11 @@ app.get('/api/admin/stats', authenticateToken, requireAdmin, async (req, res) =>
         const messages = readLocalFile('local-messages.json');
         const images = readLocalFile('local-images.json');
 
+        // حساب المستخدمين المتصلين (دخلوا خلال آخر 15 دقيقة)
+        const onlineUsers = users.filter(u => 
+            u.lastLogin && (new Date() - new Date(u.lastLogin)) < 15 * 60 * 1000
+        ).length;
+
         const stats = {
             totalUsers: users.filter(u => u.role === 'student').length,
             activeUsers: users.filter(u => u.isActive !== false && u.role === 'student').length,
@@ -1054,7 +830,10 @@ app.get('/api/admin/stats', authenticateToken, requireAdmin, async (req, res) =>
             unreadMessages: messages.filter(m => m.receiverId === 'admin' && !m.read).length,
             totalImages: images.length,
             storageUsed: images.reduce((total, img) => total + (img.fileSize || 0), 0),
-            onlineUsers: users.filter(u => u.lastLogin && (new Date() - new Date(u.lastLogin)) < 15 * 60 * 1000).length
+            onlineUsers: onlineUsers,
+            todayMessages: messages.filter(m => 
+                new Date(m.timestamp).toDateString() === new Date().toDateString()
+            ).length
         };
 
         res.json(stats);
@@ -1068,13 +847,19 @@ app.get('/api/admin/stats', authenticateToken, requireAdmin, async (req, res) =>
 app.get('/api/admin/users/search', authenticateToken, requireAdmin, async (req, res) => {
     try {
         const { query } = req.query;
+        
+        if (!query || query.length < 2) {
+            return res.status(400).json({ message: 'أدخل至少 2 حروف للبحث' });
+        }
+
         const users = readLocalFile('local-users.json')
             .filter(user => user.role === 'student')
             .filter(user => 
-                user.fullName.includes(query) || 
+                user.fullName.toLowerCase().includes(query.toLowerCase()) || 
                 user.phone.includes(query) ||
-                user.university.includes(query) ||
-                user.major.includes(query)
+                user.university.toLowerCase().includes(query.toLowerCase()) ||
+                user.major.toLowerCase().includes(query.toLowerCase()) ||
+                user.batch.includes(query)
             )
             .map(user => ({
                 _id: user._id,
@@ -1091,6 +876,33 @@ app.get('/api/admin/users/search', authenticateToken, requireAdmin, async (req, 
         res.json(users);
     } catch (error) {
         console.error('خطأ البحث في المستخدمين:', error);
+        res.status(500).json({ message: 'خطأ في الخادم' });
+    }
+});
+
+// الحصول على معلومات المستخدم الحالي
+app.get('/api/user/profile', authenticateToken, async (req, res) => {
+    try {
+        const users = readLocalFile('local-users.json');
+        const user = users.find(u => u._id === req.user._id);
+        
+        if (!user) {
+            return res.status(404).json({ message: 'المستخدم غير موجود' });
+        }
+
+        res.json({
+            _id: user._id,
+            fullName: user.fullName,
+            phone: user.phone,
+            university: user.university,
+            major: user.major,
+            batch: user.batch,
+            role: user.role,
+            createdAt: user.createdAt,
+            lastLogin: user.lastLogin
+        });
+    } catch (error) {
+        console.error('خطأ جلب معلومات المستخدم:', error);
         res.status(500).json({ message: 'خطأ في الخادم' });
     }
 });
@@ -1125,6 +937,8 @@ const createAdminUser = async () => {
             console.log('✅ تم إنشاء حساب المدير الافتراضي');
             console.log('📱 رقم الهاتف: 500000000');
             console.log('🔐 كلمة المرور: Admin123!@#');
+        } else {
+            console.log('✅ حساب المدير موجود بالفعل');
         }
     } catch (error) {
         console.error('خطأ في إنشاء المدير:', error);
@@ -1153,7 +967,8 @@ app.get('/health', (req, res) => {
             fileUpload: true,
             adminPanel: true,
             emoji: true,
-            folderUpload: true
+            folderUpload: true,
+            realTime: true
         }
     });
 });
@@ -1200,6 +1015,7 @@ app.listen(PORT, '0.0.0.0', () => {
     console.log(`📁 ميزة إرسال المجلدات: مفعلة`);
     console.log(`😊 نظام الإيموجي: مفعل`);
     console.log(`👨‍💼 لوحة الإدارة المتقدمة: مفعلة`);
+    console.log(`🔄 تحديث تلقائي للمحادثات: مفعل`);
     
     setTimeout(createAdminUser, 2000);
 });
