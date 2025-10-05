@@ -588,7 +588,56 @@
             align-items: center;
             gap: 0.5rem;
         }
+.nav-item {
+    position: relative;
+}
 
+.nav-item .unread-badge {
+    position: absolute;
+    top: -5px;
+    left: -5px;
+    background: var(--accent);
+    color: white;
+    border-radius: 50%;
+    width: 18px;
+    height: 18px;
+    font-size: 0.7rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+}
+
+.conversation-item {
+    position: relative;
+    transition: all 0.3s ease;
+}
+
+.conversation-item:hover {
+    background: rgba(44, 90, 160, 0.1);
+    transform: translateX(-5px);
+}
+
+.conversation-item.active {
+    background: rgba(44, 90, 160, 0.15);
+    border-right: 3px solid var(--primary);
+}
+
+.conversation-stats {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.3rem;
+    flex-wrap: wrap;
+}
+
+.stat-badge {
+    background: rgba(108, 117, 125, 0.1);
+    color: var(--gray);
+    padding: 0.2rem 0.5rem;
+    border-radius: 8px;
+    font-size: 0.7rem;
+    border: 1px solid rgba(108, 117, 125, 0.2);
+}
         .admin-message-indicator {
             background: var(--warning);
             color: var(--dark);
@@ -1312,6 +1361,10 @@
                     <a href="#" class="nav-item hidden" id="chatLink">
                         <i class="fas fa-comments"></i> الدردشة
                     </a>
+                     <a href="#" class="nav-item" id="chatLink">
+        <i class="fas fa-comments"></i> الدردشة
+        <span class="unread-badge" id="conversationsBadge" style="display: none;">0</span>
+    </a>
                     <a href="#" class="nav-item hidden" id="imagesLink">
                         <i class="fas fa-images"></i> الصور
                     </a>
@@ -3045,7 +3098,70 @@
                     mobileToggle.style.display = 'none';
                 }
             }
-        });
+        }
+        // تحديث تلقائي للمحادثات كل 10 ثواني
+function startConversationsAutoRefresh() {
+    if (currentUser && currentUser.role === 'admin') {
+        // تحديث كل 10 ثواني
+        setInterval(() => {
+            if (document.getElementById('chatPage').classList.contains('active') || 
+                document.getElementById('adminPage').classList.contains('active')) {
+                loadConversations();
+            }
+        }, 10000);
+    }
+}
+
+// تحديث عند تبديل الصفحات
+function showChat() {
+    if (!currentUser) {
+        showLogin();
+        return;
+    }
+
+    showPage('chatPage');
+    updateNavigation(true, currentUser.role === 'admin');
+    
+    const sidebar = document.getElementById('conversationsSidebar');
+    const mobileToggle = document.querySelector('.mobile-chat-toggle');
+    
+    if (currentUser.role === 'admin') {
+        sidebar.classList.remove('hidden');
+        if (window.innerWidth <= 768) {
+            mobileToggle.style.display = 'flex';
+        }
+        
+        // تحميل المحادثات فوراً
+        loadConversations();
+        addAdminChatControls();
+    } else {
+        sidebar.classList.add('hidden');
+        mobileToggle.style.display = 'none';
+        document.getElementById('chatWithName').textContent = 'مدير النظام';
+    }
+    
+    loadMessages();
+    
+    // بدء التحديث التلقائي
+    startConversationsAutoRefresh();
+}
+
+// تحديث عند فتح لوحة الإدارة
+function showAdminPanel() {
+    if (!currentUser || currentUser.role !== 'admin') {
+        showLogin();
+        return;
+    }
+
+    showPage('adminPage');
+    updateNavigation(true, true);
+    loadAdminStats();
+    loadUsersList();
+    
+    // تحميل المحادثات أيضاً في لوحة الإدارة
+    loadConversations();
+    startConversationsAutoRefresh();
+});
     </script>
 </body>
 </html>
