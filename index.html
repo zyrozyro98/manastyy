@@ -265,6 +265,12 @@
             color: white;
         }
 
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
         /* Dashboard */
         .dashboard {
             padding: 2rem 0;
@@ -973,6 +979,23 @@
             font-size: 0.9rem;
         }
 
+        .connection-status {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            background: var(--success);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 0.8rem;
+            z-index: 1001;
+            display: none;
+        }
+        
+        .connection-status.offline {
+            background: var(--danger);
+        }
+
         /* Responsive Design */
         @media (max-width: 1200px) {
             .chat-container {
@@ -1215,6 +1238,10 @@
     </style>
 </head>
 <body>
+    <div class="connection-status" id="connectionStatus">
+        <i class="fas fa-wifi"></i> متصل
+    </div>
+
     <div class="app-container">
         <!-- Header -->
         <header class="header">
@@ -1691,6 +1718,12 @@
             setupAdminTabs();
             setupFileUploads();
             setupMobileChat();
+            setupChatUI();
+            
+            // اختبار الاتصال عند التحميل
+            setTimeout(() => {
+                testConnection();
+            }, 1000);
         }
 
         function setupEventListeners() {
@@ -1723,7 +1756,10 @@
             // نظام الدردشة
             document.getElementById('sendMessage').addEventListener('click', sendMessage);
             document.getElementById('messageInput').addEventListener('keypress', function(e) {
-                if (e.key === 'Enter') sendMessage();
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    sendMessage();
+                }
             });
 
             // نظام الإدارة
@@ -1813,6 +1849,43 @@
                 toggleBtn.addEventListener('click', () => {
                     sidebar.classList.toggle('mobile-visible');
                 });
+            }
+        }
+
+        function setupChatUI() {
+            const messageInput = document.getElementById('messageInput');
+            const sendButton = document.getElementById('sendMessage');
+            
+            // تحديث حالة زر الإرسال
+            messageInput.addEventListener('input', function() {
+                const hasText = this.value.trim().length > 0;
+                sendButton.disabled = !hasText;
+                sendButton.style.opacity = hasText ? '1' : '0.6';
+            });
+        }
+
+        async function testConnection() {
+            try {
+                const response = await fetch(`${API_BASE}/health`);
+                const statusElement = document.getElementById('connectionStatus');
+                
+                if (response.ok) {
+                    statusElement.style.display = 'block';
+                    statusElement.className = 'connection-status';
+                    statusElement.innerHTML = '<i class="fas fa-wifi"></i> متصل';
+                    return true;
+                } else {
+                    statusElement.style.display = 'block';
+                    statusElement.className = 'connection-status offline';
+                    statusElement.innerHTML = '<i class="fas fa-wifi-slash"></i> غير متصل';
+                    return false;
+                }
+            } catch (error) {
+                const statusElement = document.getElementById('connectionStatus');
+                statusElement.style.display = 'block';
+                statusElement.className = 'connection-status offline';
+                statusElement.innerHTML = '<i class="fas fa-wifi-slash"></i> غير متصل';
+                return false;
             }
         }
 
@@ -2015,13 +2088,19 @@
                 if (response.ok) {
                     conversations = await response.json();
                     displayConversations();
+                    
+                    // إذا كان هناك محادثة نشطة، تأكد من تحديثها
+                    if (currentConversation) {
+                        const activeConv = conversations.find(conv => conv.userId === currentConversation);
+                        if (activeConv) {
+                            document.getElementById('chatWithName').textContent = activeConv.userName;
+                        }
+                    }
                 } else {
                     console.error('Failed to load conversations');
-                    showAlert('chatPage', 'فشل في تحميل المحادثات', 'error');
                 }
             } catch (error) {
                 console.error('Error loading conversations:', error);
-                showAlert('chatPage', 'خطأ في تحميل المحادثات', 'error');
             }
         }
 
@@ -2259,10 +2338,20 @@
             }
 
             try {
-                const receiverId = currentUser.role === 'admin' ? currentConversation : 'admin';
-                const requestBody = currentUser.role === 'admin' ? 
-                    { text, receiverId } : 
-                    { text };
+                let receiverId;
+                let requestBody;
+
+                if (currentUser.role === 'admin') {
+                    // المدير يرسل لمستخدم محدد
+                    receiverId = currentConversation;
+                    requestBody = { 
+                        text, 
+                        receiverId: receiverId
+                    };
+                } else {
+                    // المستخدم العادي يرسل للمدير
+                    requestBody = { text };
+                }
 
                 const response = await fetch(`${API_BASE}/chat/send`, {
                     method: 'POST',
@@ -2285,7 +2374,9 @@
                     
                     // للمدير: تحديث قائمة المحادثات
                     if (currentUser.role === 'admin') {
-                        setTimeout(loadConversations, 1000);
+                        setTimeout(() => {
+                            loadConversations();
+                        }, 1000);
                     }
                 } else {
                     const data = await response.json();
@@ -3049,15 +3140,20 @@
             });
         }
 
-        function logout() {
+        function cleanup() {
             if (chatInterval) {
                 clearInterval(chatInterval);
+                chatInterval = null;
             }
+            currentConversation = null;
+            conversations = [];
+        }
+
+        function logout() {
+            cleanup();
             localStorage.removeItem('token');
             localStorage.removeItem('user');
             currentUser = null;
-            currentConversation = null;
-            conversations = [];
             showHome();
         }
     </script>
