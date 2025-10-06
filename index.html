@@ -925,6 +925,54 @@
             font-size: 1.5rem;
         }
 
+        /* Chat Placeholder */
+        .chat-placeholder {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: var(--gray);
+            text-align: center;
+            padding: 2rem;
+        }
+
+        .chat-placeholder i {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+
+        .conversation-search {
+            padding: 1rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            border: 1px solid var(--border);
+            border-radius: 25px;
+            font-size: 0.9rem;
+        }
+
+        .no-conversations {
+            text-align: center;
+            padding: 2rem;
+            color: var(--gray);
+        }
+
+        .message-system {
+            background: rgba(255, 193, 7, 0.1);
+            border: 1px solid rgba(255, 193, 7, 0.2);
+            color: #856404;
+            text-align: center;
+            padding: 0.75rem;
+            border-radius: 10px;
+            margin: 1rem 0;
+            font-size: 0.9rem;
+        }
+
         /* Responsive Design */
         @media (max-width: 1200px) {
             .chat-container {
@@ -1451,12 +1499,10 @@
                         </div>
 
                         <div class="chat-messages" id="chatMessages">
-                            <div class="message received">
-                                <div class="message-header">
-                                    <span class="message-sender">مدير النظام</span>
-                                    <span class="message-time">الآن</span>
-                                </div>
-                                <div>مرحباً بك في نظام الدردشة! كيف يمكنني مساعدتك اليوم؟</div>
+                            <div class="chat-placeholder">
+                                <i class="fas fa-comments"></i>
+                                <h3>مرحباً بك في نظام الدردشة</h3>
+                                <p>ابدأ المحادثة بإرسال رسالة ترحيب</p>
                             </div>
                         </div>
 
@@ -1632,6 +1678,7 @@
         let batchUploadedFiles = [];
         let conversations = [];
         let users = [];
+        let chatInterval = null;
 
         // تهيئة التطبيق
         document.addEventListener('DOMContentLoaded', function() {
@@ -1970,6 +2017,7 @@
                     displayConversations();
                 } else {
                     console.error('Failed to load conversations');
+                    showAlert('chatPage', 'فشل في تحميل المحادثات', 'error');
                 }
             } catch (error) {
                 console.error('Error loading conversations:', error);
@@ -1983,21 +2031,32 @@
             
             if (!conversations || conversations.length === 0) {
                 container.innerHTML = `
-                    <div class="conversation-item text-center" style="color: var(--gray); padding: 2rem;">
-                        <i class="fas fa-comments" style="font-size: 2rem; margin-bottom: 1rem;"></i>
+                    <div class="no-conversations">
+                        <i class="fas fa-comments" style="font-size: 3rem; margin-bottom: 1rem; opacity: 0.5;"></i>
                         <p>لا توجد محادثات بعد</p>
+                        <small>سيظهر المستخدمون هنا عندما يرسلون رسائل</small>
                     </div>
                 `;
                 return;
             }
 
             container.innerHTML = '';
+            
+            // إضافة شريط البحث
+            const searchDiv = document.createElement('div');
+            searchDiv.className = 'conversation-search';
+            searchDiv.innerHTML = `
+                <input type="text" class="search-input" placeholder="ابحث في المحادثات..." id="conversationSearch">
+            `;
+            container.appendChild(searchDiv);
+
+            // إضافة المحادثات
             conversations.forEach(conv => {
                 const convElement = document.createElement('div');
                 convElement.className = `conversation-item ${currentConversation === conv.userId ? 'active' : ''}`;
                 convElement.innerHTML = `
                     <div class="user-avatar">
-                        ${conv.userName ? conv.userName.charAt(0) : '?'}
+                        ${conv.userName ? conv.userName.charAt(0).toUpperCase() : '?'}
                     </div>
                     <div class="conversation-info">
                         <div class="conversation-name">${conv.userName || 'مستخدم غير معروف'}</div>
@@ -2012,6 +2071,25 @@
                 
                 container.appendChild(convElement);
             });
+
+            // إضافة حدث البحث
+            document.getElementById('conversationSearch').addEventListener('input', function(e) {
+                const searchTerm = e.target.value.toLowerCase();
+                const items = container.querySelectorAll('.conversation-item');
+                
+                items.forEach(item => {
+                    if (item.classList.contains('conversation-search')) return;
+                    
+                    const name = item.querySelector('.conversation-name').textContent.toLowerCase();
+                    const preview = item.querySelector('.conversation-preview').textContent.toLowerCase();
+                    
+                    if (name.includes(searchTerm) || preview.includes(searchTerm)) {
+                        item.style.display = 'flex';
+                    } else {
+                        item.style.display = 'none';
+                    }
+                });
+            });
         }
 
         // اختيار محادثة
@@ -2022,9 +2100,7 @@
                 // تحديث واجهة المحادثات
                 document.querySelectorAll('.conversation-item').forEach(item => {
                     item.classList.remove('active');
-                });
-                document.querySelectorAll('.conversation-item').forEach(item => {
-                    if (item.querySelector('.conversation-name').textContent === userName) {
+                    if (item.querySelector('.conversation-name')?.textContent === userName) {
                         item.classList.add('active');
                     }
                 });
@@ -2044,10 +2120,29 @@
                     document.getElementById('conversationsSidebar').classList.remove('mobile-visible');
                 }
 
+                // بدء التحديث التلقائي للمحادثة
+                startChatAutoRefresh();
+
             } catch (error) {
                 console.error('Error selecting conversation:', error);
                 showAlert('chatPage', 'خطأ في فتح المحادثة', 'error');
             }
+        }
+
+        // بدء التحديث التلقائي للمحادثة
+        function startChatAutoRefresh() {
+            if (chatInterval) {
+                clearInterval(chatInterval);
+            }
+            
+            chatInterval = setInterval(async () => {
+                if (currentUser.role === 'admin' && currentConversation) {
+                    await loadConversationMessages(currentConversation);
+                    await loadConversations(); // تحديث قائمة المحادثات للعدادات
+                } else if (currentUser.role === 'student') {
+                    await loadMessages();
+                }
+            }, 5000); // تحديث كل 5 ثواني
         }
 
         // تحميل رسائل محادثة محددة
@@ -2064,65 +2159,14 @@
                     displayMessages(messages);
                     
                     // إعادة تحميل قائمة المحادثات لتحديث العداد
-                    loadConversations();
+                    if (currentUser.role === 'admin') {
+                        loadConversations();
+                    }
                 } else {
                     throw new Error('Failed to load messages');
                 }
             } catch (error) {
                 console.error('Error loading conversation messages:', error);
-                showAlert('chatPage', 'خطأ في تحميل الرسائل', 'error');
-            }
-        }
-
-        // إرسال رسالة
-        async function sendMessage() {
-            const messageInput = document.getElementById('messageInput');
-            const text = messageInput.value.trim();
-            
-            if (!text) {
-                showAlert('chatPage', 'الرسالة لا يمكن أن تكون فارغة', 'error');
-                return;
-            }
-
-            // للمدير: التأكد من اختيار محادثة
-            if (currentUser.role === 'admin' && !currentConversation) {
-                showAlert('chatPage', 'يجب اختيار محادثة أولاً', 'error');
-                return;
-            }
-
-            try {
-                const receiverId = currentUser.role === 'admin' ? currentConversation : 'admin';
-                const response = await fetch(`${API_BASE}/chat/send`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${localStorage.getItem('token')}`
-                    },
-                    body: JSON.stringify({ 
-                        text,
-                        receiverId: currentUser.role === 'admin' ? currentConversation : undefined
-                    })
-                });
-
-                if (response.ok) {
-                    messageInput.value = '';
-                    if (currentUser.role === 'admin' && currentConversation) {
-                        await loadConversationMessages(currentConversation);
-                    } else {
-                        await loadMessages();
-                    }
-                    
-                    // للمدير: تحديث قائمة المحادثات
-                    if (currentUser.role === 'admin') {
-                        setTimeout(loadConversations, 500);
-                    }
-                } else {
-                    const data = await response.json();
-                    showAlert('chatPage', data.message, 'error');
-                }
-            } catch (error) {
-                console.error('Error sending message:', error);
-                showAlert('chatPage', 'خطأ في إرسال الرسالة', 'error');
             }
         }
 
@@ -2143,7 +2187,6 @@
                 }
             } catch (error) {
                 console.error('Error loading messages:', error);
-                showAlert('chatPage', 'خطأ في تحميل الرسائل', 'error');
             }
         }
 
@@ -2153,37 +2196,105 @@
             
             if (!messages || messages.length === 0) {
                 container.innerHTML = `
-                    <div class="text-center" style="color: var(--gray); margin-top: 2rem;">
-                        <i class="fas fa-comments" style="font-size: 3rem; margin-bottom: 1rem;"></i>
-                        <p>لا توجد رسائل بعد</p>
-                        <p style="font-size: 0.9rem;">ابدأ المحادثة بإرسال رسالة</p>
+                    <div class="chat-placeholder">
+                        <i class="fas fa-comments"></i>
+                        <h3>لا توجد رسائل بعد</h3>
+                        <p>ابدأ المحادثة بإرسال رسالة ترحيب</p>
                     </div>
                 `;
                 return;
             }
 
             container.innerHTML = '';
-            messages.forEach(msg => {
+            
+            // ترتيب الرسائل من الأقدم إلى الأحدث
+            const sortedMessages = messages.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+            
+            sortedMessages.forEach(msg => {
                 const messageDiv = document.createElement('div');
                 const isSent = msg.senderId === currentUser._id;
                 const isBroadcast = msg.isBroadcast;
+                const isSystem = msg.senderId === 'system';
                 
-                messageDiv.classList.add('message');
-                messageDiv.classList.add(isSent ? 'sent' : 'received');
-                if (isBroadcast) messageDiv.classList.add('message-broadcast');
-                
-                messageDiv.innerHTML = `
-                    <div class="message-header">
-                        <span class="message-sender">${msg.senderName || 'مرسل غير معروف'}</span>
-                        <span class="message-time">${formatTime(msg.timestamp)}</span>
-                    </div>
-                    <div>${msg.text}</div>
-                `;
+                if (isSystem) {
+                    messageDiv.className = 'message-system';
+                    messageDiv.innerHTML = `
+                        <i class="fas fa-info-circle"></i>
+                        ${msg.text}
+                    `;
+                } else {
+                    messageDiv.classList.add('message');
+                    messageDiv.classList.add(isSent ? 'sent' : 'received');
+                    if (isBroadcast) messageDiv.classList.add('message-broadcast');
+                    
+                    messageDiv.innerHTML = `
+                        <div class="message-header">
+                            <span class="message-sender">${msg.senderName || 'مرسل غير معروف'}</span>
+                            <span class="message-time">${formatTime(msg.timestamp)}</span>
+                        </div>
+                        <div>${msg.text}</div>
+                    `;
+                }
                 
                 container.appendChild(messageDiv);
             });
 
             container.scrollTop = container.scrollHeight;
+        }
+
+        // إرسال رسالة
+        async function sendMessage() {
+            const messageInput = document.getElementById('messageInput');
+            const text = messageInput.value.trim();
+            
+            if (!text) {
+                showAlert('chatPage', 'الرسالة لا يمكن أن تكون فارغة', 'error');
+                return;
+            }
+
+            // للمدير: التأكد من اختيار محادثة
+            if (currentUser.role === 'admin' && !currentConversation) {
+                showAlert('chatPage', 'يجب اختيار محادثة أولاً من القائمة الجانبية', 'error');
+                return;
+            }
+
+            try {
+                const receiverId = currentUser.role === 'admin' ? currentConversation : 'admin';
+                const requestBody = currentUser.role === 'admin' ? 
+                    { text, receiverId } : 
+                    { text };
+
+                const response = await fetch(`${API_BASE}/chat/send`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    },
+                    body: JSON.stringify(requestBody)
+                });
+
+                if (response.ok) {
+                    messageInput.value = '';
+                    
+                    // تحديث الرسائل فوراً
+                    if (currentUser.role === 'admin' && currentConversation) {
+                        await loadConversationMessages(currentConversation);
+                    } else {
+                        await loadMessages();
+                    }
+                    
+                    // للمدير: تحديث قائمة المحادثات
+                    if (currentUser.role === 'admin') {
+                        setTimeout(loadConversations, 1000);
+                    }
+                } else {
+                    const data = await response.json();
+                    showAlert('chatPage', data.message || 'خطأ في إرسال الرسالة', 'error');
+                }
+            } catch (error) {
+                console.error('Error sending message:', error);
+                showAlert('chatPage', 'خطأ في الاتصال بالخادم', 'error');
+            }
         }
 
         // إرسال رسالة جماعية
@@ -2632,18 +2743,27 @@
 
         // دوال المساعدة
         function formatTime(timestamp) {
-            const date = new Date(timestamp);
-            const now = new Date();
-            const diff = now - date;
-            
-            if (diff < 60000) { // أقل من دقيقة
+            try {
+                const date = new Date(timestamp);
+                const now = new Date();
+                const diff = now - date;
+                
+                if (diff < 60000) { // أقل من دقيقة
+                    return 'الآن';
+                } else if (diff < 3600000) { // أقل من ساعة
+                    const minutes = Math.floor(diff / 60000);
+                    return `قبل ${minutes} دقيقة`;
+                } else if (diff < 86400000) { // أقل من يوم
+                    const hours = Math.floor(diff / 3600000);
+                    return `قبل ${hours} ساعة`;
+                } else {
+                    return date.toLocaleDateString('ar-SA', {
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    });
+                }
+            } catch (error) {
                 return 'الآن';
-            } else if (diff < 3600000) { // أقل من ساعة
-                return `قبل ${Math.floor(diff / 60000)} دقيقة`;
-            } else if (diff < 86400000) { // أقل من يوم
-                return `قبل ${Math.floor(diff / 3600000)} ساعة`;
-            } else {
-                return date.toLocaleDateString('ar-SA');
             }
         }
 
@@ -2692,9 +2812,13 @@
                 ${message}
             `;
             
-            // إزالة أي تنبيهات سابقة في نفس الحاوية
+            // إزالة أي تنبيهات سابقة من نفس النوع
             const existingAlerts = container.querySelectorAll('.alert');
-            existingAlerts.forEach(alert => alert.remove());
+            existingAlerts.forEach(alert => {
+                if (alert.textContent.includes(message)) {
+                    alert.remove();
+                }
+            });
             
             // إدراج التنبيه في البداية
             if (container.children.length > 0) {
@@ -2808,13 +2932,29 @@
             updateNavigation(true, currentUser.role === 'admin');
             
             if (currentUser.role === 'admin') {
+                // إعداد واجهة المدير
                 loadConversations();
                 document.getElementById('chatWithName').textContent = 'اختر محادثة';
                 document.getElementById('chatStatus').textContent = 'غير متصل';
+                
+                // عرض رسالة ترحيب للمدير
+                const container = document.getElementById('chatMessages');
+                container.innerHTML = `
+                    <div class="chat-placeholder">
+                        <i class="fas fa-users"></i>
+                        <h3>مرحباً بك في لوحة المحادثات</h3>
+                        <p>اختر محادثة من القائمة الجانبية لبدء المحادثة</p>
+                        <small>سيظهر المستخدمون هنا عندما يرسلون رسائل</small>
+                    </div>
+                `;
             } else {
+                // إعداد واجهة المستخدم العادي
                 loadMessages();
                 document.getElementById('chatWithName').textContent = 'مدير النظام';
                 document.getElementById('chatStatus').textContent = 'متصل الآن';
+                
+                // بدء التحديث التلقائي
+                startChatAutoRefresh();
             }
         }
 
@@ -2910,10 +3050,14 @@
         }
 
         function logout() {
+            if (chatInterval) {
+                clearInterval(chatInterval);
+            }
             localStorage.removeItem('token');
             localStorage.removeItem('user');
             currentUser = null;
             currentConversation = null;
+            conversations = [];
             showHome();
         }
     </script>
