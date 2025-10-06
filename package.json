@@ -5,7 +5,8 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node server.js"
+    "dev": "node server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
     "express": "^4.18.2",
@@ -15,17 +16,45 @@
     "cors": "^2.8.5",
     "dotenv": "^16.3.1"
   },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
   "keywords": [
     "education",
     "students",
     "platform",
     "management",
     "arabic",
-    "secure"
+    "secure",
+    "chat",
+    "messaging",
+    "file-upload",
+    "authentication"
   ],
-  "author": "Student Platform Team",
+  "author": {
+    "name": "Student Platform Team",
+    "email": "info@student-platform.com"
+  },
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/student-platform/student-platform-pro.git"
+  },
+  "bugs": {
+    "url": "https://github.com/student-platform/student-platform-pro/issues"
+  },
+  "homepage": "https://github.com/student-platform/student-platform-pro#readme",
   "engines": {
-    "node": ">=16.0.0"
-  }
+    "node": ">=16.0.0",
+    "npm": ">=8.0.0"
+  },
+  "os": [
+    "linux",
+    "windows",
+    "macos"
+  ],
+  "cpu": [
+    "x64",
+    "arm64"
+  ]
 }
