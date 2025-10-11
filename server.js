@@ -52,6 +52,7 @@ function readLocalFile(filename) {
         const data = fs.readFileSync(filename, 'utf8');
         return JSON.parse(data);
     } catch (error) {
+        console.error(`خطأ في قراءة الملف ${filename}:`, error);
         return [];
     }
 }
@@ -82,7 +83,7 @@ const upload = multer({
     storage: storage,
     limits: {
         fileSize: 10 * 1024 * 1024, // 10MB
-        files: 10
+        files: 50 // زيادة عدد الملفات المسموح بها
     },
     fileFilter: (req, file, cb) => {
         if (file.mimetype.startsWith('image/')) {
@@ -153,6 +154,8 @@ function updateLoginAttempts(ip, success) {
 }
 
 // المسارات
+
+// تسجيل مستخدم جديد
 app.post('/api/auth/register', async (req, res) => {
     try {
         const { fullName, phone, university, major, batch, password } = req.body;
@@ -169,7 +172,7 @@ app.post('/api/auth/register', async (req, res) => {
         const saudiPhoneRegex = /^5\d{8}$/;
         if (!saudiPhoneRegex.test(phone)) {
             return res.status(400).json({ 
-                message: 'رقم الهاتف غير صحيح' 
+                message: 'رقم الهاتف غير صحيح. يجب أن يبدأ بـ 5 ويتكون من 9 أرقام' 
             });
         }
 
@@ -211,6 +214,7 @@ app.post('/api/auth/register', async (req, res) => {
     }
 });
 
+// تسجيل الدخول
 app.post('/api/auth/login', checkLoginAttempts, async (req, res) => {
     try {
         const { phone, password } = req.body;
@@ -270,7 +274,7 @@ app.post('/api/auth/login', checkLoginAttempts, async (req, res) => {
     }
 });
 
-// نظام الدردشة المتقدم
+// إرسال رسالة
 app.post('/api/chat/send', authenticateToken, async (req, res) => {
     try {
         const { text, receiverId } = req.body;
@@ -284,17 +288,10 @@ app.post('/api/chat/send', authenticateToken, async (req, res) => {
         }
 
         const messages = readLocalFile('local-messages.json');
-        const users = readLocalFile('local-users.json');
-        
-        const sender = users.find(u => u._id === req.user._id);
-        if (!sender) {
-            return res.status(404).json({ message: 'المستخدم غير موجود' });
-        }
-
         const newMessage = {
             _id: crypto.randomBytes(16).toString('hex'),
             senderId: req.user._id,
-            senderName: sender.fullName,
+            senderName: req.user.fullName,
             receiverId: receiverId || 'admin',
             text: text.trim(),
             timestamp: new Date().toISOString(),
@@ -310,6 +307,86 @@ app.post('/api/chat/send', authenticateToken, async (req, res) => {
         });
     } catch (error) {
         console.error('خطأ إرسال الرسالة:', error);
+        res.status(500).json({ message: 'خطأ في الخادم' });
+    }
+});
+
+// الحصول على محادثات المستخدم العادي
+app.get('/api/chat/conversations', authenticateToken, async (req, res) => {
+    try {
+        const messages = readLocalFile('local-messages.json');
+        
+        // للمستخدم العادي، المحادثة تكون مع المدير فقط
+        const adminMessages = messages.filter(msg => 
+            (msg.senderId === req.user._id && msg.receiverId === 'admin') ||
+            (msg.senderId === 'admin' && msg.receiverId === req.user._id)
+        );
+
+        if (adminMessages.length === 0) {
+            return res.json([{
+                userId: 'admin',
+                userName: 'مدير النظام',
+                userPhone: '500000000',
+                userUniversity: 'الإدارة العامة',
+                lastMessage: 'لا توجد رسائل بعد',
+                lastMessageTime: new Date().toISOString(),
+                unreadCount: 0,
+                totalMessages: 0
+            }]);
+        }
+
+        // آخر رسالة
+        const lastMessage = adminMessages[adminMessages.length - 1];
+        
+        // عدد الرسائل غير المقروءة
+        const unreadCount = adminMessages.filter(msg => 
+            msg.receiverId === req.user._id && !msg.read
+        ).length;
+
+        const conversation = {
+            userId: 'admin',
+            userName: 'مدير النظام',
+            userPhone: '500000000',
+            userUniversity: 'الإدارة العامة',
+            lastMessage: lastMessage.text,
+            lastMessageTime: lastMessage.timestamp,
+            unreadCount: unreadCount,
+            totalMessages: adminMessages.length
+        };
+
+        res.json([conversation]);
+    } catch (error) {
+        console.error('خطأ جلب محادثات المستخدم:', error);
+        res.status(500).json({ message: 'خطأ في الخادم' });
+    }
+});
+
+// الحصول على رسائل المحادثة مع المدير (للمستخدم العادي)
+app.get('/api/chat/messages', authenticateToken, async (req, res) => {
+    try {
+        const messages = readLocalFile('local-messages.json');
+        
+        const userMessages = messages.filter(msg => 
+            (msg.senderId === req.user._id && msg.receiverId === 'admin') ||
+            (msg.senderId === 'admin' && msg.receiverId === req.user._id)
+        );
+
+        // تحديث حالة القراءة للرسائل الموجهة للمستخدم
+        let updated = false;
+        userMessages.forEach(msg => {
+            if (msg.receiverId === req.user._id && !msg.read) {
+                msg.read = true;
+                updated = true;
+            }
+        });
+
+        if (updated) {
+            writeLocalFile('local-messages.json', messages);
+        }
+
+        res.json(userMessages.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)));
+    } catch (error) {
+        console.error('خطأ جلب رسائل المستخدم:', error);
         res.status(500).json({ message: 'خطأ في الخادم' });
     }
 });
@@ -377,93 +454,95 @@ app.post('/api/admin/send-message', authenticateToken, requireAdmin, async (req,
     }
 });
 
-// الحصول على المحادثات للمدير
-app.get('/api/chat/conversations', authenticateToken, async (req, res) => {
+// الحصول على المحادثات للمدير (محسّن)
+app.get('/api/admin/conversations', authenticateToken, requireAdmin, async (req, res) => {
     try {
-        if (req.user.role !== 'admin') {
-            return res.status(403).json({ message: 'صلاحيات غير كافية' });
-        }
-
         const messages = readLocalFile('local-messages.json');
         const users = readLocalFile('local-users.json');
         
         const userConversations = {};
         
-        // جمع جميع المحادثات مع المستخدمين
+        // تجميع جميع الرسائل مع المستخدمين
         messages.forEach(msg => {
             const otherUserId = msg.senderId === 'admin' ? msg.receiverId : msg.senderId;
             
-            // تجاهل الرسائل التي ليس لها مستخدم
-            if (otherUserId === 'admin') return;
-            
-            if (!userConversations[otherUserId]) {
-                const user = users.find(u => u._id === otherUserId);
-                if (user) {
-                    // جمع رسائل هذا المستخدم
-                    const userMessages = messages.filter(m => 
-                        (m.senderId === 'admin' && m.receiverId === otherUserId) ||
-                        (m.senderId === otherUserId && m.receiverId === 'admin')
-                    );
+            // تجاهل الرسائل الذاتية والمجموعات
+            if (otherUserId !== 'admin' && otherUserId !== 'broadcast') {
+                if (!userConversations[otherUserId]) {
+                    const user = users.find(u => u._id === otherUserId);
+                    if (user) {
+                        userConversations[otherUserId] = {
+                            userId: user._id,
+                            userName: user.fullName,
+                            userPhone: user.phone,
+                            userUniversity: user.university,
+                            userMajor: user.major,
+                            lastMessage: '',
+                            lastMessageTime: null,
+                            unreadCount: 0,
+                            totalMessages: 0,
+                            lastActivity: null
+                        };
+                    }
+                }
+                
+                if (userConversations[otherUserId]) {
+                    // تحديث آخر رسالة
+                    if (!userConversations[otherUserId].lastMessageTime || 
+                        new Date(msg.timestamp) > new Date(userConversations[otherUserId].lastMessageTime)) {
+                        userConversations[otherUserId].lastMessage = msg.text;
+                        userConversations[otherUserId].lastMessageTime = msg.timestamp;
+                    }
                     
-                    const lastMessage = userMessages[userMessages.length - 1];
-                    const unreadCount = userMessages.filter(m => 
-                        m.receiverId === 'admin' && 
-                        m.senderId === otherUserId && 
-                        !m.read
-                    ).length;
-
-                    userConversations[otherUserId] = {
-                        userId: user._id,
-                        userName: user.fullName,
-                        userPhone: user.phone,
-                        lastMessage: lastMessage?.text || 'لا توجد رسائل',
-                        lastMessageTime: lastMessage?.timestamp || new Date().toISOString(),
-                        unreadCount: unreadCount
-                    };
+                    // حساب الرسائل غير المقروءة
+                    if (msg.receiverId === 'admin' && !msg.read) {
+                        userConversations[otherUserId].unreadCount++;
+                    }
+                    
+                    // حساب إجمالي الرسائل
+                    userConversations[otherUserId].totalMessages++;
+                    
+                    // تحديث آخر نشاط
+                    if (!userConversations[otherUserId].lastActivity || 
+                        new Date(msg.timestamp) > new Date(userConversations[otherUserId].lastActivity)) {
+                        userConversations[otherUserId].lastActivity = msg.timestamp;
+                    }
                 }
             }
         });
-        
-        res.json(Object.values(userConversations));
+
+        // تحويل إلى مصفوفة وترتيب حسب آخر نشاط
+        const conversations = Object.values(userConversations)
+            .sort((a, b) => new Date(b.lastActivity) - new Date(a.lastActivity));
+
+        res.json(conversations);
     } catch (error) {
         console.error('خطأ جلب المحادثات:', error);
         res.status(500).json({ message: 'خطأ في الخادم' });
     }
 });
 
-// الحصول على رسائل محادثة محددة
-app.get('/api/chat/conversation/:userId', authenticateToken, async (req, res) => {
+// الحصول على رسائل محادثة محددة للمدير
+app.get('/api/chat/messages/:userId', authenticateToken, requireAdmin, async (req, res) => {
     try {
         const { userId } = req.params;
         const messages = readLocalFile('local-messages.json');
         
-        let conversationMessages;
-        if (req.user.role === 'admin') {
-            conversationMessages = messages.filter(msg => 
-                (msg.senderId === 'admin' && msg.receiverId === userId) ||
-                (msg.senderId === userId && msg.receiverId === 'admin')
-            );
-        } else {
-            // للمستخدم العادي: التأكد أنه يطلب محادثته فقط
-            if (userId !== req.user._id && userId !== 'admin') {
-                return res.status(403).json({ message: 'غير مصرح' });
-            }
-            conversationMessages = messages.filter(msg => 
-                (msg.senderId === req.user._id && msg.receiverId === 'admin') ||
-                (msg.senderId === 'admin' && msg.receiverId === req.user._id)
-            );
-        }
+        const conversationMessages = messages.filter(msg => 
+            (msg.senderId === 'admin' && msg.receiverId === userId) ||
+            (msg.senderId === userId && msg.receiverId === 'admin')
+        );
         
-        // تحديث حالة القراءة
-        let updated = false;
+        // تحديث حالة القراءة للمستخدم الحالي
+        let updatedCount = 0;
         conversationMessages.forEach(msg => {
-            if (msg.receiverId === req.user._id && !msg.read) {
+            if (msg.receiverId === 'admin' && !msg.read) {
                 msg.read = true;
-                updated = true;
+                updatedCount++;
             }
         });
         
-        if (updated) {
+        if (updatedCount > 0) {
             writeLocalFile('local-messages.json', messages);
         }
         
@@ -474,37 +553,7 @@ app.get('/api/chat/conversation/:userId', authenticateToken, async (req, res) =>
     }
 });
 
-// الحصول على جميع الرسائل (للمستخدم العادي)
-app.get('/api/chat/messages', authenticateToken, async (req, res) => {
-    try {
-        const messages = readLocalFile('local-messages.json');
-        
-        const userMessages = messages.filter(msg => 
-            (msg.senderId === req.user._id && msg.receiverId === 'admin') ||
-            (msg.senderId === 'admin' && msg.receiverId === req.user._id)
-        );
-        
-        // تحديث حالة القراءة
-        let updated = false;
-        userMessages.forEach(msg => {
-            if (msg.receiverId === req.user._id && !msg.read) {
-                msg.read = true;
-                updated = true;
-            }
-        });
-        
-        if (updated) {
-            writeLocalFile('local-messages.json', messages);
-        }
-        
-        res.json(userMessages.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)));
-    } catch (error) {
-        console.error('خطأ جلب الرسائل:', error);
-        res.status(500).json({ message: 'خطأ في الخادم' });
-    }
-});
-
-// إدارة الصور المتقدمة
+// إرسال صورة فردية
 app.post('/api/admin/send-image', authenticateToken, requireAdmin, upload.single('image'), async (req, res) => {
     try {
         const { receiverId, description } = req.body;
@@ -615,6 +664,94 @@ app.post('/api/admin/broadcast-image', authenticateToken, requireAdmin, upload.s
     }
 });
 
+// إرسال مجلد صور بناءً على أسماء الملفات (أرقام الهواتف)
+app.post('/api/admin/send-folder', authenticateToken, requireAdmin, upload.array('images', 50), async (req, res) => {
+    try {
+        if (!req.files || req.files.length === 0) {
+            return res.status(400).json({ message: 'لم يتم رفع أي صور' });
+        }
+
+        const users = readLocalFile('local-users.json');
+        const images = readLocalFile('local-images.json');
+        let successCount = 0;
+        let failedCount = 0;
+        const results = [];
+
+        for (const file of req.files) {
+            // استخراج رقم الهاتف من اسم الملف (إزالة الامتداد)
+            const phoneFromFilename = file.originalname.replace(/\.[^/.]+$/, "");
+            
+            // البحث عن المستخدم باستخدام رقم الهاتف
+            const user = users.find(u => u.phone === phoneFromFilename && u.role === 'student' && u.isActive !== false);
+            
+            if (user) {
+                const newImage = {
+                    _id: crypto.randomBytes(16).toString('hex'),
+                    userId: user._id,
+                    userName: user.fullName,
+                    userPhone: user.phone,
+                    imageName: file.filename,
+                    originalName: file.originalname,
+                    url: `/uploads/${file.filename}`,
+                    description: `مرسل تلقائياً بناءً على اسم الملف`,
+                    sentBy: req.user._id,
+                    sentAt: new Date().toISOString(),
+                    fileSize: file.size,
+                    mimeType: file.mimetype,
+                    isAutoSent: true
+                };
+
+                images.push(newImage);
+                successCount++;
+                results.push({
+                    fileName: file.originalname,
+                    status: 'success',
+                    userName: user.fullName,
+                    phone: user.phone
+                });
+            } else {
+                failedCount++;
+                results.push({
+                    fileName: file.originalname,
+                    status: 'failed',
+                    reason: 'لم يتم العثور على مستخدم بهذا الرقم'
+                });
+                
+                // حذف الصورة إذا لم يتم العثور على مستخدم
+                if (fs.existsSync(file.path)) {
+                    fs.unlinkSync(file.path);
+                }
+            }
+        }
+
+        writeLocalFile('local-images.json', images);
+
+        res.json({ 
+            message: `تم معالجة ${req.files.length} صورة`,
+            summary: {
+                total: req.files.length,
+                success: successCount,
+                failed: failedCount
+            },
+            details: results
+        });
+    } catch (error) {
+        console.error('خطأ إرسال المجلد:', error);
+        
+        // تنظيف جميع الصور المرفوعة في حالة الخطأ
+        if (req.files) {
+            req.files.forEach(file => {
+                if (fs.existsSync(file.path)) {
+                    fs.unlinkSync(file.path);
+                }
+            });
+        }
+        
+        res.status(500).json({ message: 'خطأ في معالجة المجلد' });
+    }
+});
+
+// الحصول على الصور للمستخدم
 app.get('/api/images', authenticateToken, async (req, res) => {
     try {
         const images = readLocalFile('local-images.json')
@@ -652,8 +789,8 @@ app.get('/api/admin/users', authenticateToken, requireAdmin, async (req, res) =>
     }
 });
 
-// الحصول على معلومات مستخدم محدد
-app.get('/api/admin/user/:userId', authenticateToken, requireAdmin, async (req, res) => {
+// تفعيل/تعطيل المستخدم
+app.post('/api/admin/users/:userId/toggle', authenticateToken, requireAdmin, async (req, res) => {
     try {
         const { userId } = req.params;
         const users = readLocalFile('local-users.json');
@@ -663,16 +800,20 @@ app.get('/api/admin/user/:userId', authenticateToken, requireAdmin, async (req, 
             return res.status(404).json({ message: 'المستخدم غير موجود' });
         }
 
-        res.json({
-            _id: user._id,
-            fullName: user.fullName,
-            phone: user.phone,
-            university: user.university,
-            major: user.major,
-            batch: user.batch
+        user.isActive = !user.isActive;
+        writeLocalFile('local-users.json', users);
+
+        res.json({ 
+            message: `تم ${user.isActive ? 'تفعيل' : 'تعطيل'} المستخدم بنجاح`,
+            user: {
+                _id: user._id,
+                fullName: user.fullName,
+                phone: user.phone,
+                isActive: user.isActive
+            }
         });
     } catch (error) {
-        console.error('خطأ جلب معلومات المستخدم:', error);
+        console.error('خطأ في تعديل حالة المستخدم:', error);
         res.status(500).json({ message: 'خطأ في الخادم' });
     }
 });
@@ -684,19 +825,164 @@ app.get('/api/admin/stats', authenticateToken, requireAdmin, async (req, res) =>
         const messages = readLocalFile('local-messages.json');
         const images = readLocalFile('local-images.json');
 
+        // حساب المستخدمين المتصلين (دخلوا خلال آخر 15 دقيقة)
+        const onlineUsers = users.filter(u => 
+            u.lastLogin && (new Date() - new Date(u.lastLogin)) < 15 * 60 * 1000
+        ).length;
+
         const stats = {
             totalUsers: users.filter(u => u.role === 'student').length,
             activeUsers: users.filter(u => u.isActive !== false && u.role === 'student').length,
             totalMessages: messages.length,
             unreadMessages: messages.filter(m => m.receiverId === 'admin' && !m.read).length,
             totalImages: images.length,
-            storageUsed: images.reduce((total, img) => total + (img.fileSize || 0), 0)
+            storageUsed: images.reduce((total, img) => total + (img.fileSize || 0), 0),
+            onlineUsers: onlineUsers,
+            todayMessages: messages.filter(m => 
+                new Date(m.timestamp).toDateString() === new Date().toDateString()
+            ).length
         };
 
         res.json(stats);
     } catch (error) {
         console.error('خطأ جلب الإحصائيات:', error);
         res.status(500).json({ message: 'خطأ في الخادم' });
+    }
+});
+
+// البحث في المستخدمين
+app.get('/api/admin/users/search', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const { query } = req.query;
+        
+        if (!query || query.length < 2) {
+            return res.status(400).json({ message: 'أدخل至少 2 حروف للبحث' });
+        }
+
+        const users = readLocalFile('local-users.json')
+            .filter(user => user.role === 'student')
+            .filter(user => 
+                user.fullName.toLowerCase().includes(query.toLowerCase()) || 
+                user.phone.includes(query) ||
+                user.university.toLowerCase().includes(query.toLowerCase()) ||
+                user.major.toLowerCase().includes(query.toLowerCase()) ||
+                user.batch.includes(query)
+            )
+            .map(user => ({
+                _id: user._id,
+                fullName: user.fullName,
+                phone: user.phone,
+                university: user.university,
+                major: user.major,
+                batch: user.batch,
+                isActive: user.isActive,
+                createdAt: user.createdAt,
+                lastLogin: user.lastLogin
+            }));
+        
+        res.json(users);
+    } catch (error) {
+        console.error('خطأ البحث في المستخدمين:', error);
+        res.status(500).json({ message: 'خطأ في الخادم' });
+    }
+});
+
+// الحصول على معلومات المستخدم الحالي
+app.get('/api/user/profile', authenticateToken, async (req, res) => {
+    try {
+        const users = readLocalFile('local-users.json');
+        const user = users.find(u => u._id === req.user._id);
+        
+        if (!user) {
+            return res.status(404).json({ message: 'المستخدم غير موجود' });
+        }
+
+        res.json({
+            _id: user._id,
+            fullName: user.fullName,
+            phone: user.phone,
+            university: user.university,
+            major: user.major,
+            batch: user.batch,
+            role: user.role,
+            createdAt: user.createdAt,
+            lastLogin: user.lastLogin
+        });
+    } catch (error) {
+        console.error('خطأ جلب معلومات المستخدم:', error);
+        res.status(500).json({ message: 'خطأ في الخادم' });
+    }
+});
+
+// بيانات تجريبية للتطوير والاختبار
+app.post('/api/dev/seed-data', async (req, res) => {
+    try {
+        const users = readLocalFile('local-users.json');
+        const messages = readLocalFile('local-messages.json');
+        
+        // إنشاء مستخدم تجريبي إذا لم يكن موجوداً
+        if (!users.find(u => u.phone === '511111111')) {
+            const hashedPassword = await bcrypt.hash('123456', 12);
+            const testUser = {
+                _id: 'student-' + crypto.randomBytes(8).toString('hex'),
+                fullName: 'طالب تجريبي',
+                phone: '511111111',
+                university: 'جامعة الملك سعود',
+                major: 'هندسة الحاسب',
+                batch: '2024',
+                password: hashedPassword,
+                role: 'student',
+                isActive: true,
+                createdAt: new Date().toISOString(),
+                lastLogin: new Date().toISOString()
+            };
+            users.push(testUser);
+            writeLocalFile('local-users.json', users);
+        }
+
+        // إضافة بعض الرسائل التجريبية
+        if (messages.length === 0) {
+            const testUser = users.find(u => u.phone === '511111111');
+            if (testUser) {
+                const sampleMessages = [
+                    {
+                        _id: crypto.randomBytes(16).toString('hex'),
+                        senderId: 'admin',
+                        senderName: 'مدير النظام',
+                        receiverId: testUser._id,
+                        text: 'مرحباً بك في المنصة الطلابية!',
+                        timestamp: new Date(Date.now() - 3600000).toISOString(),
+                        read: false
+                    },
+                    {
+                        _id: crypto.randomBytes(16).toString('hex'),
+                        senderId: testUser._id,
+                        senderName: 'طالب تجريبي',
+                        receiverId: 'admin',
+                        text: 'شكراً لك، كيف يمكنني استخدام المنصة؟',
+                        timestamp: new Date(Date.now() - 1800000).toISOString(),
+                        read: true
+                    },
+                    {
+                        _id: crypto.randomBytes(16).toString('hex'),
+                        senderId: 'admin',
+                        senderName: 'مدير النظام',
+                        receiverId: testUser._id,
+                        text: 'يمكنك إرسال رسائل للمدير وعرض الصور المرسلة لك',
+                        timestamp: new Date().toISOString(),
+                        read: false
+                    }
+                ];
+                
+                sampleMessages.forEach(msg => messages.push(msg));
+                writeLocalFile('local-messages.json', messages);
+            }
+        }
+
+        res.json({ message: 'تم إضافة البيانات التجريبية بنجاح' });
+    } catch (error) {
+        console.error('خطأ في إضافة البيانات التجريبية:', error);
+        res.status(500).json({ message: 'خطأ في إضافة البيانات' });
     }
 });
 
@@ -730,6 +1016,8 @@ const createAdminUser = async () => {
             console.log('✅ تم إنشاء حساب المدير الافتراضي');
             console.log('📱 رقم الهاتف: 500000000');
             console.log('🔐 كلمة المرور: Admin123!@#');
+        } else {
+            console.log('✅ حساب المدير موجود بالفعل');
         }
     } catch (error) {
         console.error('خطأ في إنشاء المدير:', error);
@@ -751,8 +1039,16 @@ app.get('/health', (req, res) => {
     res.json({ 
         status: '✅ النظام يعمل بشكل طبيعي',
         timestamp: new Date().toISOString(),
-        version: '2.0.0',
-        environment: process.env.NODE_ENV || 'development'
+        version: '2.2.0',
+        environment: process.env.NODE_ENV || 'development',
+        features: {
+            chat: true,
+            fileUpload: true,
+            adminPanel: true,
+            emoji: true,
+            folderUpload: true,
+            realTime: true
+        }
     });
 });
 
@@ -767,6 +1063,16 @@ app.use((req, res, next) => {
 // معالجة الأخطاء
 app.use((error, req, res, next) => {
     console.error('خطأ غير متوقع:', error);
+    
+    if (error instanceof multer.MulterError) {
+        if (error.code === 'LIMIT_FILE_SIZE') {
+            return res.status(400).json({ message: 'حجم الملف كبير جداً' });
+        }
+        if (error.code === 'LIMIT_FILE_COUNT') {
+            return res.status(400).json({ message: 'تم تجاوز عدد الملفات المسموح بها' });
+        }
+    }
+    
     res.status(500).json({ 
         message: 'حدث خطأ غير متوقع في النظام',
         reference: crypto.randomBytes(4).toString('hex')
@@ -782,9 +1088,13 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 المنصة الإلكترونية تعمل على البورت ${PORT}`);
     console.log(`🌐 الرابط: http://localhost:${PORT}`);
-    console.log(`⚡ النسخة: 2.0.0 - الاحترافية`);
+    console.log(`⚡ النسخة: 2.2.0 - الاحترافية`);
     console.log(`🔒 نظام أمان متقدم مفعل`);
     console.log(`💾 نظام التخزين: الملفات المحلية`);
+    console.log(`📁 ميزة إرسال المجلدات: مفعلة`);
+    console.log(`😊 نظام الإيموجي: مفعل`);
+    console.log(`👨‍💼 لوحة الإدارة المتقدمة: مفعلة`);
+    console.log(`🔄 تحديث تلقائي للمحادثات: مفعل`);
     
     setTimeout(createAdminUser, 2000);
 });
