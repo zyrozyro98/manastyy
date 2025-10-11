@@ -291,11 +291,20 @@ app.post('/api/chat/send', authenticateToken, async (req, res) => {
             return res.status(404).json({ message: 'المستخدم غير موجود' });
         }
 
+        // تحديد المستلم بناءً على دور المرسل
+        let actualReceiverId = receiverId;
+        if (req.user.role === 'student') {
+            // الطلاب يرسلون فقط للمدير
+            actualReceiverId = 'admin';
+        } else if (req.user.role === 'admin' && !receiverId) {
+            return res.status(400).json({ message: 'يجب تحديد مستلم للرسالة' });
+        }
+
         const newMessage = {
             _id: crypto.randomBytes(16).toString('hex'),
             senderId: req.user._id,
             senderName: sender.fullName,
-            receiverId: receiverId || 'admin',
+            receiverId: actualReceiverId,
             text: text.trim(),
             timestamp: new Date().toISOString(),
             read: false
