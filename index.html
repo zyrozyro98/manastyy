@@ -2068,6 +2068,47 @@
                                                         <i class="fas fa-upload"></i> استيراد المستخدمين
                                                     </button>
                                                 </div>
+                                                <!-- في قسم الاستيراد والتصدير -->
+<div class="card mt-4">
+    <div class="card-header">
+        <h5><i class="fas fa-database"></i> إدارة قاعدة البيانات</h5>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h6><i class="fas fa-download"></i> نسخ احتياطي</h6>
+                    </div>
+                    <div class="card-body">
+                        <p>إنشاء نسخة احتياطية من جميع بيانات المنصة</p>
+                        <button class="btn btn-warning btn-block" onclick="createBackup()">
+                            <i class="fas fa-database"></i> إنشاء نسخة احتياطية
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h6><i class="fas fa-upload"></i> استعادة البيانات</h6>
+                    </div>
+                    <div class="card-body">
+                        <p>استعادة البيانات من نسخة احتياطية سابقة</p>
+                        <div class="upload-area" onclick="document.getElementById('restoreFile').click()">
+                            <i class="fas fa-file-upload"></i>
+                            <p>انقر لاختيار ملف النسخة الاحتياطية</p>
+                            <input type="file" id="restoreFile" accept=".json" style="display: none;">
+                        </div>
+                        <button class="btn btn-danger btn-block mt-3" onclick="restoreBackup()">
+                            <i class="fas fa-history"></i> استعادة البيانات
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
                                             </div>
                                         </div>
                                     </div>
@@ -3535,6 +3576,82 @@
                 showAlert('importExportTab', 'خطأ في استيراد البيانات', 'error');
             }
         }
+        // دوال إدارة قاعدة البيانات
+async function createBackup() {
+    try {
+        const response = await fetch(`${API_BASE}/admin/backup`, {
+            headers: {
+                'Authorization': `Bearer ${currentToken}`
+            }
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            showAlert('importExportTab', 
+                `تم إنشاء نسخة احتياطية بنجاح: ${data.usersCount} مستخدم، ${data.messagesCount} رسالة، ${data.imagesCount} صورة`, 
+                'success');
+        } else {
+            const data = await response.json();
+            showAlert('importExportTab', data.message, 'error');
+        }
+    } catch (error) {
+        console.error('Error creating backup:', error);
+        showAlert('importExportTab', 'خطأ في إنشاء النسخة الاحتياطية', 'error');
+    }
+}
+
+async function restoreBackup() {
+    const fileInput = document.getElementById('restoreFile');
+    const file = fileInput.files[0];
+    
+    if (!file) {
+        showAlert('importExportTab', 'لم يتم اختيار أي ملف نسخة احتياطية', 'error');
+        return;
+    }
+
+    if (!confirm('⚠️ تحذير: سيتم استبدال جميع البيانات الحالية بالبيانات من النسخة الاحتياطية. هل تريد المتابعة؟')) {
+        return;
+    }
+
+    try {
+        const formData = new FormData();
+        formData.append('backupFile', file);
+
+        const response = await fetch(`${API_BASE}/admin/restore`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${currentToken}`
+            },
+            body: formData
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            showAlert('importExportTab', 
+                `تم استعادة البيانات بنجاح: ${data.usersRestored} مستخدم، ${data.messagesRestored} رسالة، ${data.imagesRestored} صورة`, 
+                'success');
+            
+            // تحديث البيانات
+            setTimeout(() => {
+                loadUsersList(1);
+                loadAdminStats();
+            }, 2000);
+        } else {
+            showAlert('importExportTab', data.message, 'error');
+        }
+    } catch (error) {
+        console.error('Error restoring backup:', error);
+        showAlert('importExportTab', 'خطأ في استعادة البيانات', 'error');
+    }
+}
+
+// إعداد استماع لملف الاستعادة
+document.getElementById('restoreFile').addEventListener('change', function(e) {
+    if (e.target.files[0]) {
+        showAlert('importExportTab', `تم اختيار ملف: ${e.target.files[0].name}`, 'success');
+    }
+});
 
         // نظام الصور للمستخدم
         async function loadUserImages() {
