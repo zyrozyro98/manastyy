@@ -324,7 +324,7 @@ app.post('/api/chat/send', authenticateToken, async (req, res) => {
     try {
         const { text, receiverId, image, emoji, messageType = 'text' } = req.body;
 
-        if (!text && !image && messageType === 'text') {
+        if (!text && !image && !emoji && messageType === 'text') {
             return res.status(400).json({ message: 'الرسالة لا يمكن أن تكون فارغة' });
         }
 
@@ -339,22 +339,30 @@ app.post('/api/chat/send', authenticateToken, async (req, res) => {
 
         let actualReceiverId = receiverId;
         if (req.user.role === 'student') {
-            actualReceiverId = 'admin';
+            // الطلاب يرسلون فقط للمدير
+            const admin = await dbGet("SELECT _id FROM users WHERE role = 'admin' LIMIT 1");
+            actualReceiverId = admin._id;
         } else if (req.user.role === 'admin' && !receiverId) {
             return res.status(400).json({ message: 'يجب تحديد مستلم للرسالة' });
         }
 
         const messageId = crypto.randomBytes(16).toString('hex');
+        
+        // تحديد نوع الرسالة
+        let finalMessageType = messageType;
+        if (emoji) finalMessageType = 'emoji';
+        if (image) finalMessageType = 'image';
 
         await dbRun(
             `INSERT INTO messages (_id, senderId, senderName, receiverId, text, image, emoji, messageType) 
              VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-            [messageId, req.user._id, sender.fullName, actualReceiverId, text, image, emoji, messageType]
+            [messageId, req.user._id, sender.fullName, actualReceiverId, text, image, emoji, finalMessageType]
         );
 
         res.json({ 
             message: 'تم إرسال الرسالة',
-            messageId: messageId
+            messageId: messageId,
+            receiverId: actualReceiverId
         });
     } catch (error) {
         console.error('خطأ إرسال الرسالة:', error);
@@ -395,12 +403,21 @@ app.post('/api/admin/send-message', authenticateToken, requireAdmin, async (req,
             
             for (const user of users) {
                 const messageId = crypto.randomBytes(16).toString('hex');
+                let messageType = 'text';
+                if (image) messageType = 'image';
+                if (emoji) messageType = 'emoji';
+
                 await dbRun(
                     `INSERT INTO messages (_id, senderId, senderName, receiverId, text, image, emoji, messageType, isBroadcast) 
                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                    [messageId, 'admin', 'مدير النظام', user._id, text, image, emoji, image ? 'image' : (emoji ? 'emoji' : 'text'), 1]
+                    [messageId, req.user._id, 'مدير النظام', user._id, text, image, emoji, messageType, 1]
                 );
             }
+            
+            res.json({ 
+                message: `تم الإرسال الجماعي إلى ${users.length} مستخدم`,
+                count: users.length
+            });
         } else {
             // إرسال فردي
             if (!receiverId) {
@@ -413,16 +430,21 @@ app.post('/api/admin/send-message', authenticateToken, requireAdmin, async (req,
             }
 
             const messageId = crypto.randomBytes(16).toString('hex');
+            let messageType = 'text';
+            if (image) messageType = 'image';
+            if (emoji) messageType = 'emoji';
+
             await dbRun(
                 `INSERT INTO messages (_id, senderId, senderName, receiverId, text, image, emoji, messageType) 
                  VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-                [messageId, 'admin', 'مدير النظام', receiverId, text, image, emoji, image ? 'image' : (emoji ? 'emoji' : 'text')]
+                [messageId, req.user._id, 'مدير النظام', receiverId, text, image, emoji, messageType]
             );
-        }
 
-        res.json({ 
-            message: isBroadcast ? 'تم الإرسال الجماعي بنجاح' : 'تم إرسال الرسالة بنجاح'
-        });
+            res.json({ 
+                message: 'تم إرسال الرسالة بنجاح',
+                receiverName: receiver.fullName
+            });
+        }
     } catch (error) {
         console.error('خطأ إرسال الرسالة:', error);
         res.status(500).json({ message: 'خطأ في الخادم' });
@@ -445,22 +467,23 @@ app.get('/api/chat/conversations', authenticateToken, async (req, res) => {
                 u.major,
                 u.batch,
                 u.profileImage,
-                m.text as lastMessage,
-                m.timestamp as lastMessageTime,
-                (SELECT COUNT(*) FROM messages WHERE receiverId = 'admin' AND senderId = u._id AND read = 0) as unreadCount
+                u.lastLogin,
+                (SELECT text FROM messages 
+                 WHERE (senderId = u._id AND receiverId = ?) OR (senderId = ? AND receiverId = u._id)
+                 ORDER BY timestamp DESC LIMIT 1) as lastMessage,
+                (SELECT timestamp FROM messages 
+                 WHERE (senderId = u._id AND receiverId = ?) OR (senderId = ? AND receiverId = u._id)
+                 ORDER BY timestamp DESC LIMIT 1) as lastMessageTime,
+                (SELECT COUNT(*) FROM messages 
+                 WHERE senderId = u._id AND receiverId = ? AND read = 0) as unreadCount
             FROM users u
-            INNER JOIN (
-                SELECT 
-                    CASE WHEN senderId = 'admin' THEN receiverId ELSE senderId END as otherUserId,
-                    MAX(timestamp) as maxTime
-                FROM messages 
-                WHERE senderId = 'admin' OR receiverId = 'admin'
-                GROUP BY otherUserId
-            ) latest ON u._id = latest.otherUserId
-            INNER JOIN messages m ON (m.senderId = u._id OR m.receiverId = u._id) AND m.timestamp = latest.maxTime
             WHERE u.role = 'student' AND u.isActive = 1
-            ORDER BY m.timestamp DESC
-        `);
+            AND EXISTS (
+                SELECT 1 FROM messages 
+                WHERE (senderId = u._id AND receiverId = ?) OR (senderId = ? AND receiverId = u._id)
+            )
+            ORDER BY lastMessageTime DESC
+        `, [req.user._id, req.user._id, req.user._id, req.user._id, req.user._id, req.user._id, req.user._id]);
 
         res.json(conversations);
     } catch (error) {
@@ -478,25 +501,26 @@ app.get('/api/chat/conversation/:userId', authenticateToken, async (req, res) =>
         if (req.user.role === 'admin') {
             messages = await dbAll(`
                 SELECT * FROM messages 
-                WHERE (senderId = 'admin' AND receiverId = ?) OR (senderId = ? AND receiverId = 'admin')
+                WHERE (senderId = ? AND receiverId = ?) OR (senderId = ? AND receiverId = ?)
                 ORDER BY timestamp ASC
-            `, [userId, userId]);
+            `, [req.user._id, userId, userId, req.user._id]);
         } else {
-            if (userId !== req.user._id && userId !== 'admin') {
+            if (userId !== req.user._id) {
                 return res.status(403).json({ message: 'غير مصرح' });
             }
+            const admin = await dbGet("SELECT _id FROM users WHERE role = 'admin' LIMIT 1");
             messages = await dbAll(`
                 SELECT * FROM messages 
-                WHERE (senderId = ? AND receiverId = 'admin') OR (senderId = 'admin' AND receiverId = ?)
+                WHERE (senderId = ? AND receiverId = ?) OR (senderId = ? AND receiverId = ?)
                 ORDER BY timestamp ASC
-            `, [req.user._id, req.user._id]);
+            `, [req.user._id, admin._id, admin._id, req.user._id]);
         }
         
-        // تحديث حالة القراءة
+        // تحديث حالة القراءة للرسائل الواردة
         await dbRun(`
             UPDATE messages SET read = 1 
-            WHERE receiverId = ? AND read = 0
-        `, [req.user._id]);
+            WHERE receiverId = ? AND senderId = ? AND read = 0
+        `, [req.user._id, userId]);
         
         res.json(messages);
     } catch (error) {
@@ -508,17 +532,18 @@ app.get('/api/chat/conversation/:userId', authenticateToken, async (req, res) =>
 // الحصول على جميع الرسائل (للمستخدم العادي)
 app.get('/api/chat/messages', authenticateToken, async (req, res) => {
     try {
+        const admin = await dbGet("SELECT _id FROM users WHERE role = 'admin' LIMIT 1");
         const messages = await dbAll(`
             SELECT * FROM messages 
-            WHERE (senderId = ? AND receiverId = 'admin') OR (senderId = 'admin' AND receiverId = ?)
+            WHERE (senderId = ? AND receiverId = ?) OR (senderId = ? AND receiverId = ?)
             ORDER BY timestamp ASC
-        `, [req.user._id, req.user._id]);
+        `, [req.user._id, admin._id, admin._id, req.user._id]);
         
-        // تحديث حالة القراءة
+        // تحديث حالة القراءة للرسائل الواردة
         await dbRun(`
             UPDATE messages SET read = 1 
-            WHERE receiverId = ? AND read = 0
-        `, [req.user._id]);
+            WHERE receiverId = ? AND senderId = ? AND read = 0
+        `, [req.user._id, admin._id]);
         
         res.json(messages);
     } catch (error) {
@@ -675,7 +700,7 @@ app.get('/api/admin/stats', authenticateToken, requireAdmin, async (req, res) =>
         const totalUsers = await dbGet("SELECT COUNT(*) as count FROM users WHERE role = 'student'");
         const activeUsers = await dbGet("SELECT COUNT(*) as count FROM users WHERE role = 'student' AND isActive = 1");
         const totalMessages = await dbGet("SELECT COUNT(*) as count FROM messages");
-        const unreadMessages = await dbGet("SELECT COUNT(*) as count FROM messages WHERE receiverId = 'admin' AND read = 0");
+        const unreadMessages = await dbGet("SELECT COUNT(*) as count FROM messages WHERE receiverId = ? AND read = 0", [req.user._id]);
         const totalImages = await dbGet("SELECT COUNT(*) as count FROM images");
         
         const today = new Date().toISOString().split('T')[0];
@@ -694,7 +719,7 @@ app.get('/api/admin/stats', authenticateToken, requireAdmin, async (req, res) =>
             unreadMessages: unreadMessages.count,
             totalImages: totalImages.count,
             messagesToday: messagesToday.count,
-            storageUsed: 0 // يمكن إضافة حساب المساحة المستخدمة لاحقاً
+            storageUsed: 0
         };
 
         res.json(stats);
@@ -803,112 +828,9 @@ app.get('/api/images', authenticateToken, async (req, res) => {
     }
 });
 
-// نسخ احتياطي للبيانات
-app.get('/api/admin/backup', authenticateToken, requireAdmin, async (req, res) => {
-    try {
-        const backupData = {
-            users: await dbAll("SELECT * FROM users"),
-            messages: await dbAll("SELECT * FROM messages"),
-            images: await dbAll("SELECT * FROM images"),
-            backupDate: new Date().toISOString()
-        };
-
-        const backupDir = './backups';
-        if (!fs.existsSync(backupDir)) {
-            fs.mkdirSync(backupDir);
-        }
-
-        const backupFile = path.join(backupDir, `backup-${Date.now()}.json`);
-        fs.writeFileSync(backupFile, JSON.stringify(backupData, null, 2));
-
-        res.json({
-            message: 'تم إنشاء نسخة احتياطية بنجاح',
-            backupFile: backupFile,
-            usersCount: backupData.users.length,
-            messagesCount: backupData.messages.length,
-            imagesCount: backupData.images.length
-        });
-    } catch (error) {
-        console.error('خطأ في النسخ الاحتياطي:', error);
-        res.status(500).json({ message: 'خطأ في النسخ الاحتياطي' });
-    }
-});
-
-// استعادة البيانات من نسخة احتياطية
-app.post('/api/admin/restore', authenticateToken, requireAdmin, upload.single('backupFile'), async (req, res) => {
-    try {
-        if (!req.file) {
-            return res.status(400).json({ message: 'لم يتم رفع أي ملف نسخة احتياطية' });
-        }
-
-        const backupData = JSON.parse(fs.readFileSync(req.file.path, 'utf8'));
-
-        // بدء transaction
-        await dbRun("BEGIN TRANSACTION");
-
-        try {
-            // حذف البيانات الحالية
-            await dbRun("DELETE FROM images");
-            await dbRun("DELETE FROM messages");
-            await dbRun("DELETE FROM users WHERE role != 'admin'"); // الحفاظ على المدير
-
-            // استعادة المستخدمين
-            for (const user of backupData.users) {
-                if (user.role !== 'admin') {
-                    await dbRun(
-                        `INSERT INTO users (_id, fullName, phone, university, major, batch, password, role, isActive, profileImage, createdAt, lastLogin) 
-                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                        [user._id, user.fullName, user.phone, user.university, user.major, user.batch, 
-                         user.password, user.role, user.isActive, user.profileImage, user.createdAt, user.lastLogin]
-                    );
-                }
-            }
-
-            // استعادة الرسائل
-            for (const message of backupData.messages) {
-                await dbRun(
-                    `INSERT INTO messages (_id, senderId, senderName, receiverId, text, image, emoji, messageType, isBroadcast, read, timestamp) 
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                    [message._id, message.senderId, message.senderName, message.receiverId, message.text, 
-                     message.image, message.emoji, message.messageType, message.isBroadcast, message.read, message.timestamp]
-                );
-            }
-
-            // استعادة الصور
-            for (const image of backupData.images) {
-                await dbRun(
-                    `INSERT INTO images (_id, userId, userName, userPhone, imageName, originalName, url, description, sentBy, sentAt, fileSize, mimeType, isBroadcast) 
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                    [image._id, image.userId, image.userName, image.userPhone, image.imageName, image.originalName,
-                     image.url, image.description, image.sentBy, image.sentAt, image.fileSize, image.mimeType, image.isBroadcast]
-                );
-            }
-
-            await dbRun("COMMIT");
-            
-            // حذف الملف المؤقت
-            fs.unlinkSync(req.file.path);
-
-            res.json({ 
-                message: 'تم استعادة البيانات بنجاح',
-                usersRestored: backupData.users.length,
-                messagesRestored: backupData.messages.length,
-                imagesRestored: backupData.images.length
-            });
-        } catch (error) {
-            await dbRun("ROLLBACK");
-            throw error;
-        }
-    } catch (error) {
-        console.error('خطأ في استعادة البيانات:', error);
-        res.status(500).json({ message: 'خطأ في استعادة البيانات' });
-    }
-});
-
 // خدمة الملفات الثابتة
 app.use('/uploads', express.static('uploads'));
 app.use('/profile-pictures', express.static('profile-pictures'));
-app.use('/backups', express.static('backups'));
 
 // Route الأساسي
 app.get('/', (req, res) => {
@@ -925,7 +847,7 @@ app.get('/health', (req, res) => {
     res.json({ 
         status: '✅ النظام يعمل بشكل طبيعي',
         timestamp: new Date().toISOString(),
-        version: '3.0.0',
+        version: '3.1.0',
         environment: process.env.NODE_ENV || 'development',
         database: 'SQLite'
     });
@@ -958,10 +880,9 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 المنصة الإلكترونية تعمل على البورت ${PORT}`);
     console.log(`🌐 الرابط: http://localhost:${PORT}`);
-    console.log(`⚡ النسخة: 3.0.0 - نظام التخزين الدائم`);
+    console.log(`⚡ النسخة: 3.1.0 - نظام محسن`);
     console.log(`💾 قاعدة البيانات: SQLite (platform.db)`);
     console.log(`🔒 نظام أمان متقدم مفعل`);
-    console.log(`📊 الميزات: تخزين دائم، نسخ احتياطي، استعادة بيانات`);
 });
 
 // إغلاق قاعدة البيانات عند إيقاف السيرفر
