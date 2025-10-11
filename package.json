@@ -1,12 +1,12 @@
 {
-  "name": "student-platform-pro",
+  "name": "education-platform",
   "version": "2.0.0",
-  "description": "منصة طلاب إلكترونية احترافية - نظام متكامل للإدارة والتواصل",
+  "description": "منصة تعليمية متكاملة لنظام إدارة الطلاب",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node server.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "nodemon server.js",
+    "setup": "npm install && node server.js"
   },
   "dependencies": {
     "express": "^4.18.2",
@@ -21,40 +21,11 @@
   },
   "keywords": [
     "education",
-    "students",
     "platform",
+    "students",
     "management",
-    "arabic",
-    "secure",
-    "chat",
-    "messaging",
-    "file-upload",
-    "authentication"
+    "chat"
   ],
-  "author": {
-    "name": "Student Platform Team",
-    "email": "info@student-platform.com"
-  },
-  "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/student-platform/student-platform-pro.git"
-  },
-  "bugs": {
-    "url": "https://github.com/student-platform/student-platform-pro/issues"
-  },
-  "homepage": "https://github.com/student-platform/student-platform-pro#readme",
-  "engines": {
-    "node": ">=16.0.0",
-    "npm": ">=8.0.0"
-  },
-  "os": [
-    "linux",
-    "windows",
-    "macos"
-  ],
-  "cpu": [
-    "x64",
-    "arm64"
-  ]
+  "author": "Education Platform Team",
+  "license": "MIT"
 }
