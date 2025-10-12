@@ -373,15 +373,16 @@ app.get('/api/chat/messages', authenticateToken, async (req, res) => {
 
         // تحديث حالة القراءة للرسائل الموجهة للمستخدم
         let updated = false;
-        userMessages.forEach(msg => {
+        const updatedMessages = messages.map(msg => {
             if (msg.receiverId === req.user._id && !msg.read) {
                 msg.read = true;
                 updated = true;
             }
+            return msg;
         });
 
         if (updated) {
-            writeLocalFile('local-messages.json', messages);
+            writeLocalFile('local-messages.json', updatedMessages);
         }
 
         res.json(userMessages.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)));
@@ -454,7 +455,7 @@ app.post('/api/admin/send-message', authenticateToken, requireAdmin, async (req,
     }
 });
 
-// الحصول على المحادثات للمدير (محسّن)
+// الحصول على المحادثات للمدير (محسّن ومصحح)
 app.get('/api/admin/conversations', authenticateToken, requireAdmin, async (req, res) => {
     try {
         const messages = readLocalFile('local-messages.json');
@@ -464,49 +465,61 @@ app.get('/api/admin/conversations', authenticateToken, requireAdmin, async (req,
         
         // تجميع جميع الرسائل مع المستخدمين
         messages.forEach(msg => {
-            const otherUserId = msg.senderId === 'admin' ? msg.receiverId : msg.senderId;
+            // تجاهل الرسائل الذاتية والإرسال الجماعي
+            if (msg.senderId === 'admin' && msg.isBroadcast) return;
             
-            // تجاهل الرسائل الذاتية والمجموعات
-            if (otherUserId !== 'admin' && otherUserId !== 'broadcast') {
-                if (!userConversations[otherUserId]) {
-                    const user = users.find(u => u._id === otherUserId);
-                    if (user) {
-                        userConversations[otherUserId] = {
-                            userId: user._id,
-                            userName: user.fullName,
-                            userPhone: user.phone,
-                            userUniversity: user.university,
-                            userMajor: user.major,
-                            lastMessage: '',
-                            lastMessageTime: null,
-                            unreadCount: 0,
-                            totalMessages: 0,
-                            lastActivity: null
-                        };
-                    }
+            // تحديد هوية الطرف الآخر في المحادثة
+            let otherUserId;
+            if (msg.senderId === 'admin') {
+                otherUserId = msg.receiverId;
+            } else {
+                otherUserId = msg.senderId;
+            }
+            
+            // تجاهل الرسائل التي ليس لها مستخدم مقابل
+            if (otherUserId === 'admin' || otherUserId === 'broadcast') return;
+            
+            if (!userConversations[otherUserId]) {
+                const user = users.find(u => u._id === otherUserId);
+                if (user) {
+                    userConversations[otherUserId] = {
+                        userId: user._id,
+                        userName: user.fullName,
+                        userPhone: user.phone,
+                        userUniversity: user.university,
+                        userMajor: user.major,
+                        lastMessage: '',
+                        lastMessageTime: null,
+                        unreadCount: 0,
+                        totalMessages: 0,
+                        lastActivity: null
+                    };
+                }
+            }
+            
+            if (userConversations[otherUserId]) {
+                // تحديث آخر رسالة
+                if (!userConversations[otherUserId].lastMessageTime || 
+                    new Date(msg.timestamp) > new Date(userConversations[otherUserId].lastMessageTime)) {
+                    userConversations[otherUserId].lastMessage = msg.text;
+                    userConversations[otherUserId].lastMessageTime = msg.timestamp;
                 }
                 
-                if (userConversations[otherUserId]) {
-                    // تحديث آخر رسالة
-                    if (!userConversations[otherUserId].lastMessageTime || 
-                        new Date(msg.timestamp) > new Date(userConversations[otherUserId].lastMessageTime)) {
-                        userConversations[otherUserId].lastMessage = msg.text;
-                        userConversations[otherUserId].lastMessageTime = msg.timestamp;
-                    }
-                    
-                    // حساب الرسائل غير المقروءة
-                    if (msg.receiverId === 'admin' && !msg.read) {
-                        userConversations[otherUserId].unreadCount++;
-                    }
-                    
-                    // حساب إجمالي الرسائل
+                // حساب الرسائل غير المقروءة (التي أرسلها المستخدم للمدير ولم يقرأها المدير)
+                if (msg.senderId !== 'admin' && msg.receiverId === 'admin' && !msg.read) {
+                    userConversations[otherUserId].unreadCount++;
+                }
+                
+                // حساب إجمالي الرسائل بين المستخدم والمدير
+                if ((msg.senderId === otherUserId && msg.receiverId === 'admin') || 
+                    (msg.senderId === 'admin' && msg.receiverId === otherUserId)) {
                     userConversations[otherUserId].totalMessages++;
-                    
-                    // تحديث آخر نشاط
-                    if (!userConversations[otherUserId].lastActivity || 
-                        new Date(msg.timestamp) > new Date(userConversations[otherUserId].lastActivity)) {
-                        userConversations[otherUserId].lastActivity = msg.timestamp;
-                    }
+                }
+                
+                // تحديث آخر نشاط
+                if (!userConversations[otherUserId].lastActivity || 
+                    new Date(msg.timestamp) > new Date(userConversations[otherUserId].lastActivity)) {
+                    userConversations[otherUserId].lastActivity = msg.timestamp;
                 }
             }
         });
@@ -522,33 +535,100 @@ app.get('/api/admin/conversations', authenticateToken, requireAdmin, async (req,
     }
 });
 
-// الحصول على رسائل محادثة محددة للمدير
+// الحصول على رسائل محادثة محددة للمدير (مصحح)
 app.get('/api/chat/messages/:userId', authenticateToken, requireAdmin, async (req, res) => {
     try {
         const { userId } = req.params;
         const messages = readLocalFile('local-messages.json');
         
+        // الحصول على جميع الرسائل بين المدير وهذا المستخدم
         const conversationMessages = messages.filter(msg => 
             (msg.senderId === 'admin' && msg.receiverId === userId) ||
             (msg.senderId === userId && msg.receiverId === 'admin')
         );
         
-        // تحديث حالة القراءة للمستخدم الحالي
+        // تحديث حالة القراءة للرسائل التي أرسلها المستخدم للمدير
         let updatedCount = 0;
-        conversationMessages.forEach(msg => {
-            if (msg.receiverId === 'admin' && !msg.read) {
+        const updatedMessages = messages.map(msg => {
+            if (msg.senderId === userId && msg.receiverId === 'admin' && !msg.read) {
                 msg.read = true;
                 updatedCount++;
             }
+            return msg;
         });
         
         if (updatedCount > 0) {
-            writeLocalFile('local-messages.json', messages);
+            writeLocalFile('local-messages.json', updatedMessages);
         }
         
         res.json(conversationMessages.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)));
     } catch (error) {
         console.error('خطأ جلب الرسائل:', error);
+        res.status(500).json({ message: 'خطأ في الخادم' });
+    }
+});
+
+// إرسال رسالة من المدير إلى محادثة محددة
+app.post('/api/admin/reply-to-conversation', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const { userId, text } = req.body;
+
+        if (!userId || !text || text.trim().length === 0) {
+            return res.status(400).json({ message: 'معرف المستخدم والنص مطلوبان' });
+        }
+
+        const users = readLocalFile('local-users.json');
+        const user = users.find(u => u._id === userId);
+        
+        if (!user) {
+            return res.status(404).json({ message: 'المستخدم غير موجود' });
+        }
+
+        const messages = readLocalFile('local-messages.json');
+        const replyMessage = {
+            _id: crypto.randomBytes(16).toString('hex'),
+            senderId: 'admin',
+            senderName: 'مدير النظام',
+            receiverId: userId,
+            text: text.trim(),
+            timestamp: new Date().toISOString(),
+            read: false
+        };
+
+        messages.push(replyMessage);
+        writeLocalFile('local-messages.json', messages);
+
+        res.json({ 
+            message: 'تم إرسال الرد بنجاح',
+            messageId: replyMessage._id
+        });
+    } catch (error) {
+        console.error('خطأ في الرد على المحادثة:', error);
+        res.status(500).json({ message: 'خطأ في الخادم' });
+    }
+});
+
+// تعيين جميع الرسائل كمقروءة للمدير
+app.post('/api/admin/mark-all-read', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const messages = readLocalFile('local-messages.json');
+        let updatedCount = 0;
+
+        messages.forEach(msg => {
+            if (msg.receiverId === 'admin' && !msg.read) {
+                msg.read = true;
+                updatedCount++;
+            }
+        });
+
+        writeLocalFile('local-messages.json', messages);
+
+        res.json({ 
+            message: `تم تعيين ${updatedCount} رسالة كمقروءة`,
+            updatedCount 
+        });
+    } catch (error) {
+        console.error('خطأ تعيين الرسائل كمقروءة:', error);
         res.status(500).json({ message: 'خطأ في الخادم' });
     }
 });
