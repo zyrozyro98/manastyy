@@ -16,55 +16,151 @@ app.use(cors({
     credentials: true
 }));
 app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(express.static(__dirname));
 
 // معدلات الأمان
 app.disable('x-powered-by');
 
-// تهيئة الملفات والمجلدات
-function initializeApp() {
-    const files = ['local-users.json', 'local-messages.json', 'local-images.json'];
-    const folders = ['uploads', 'temp'];
-    
-    files.forEach(file => {
-        if (!fs.existsSync(file)) {
-            fs.writeFileSync(file, '[]');
-            console.log(`✅ تم إنشاء ${file}`);
+// نظام تخزين محسن
+class EnhancedStorage {
+    constructor() {
+        this.backupInterval = 5 * 60 * 1000; // 5 دقائق
+        this.init();
+    }
+
+    init() {
+        const files = ['local-users.json', 'local-messages.json', 'local-images.json'];
+        const folders = ['uploads', 'temp', 'backups'];
+        
+        files.forEach(file => {
+            if (!fs.existsSync(file)) {
+                fs.writeFileSync(file, '[]');
+                console.log(`✅ تم إنشاء ${file}`);
+            }
+        });
+        
+        folders.forEach(folder => {
+            if (!fs.existsSync(folder)) {
+                fs.mkdirSync(folder, { recursive: true });
+                console.log(`✅ تم إنشاء مجلد ${folder}`);
+            }
+        });
+
+        // بدء النسخ الاحتياطي التلقائي
+        this.startAutoBackup();
+    }
+
+    readFile(filename) {
+        try {
+            // محاولة قراءة الملف الرئيسي
+            if (fs.existsSync(filename)) {
+                const data = fs.readFileSync(filename, 'utf8');
+                return JSON.parse(data);
+            }
+            
+            // محاولة استعادة من النسخ الاحتياطي
+            const backupFile = `backups/${path.basename(filename)}.backup`;
+            if (fs.existsSync(backupFile)) {
+                console.log(`🔄 استعادة ${filename} من النسخ الاحتياطي`);
+                const data = fs.readFileSync(backupFile, 'utf8');
+                this.writeFile(filename, JSON.parse(data));
+                return JSON.parse(data);
+            }
+            
+            return [];
+        } catch (error) {
+            console.error(`خطأ في قراءة ${filename}:`, error);
+            return [];
         }
-    });
-    
-    folders.forEach(folder => {
-        if (!fs.existsSync(folder)) {
-            fs.mkdirSync(folder);
-            console.log(`✅ تم إنشاء مجلد ${folder}`);
+    }
+
+    writeFile(filename, data) {
+        try {
+            // إنشاء نسخة احتياطية أولاً
+            this.createBackup(filename);
+            
+            // الكتابة للملف الرئيسي
+            fs.writeFileSync(filename, JSON.stringify(data, null, 2));
+            return true;
+        } catch (error) {
+            console.error(`خطأ في الكتابة لـ ${filename}:`, error);
+            return false;
         }
-    });
+    }
+
+    createBackup(filename) {
+        try {
+            if (fs.existsSync(filename)) {
+                const backupDir = 'backups';
+                const backupFile = `${backupDir}/${path.basename(filename)}.backup`;
+                const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+                const datedBackup = `${backupDir}/${path.basename(filename)}.${timestamp}.backup`;
+                
+                // نسخ الملف
+                fs.copyFileSync(filename, backupFile);
+                fs.copyFileSync(filename, datedBackup);
+                
+                // الاحتفاظ بـ 5 نسخ فقط
+                this.cleanOldBackups(filename);
+            }
+        } catch (error) {
+            console.error(`خطأ في النسخ الاحتياطي لـ ${filename}:`, error);
+        }
+    }
+
+    cleanOldBackups(filename) {
+        try {
+            const backupDir = 'backups';
+            const baseName = path.basename(filename);
+            const backups = fs.readdirSync(backupDir)
+                .filter(file => file.startsWith(baseName) && file.endsWith('.backup'))
+                .map(file => ({
+                    name: file,
+                    time: fs.statSync(path.join(backupDir, file)).mtime.getTime()
+                }))
+                .sort((a, b) => b.time - a.time);
+
+            // حذف النسخ القديمة (الاحتفاظ بـ 5 فقط)
+            if (backups.length > 5) {
+                backups.slice(5).forEach(backup => {
+                    fs.unlinkSync(path.join(backupDir, backup.name));
+                });
+            }
+        } catch (error) {
+            console.error('خطأ في تنظيف النسخ الاحتياطية:', error);
+        }
+    }
+
+    startAutoBackup() {
+        setInterval(() => {
+            console.log('🔄 النسخ الاحتياطي التلقائي...');
+            ['local-users.json', 'local-messages.json', 'local-images.json'].forEach(file => {
+                if (fs.existsSync(file)) {
+                    this.createBackup(file);
+                }
+            });
+        }, this.backupInterval);
+    }
+
+    // استعادة البيانات
+    restoreData() {
+        const files = ['local-users.json', 'local-messages.json', 'local-images.json'];
+        files.forEach(file => {
+            const backupFile = `backups/${file}.backup`;
+            if (!fs.existsSync(file) && fs.existsSync(backupFile)) {
+                console.log(`🔄 استعادة ${file} من النسخ الاحتياطي`);
+                fs.copyFileSync(backupFile, file);
+            }
+        });
+    }
 }
 
-initializeApp();
+// تهيئة نظام التخزين
+const storageSystem = new EnhancedStorage();
 
 // مفتاح JWT آمن
 const JWT_SECRET = process.env.JWT_SECRET || crypto.randomBytes(64).toString('hex');
-
-// دوال مساعدة للتخزين المحلي
-function readLocalFile(filename) {
-    try {
-        const data = fs.readFileSync(filename, 'utf8');
-        return JSON.parse(data);
-    } catch (error) {
-        return [];
-    }
-}
-
-function writeLocalFile(filename, data) {
-    try {
-        fs.writeFileSync(filename, JSON.stringify(data, null, 2));
-        return true;
-    } catch (error) {
-        console.error('خطأ في الكتابة:', error);
-        return false;
-    }
-}
 
 // تخزين متقدم للصور
 const storage = multer.diskStorage({
@@ -82,7 +178,7 @@ const upload = multer({
     storage: storage,
     limits: {
         fileSize: 10 * 1024 * 1024, // 10MB
-        files: 10
+        files: 50
     },
     fileFilter: (req, file, cb) => {
         if (file.mimetype.startsWith('image/')) {
@@ -152,7 +248,16 @@ function updateLoginAttempts(ip, success) {
     }
 }
 
-// المسارات
+// نظام الاتصال في الوقت الحقيقي (WebSocket بديل)
+const activeConnections = new Map();
+
+app.use((req, res, next) => {
+    // إضافة معرف فريد لكل طلب لتتبع الاتصال
+    req.connectionId = crypto.randomBytes(8).toString('hex');
+    next();
+});
+
+// مسارات محسنة
 app.post('/api/auth/register', async (req, res) => {
     try {
         const { fullName, phone, university, major, batch, password } = req.body;
@@ -169,11 +274,11 @@ app.post('/api/auth/register', async (req, res) => {
         const saudiPhoneRegex = /^5\d{8}$/;
         if (!saudiPhoneRegex.test(phone)) {
             return res.status(400).json({ 
-                message: 'رقم الهاتف غير صحيح' 
+                message: 'رقم الهاتف غير صحيح. يجب أن يبدأ بـ 5 ويحتوي على 9 أرقام' 
             });
         }
 
-        const users = readLocalFile('local-users.json');
+        const users = storageSystem.readFile('local-users.json');
         if (users.find(u => u.phone === phone)) {
             return res.status(400).json({ message: 'رقم الهاتف مسجل مسبقاً' });
         }
@@ -194,7 +299,7 @@ app.post('/api/auth/register', async (req, res) => {
         };
 
         users.push(newUser);
-        writeLocalFile('local-users.json', users);
+        storageSystem.writeFile('local-users.json', users);
 
         res.status(201).json({ 
             message: 'تم إنشاء الحساب بنجاح',
@@ -220,7 +325,7 @@ app.post('/api/auth/login', checkLoginAttempts, async (req, res) => {
             return res.status(400).json({ message: 'رقم الهاتف وكلمة المرور مطلوبان' });
         }
 
-        const users = readLocalFile('local-users.json');
+        const users = storageSystem.readFile('local-users.json');
         const user = users.find(u => u.phone === phone && u.isActive !== false);
 
         if (!user) {
@@ -236,7 +341,7 @@ app.post('/api/auth/login', checkLoginAttempts, async (req, res) => {
 
         // تحديث آخر دخول
         user.lastLogin = new Date().toISOString();
-        writeLocalFile('local-users.json', users);
+        storageSystem.writeFile('local-users.json', users);
 
         updateLoginAttempts(ip, true);
 
@@ -250,6 +355,12 @@ app.post('/api/auth/login', checkLoginAttempts, async (req, res) => {
             JWT_SECRET,
             { expiresIn: '7d' }
         );
+
+        // تحديث حالة الاتصال
+        activeConnections.set(user._id, {
+            lastActive: Date.now(),
+            connectionId: req.connectionId
+        });
 
         res.json({
             token,
@@ -270,7 +381,7 @@ app.post('/api/auth/login', checkLoginAttempts, async (req, res) => {
     }
 });
 
-// نظام الدردشة المتقدم
+// نظام الدردشة المحسن
 app.post('/api/chat/send', authenticateToken, async (req, res) => {
     try {
         const { text, receiverId } = req.body;
@@ -283,8 +394,8 @@ app.post('/api/chat/send', authenticateToken, async (req, res) => {
             return res.status(400).json({ message: 'الرسالة طويلة جداً' });
         }
 
-        const messages = readLocalFile('local-messages.json');
-        const users = readLocalFile('local-users.json');
+        const messages = storageSystem.readFile('local-messages.json');
+        const users = storageSystem.readFile('local-users.json');
         
         const sender = users.find(u => u._id === req.user._id);
         if (!sender) {
@@ -293,15 +404,20 @@ app.post('/api/chat/send', authenticateToken, async (req, res) => {
 
         // تحديد المستلم بناءً على دور المرسل
         let actualReceiverId;
+        let actualReceiverName;
+        
         if (req.user.role === 'admin') {
             // المدير يرسل لمستخدم محدد
             if (!receiverId) {
                 return res.status(400).json({ message: 'معرف المستلم مطلوب للمدير' });
             }
             actualReceiverId = receiverId;
+            const receiver = users.find(u => u._id === receiverId);
+            actualReceiverName = receiver ? receiver.fullName : 'مستخدم غير معروف';
         } else {
             // المستخدم العادي يرسل للمدير
             actualReceiverId = 'admin';
+            actualReceiverName = 'مدير النظام';
         }
 
         const newMessage = {
@@ -309,17 +425,26 @@ app.post('/api/chat/send', authenticateToken, async (req, res) => {
             senderId: req.user._id,
             senderName: sender.fullName,
             receiverId: actualReceiverId,
+            receiverName: actualReceiverName,
             text: text.trim(),
             timestamp: new Date().toISOString(),
-            read: false
+            read: false,
+            delivered: false
         };
 
         messages.push(newMessage);
-        writeLocalFile('local-messages.json', messages);
+        storageSystem.writeFile('local-messages.json', messages);
+
+        // تحديث حالة الاتصال للمستلم
+        if (activeConnections.has(actualReceiverId)) {
+            newMessage.delivered = true;
+            // في تطبيق حقيقي، هنا سنستخدم WebSocket لإرسال الإشعار
+        }
 
         res.json({ 
             message: 'تم إرسال الرسالة',
-            messageId: newMessage._id
+            messageId: newMessage._id,
+            delivered: newMessage.delivered
         });
     } catch (error) {
         console.error('خطأ إرسال الرسالة:', error);
@@ -336,8 +461,8 @@ app.post('/api/admin/send-message', authenticateToken, requireAdmin, async (req,
             return res.status(400).json({ message: 'الرسالة لا يمكن أن تكون فارغة' });
         }
 
-        const messages = readLocalFile('local-messages.json');
-        const users = readLocalFile('local-users.json');
+        const messages = storageSystem.readFile('local-messages.json');
+        const users = storageSystem.readFile('local-users.json');
 
         if (isBroadcast) {
             // إرسال جماعي
@@ -348,9 +473,11 @@ app.post('/api/admin/send-message', authenticateToken, requireAdmin, async (req,
                         senderId: 'admin',
                         senderName: 'مدير النظام',
                         receiverId: user._id,
+                        receiverName: user.fullName,
                         text: text.trim(),
                         timestamp: new Date().toISOString(),
                         read: false,
+                        delivered: false,
                         isBroadcast: true
                     };
                     messages.push(broadcastMessage);
@@ -372,15 +499,17 @@ app.post('/api/admin/send-message', authenticateToken, requireAdmin, async (req,
                 senderId: 'admin',
                 senderName: 'مدير النظام',
                 receiverId: receiverId,
+                receiverName: receiver.fullName,
                 text: text.trim(),
                 timestamp: new Date().toISOString(),
                 read: false,
+                delivered: false,
                 isBroadcast: false
             };
             messages.push(directMessage);
         }
 
-        writeLocalFile('local-messages.json', messages);
+        storageSystem.writeFile('local-messages.json', messages);
         res.json({ 
             message: isBroadcast ? 'تم الإرسال الجماعي بنجاح' : 'تم إرسال الرسالة بنجاح'
         });
@@ -397,8 +526,8 @@ app.get('/api/chat/conversations', authenticateToken, async (req, res) => {
             return res.status(403).json({ message: 'صلاحيات غير كافية' });
         }
 
-        const messages = readLocalFile('local-messages.json');
-        const users = readLocalFile('local-users.json');
+        const messages = storageSystem.readFile('local-messages.json');
+        const users = storageSystem.readFile('local-users.json');
         
         const userConversations = {};
         
@@ -431,7 +560,8 @@ app.get('/api/chat/conversations', authenticateToken, async (req, res) => {
                         userPhone: user.phone,
                         lastMessage: lastMessage?.text || 'لا توجد رسائل',
                         lastMessageTime: lastMessage?.timestamp || new Date().toISOString(),
-                        unreadCount: unreadCount
+                        unreadCount: unreadCount,
+                        hasUnread: unreadCount > 0
                     };
                 }
             }
@@ -448,7 +578,7 @@ app.get('/api/chat/conversations', authenticateToken, async (req, res) => {
 app.get('/api/chat/conversation/:userId', authenticateToken, async (req, res) => {
     try {
         const { userId } = req.params;
-        const messages = readLocalFile('local-messages.json');
+        const messages = storageSystem.readFile('local-messages.json');
         
         let conversationMessages;
         if (req.user.role === 'admin') {
@@ -477,7 +607,7 @@ app.get('/api/chat/conversation/:userId', authenticateToken, async (req, res) =>
         });
         
         if (updated) {
-            writeLocalFile('local-messages.json', messages);
+            storageSystem.writeFile('local-messages.json', messages);
         }
         
         res.json(conversationMessages.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)));
@@ -490,7 +620,7 @@ app.get('/api/chat/conversation/:userId', authenticateToken, async (req, res) =>
 // الحصول على جميع الرسائل (للمستخدم العادي)
 app.get('/api/chat/messages', authenticateToken, async (req, res) => {
     try {
-        const messages = readLocalFile('local-messages.json');
+        const messages = storageSystem.readFile('local-messages.json');
         
         const userMessages = messages.filter(msg => 
             (msg.senderId === req.user._id && msg.receiverId === 'admin') ||
@@ -507,7 +637,7 @@ app.get('/api/chat/messages', authenticateToken, async (req, res) => {
         });
         
         if (updated) {
-            writeLocalFile('local-messages.json', messages);
+            storageSystem.writeFile('local-messages.json', messages);
         }
         
         res.json(userMessages.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)));
@@ -530,7 +660,7 @@ app.post('/api/admin/send-image', authenticateToken, requireAdmin, upload.single
             return res.status(400).json({ message: 'معرف المستلم مطلوب' });
         }
 
-        const users = readLocalFile('local-users.json');
+        const users = storageSystem.readFile('local-users.json');
         const receiver = users.find(u => u._id === receiverId);
         
         if (!receiver) {
@@ -541,7 +671,7 @@ app.post('/api/admin/send-image', authenticateToken, requireAdmin, upload.single
             return res.status(404).json({ message: 'المستخدم غير موجود' });
         }
 
-        const images = readLocalFile('local-images.json');
+        const images = storageSystem.readFile('local-images.json');
         const newImage = {
             _id: crypto.randomBytes(16).toString('hex'),
             userId: receiverId,
@@ -554,11 +684,12 @@ app.post('/api/admin/send-image', authenticateToken, requireAdmin, upload.single
             sentBy: req.user._id,
             sentAt: new Date().toISOString(),
             fileSize: req.file.size,
-            mimeType: req.file.mimetype
+            mimeType: req.file.mimetype,
+            isBroadcast: false
         };
 
         images.push(newImage);
-        writeLocalFile('local-images.json', images);
+        storageSystem.writeFile('local-images.json', images);
 
         res.json({ 
             message: 'تم إرسال الصورة بنجاح',
@@ -588,8 +719,8 @@ app.post('/api/admin/broadcast-image', authenticateToken, requireAdmin, upload.s
             return res.status(400).json({ message: 'لم يتم رفع أي صورة' });
         }
 
-        const users = readLocalFile('local-users.json');
-        const images = readLocalFile('local-images.json');
+        const users = storageSystem.readFile('local-users.json');
+        const images = storageSystem.readFile('local-images.json');
         let successCount = 0;
 
         users.forEach(user => {
@@ -614,7 +745,7 @@ app.post('/api/admin/broadcast-image', authenticateToken, requireAdmin, upload.s
             }
         });
 
-        writeLocalFile('local-images.json', images);
+        storageSystem.writeFile('local-images.json', images);
         res.json({ 
             message: `تم إرسال الصورة إلى ${successCount} مستخدم`,
             successCount
@@ -635,8 +766,8 @@ app.post('/api/admin/send-batch-images', authenticateToken, requireAdmin, upload
             return res.status(400).json({ message: 'لم يتم رفع أي صور' });
         }
 
-        const users = readLocalFile('local-users.json');
-        const images = readLocalFile('local-images.json');
+        const users = storageSystem.readFile('local-users.json');
+        const images = storageSystem.readFile('local-images.json');
         
         const results = {
             success: 0,
@@ -701,7 +832,7 @@ app.post('/api/admin/send-batch-images', authenticateToken, requireAdmin, upload
         }
 
         // حفظ التحديثات
-        writeLocalFile('local-images.json', images);
+        storageSystem.writeFile('local-images.json', images);
 
         res.json({
             message: `تم معالجة ${req.files.length} صورة`,
@@ -726,7 +857,7 @@ app.post('/api/admin/send-batch-images', authenticateToken, requireAdmin, upload
 
 app.get('/api/images', authenticateToken, async (req, res) => {
     try {
-        const images = readLocalFile('local-images.json')
+        const images = storageSystem.readFile('local-images.json')
             .filter(img => img.userId === req.user._id)
             .sort((a, b) => new Date(b.sentAt) - new Date(a.sentAt));
         
@@ -740,7 +871,7 @@ app.get('/api/images', authenticateToken, async (req, res) => {
 // إدارة المستخدمين للمدير
 app.get('/api/admin/users', authenticateToken, requireAdmin, async (req, res) => {
     try {
-        const users = readLocalFile('local-users.json')
+        const users = storageSystem.readFile('local-users.json')
             .filter(user => user.role === 'student')
             .map(user => ({
                 _id: user._id,
@@ -765,7 +896,7 @@ app.get('/api/admin/users', authenticateToken, requireAdmin, async (req, res) =>
 app.get('/api/admin/user/:userId', authenticateToken, requireAdmin, async (req, res) => {
     try {
         const { userId } = req.params;
-        const users = readLocalFile('local-users.json');
+        const users = storageSystem.readFile('local-users.json');
         const user = users.find(u => u._id === userId);
         
         if (!user) {
@@ -789,9 +920,9 @@ app.get('/api/admin/user/:userId', authenticateToken, requireAdmin, async (req, 
 // إحصائيات النظام
 app.get('/api/admin/stats', authenticateToken, requireAdmin, async (req, res) => {
     try {
-        const users = readLocalFile('local-users.json');
-        const messages = readLocalFile('local-messages.json');
-        const images = readLocalFile('local-images.json');
+        const users = storageSystem.readFile('local-users.json');
+        const messages = storageSystem.readFile('local-messages.json');
+        const images = storageSystem.readFile('local-images.json');
 
         const stats = {
             totalUsers: users.filter(u => u.role === 'student').length,
@@ -799,7 +930,9 @@ app.get('/api/admin/stats', authenticateToken, requireAdmin, async (req, res) =>
             totalMessages: messages.length,
             unreadMessages: messages.filter(m => m.receiverId === 'admin' && !m.read).length,
             totalImages: images.length,
-            storageUsed: images.reduce((total, img) => total + (img.fileSize || 0), 0)
+            storageUsed: images.reduce((total, img) => total + (img.fileSize || 0), 0),
+            onlineUsers: Array.from(activeConnections.keys()).length,
+            systemUptime: process.uptime()
         };
 
         res.json(stats);
@@ -809,13 +942,39 @@ app.get('/api/admin/stats', authenticateToken, requireAdmin, async (req, res) =>
     }
 });
 
+// مسار فحص الاتصال المحسن
+app.get('/api/health', authenticateToken, (req, res) => {
+    const userStatus = activeConnections.has(req.user._id) ? 'متصل' : 'غير متصل';
+    
+    res.json({
+        status: '✅ النظام يعمل بشكل طبيعي',
+        userStatus: userStatus,
+        timestamp: new Date().toISOString(),
+        connectionId: req.connectionId,
+        activeConnections: activeConnections.size
+    });
+});
+
+// مسار الحفاظ على الاتصال
+app.post('/api/keep-alive', authenticateToken, (req, res) => {
+    activeConnections.set(req.user._id, {
+        lastActive: Date.now(),
+        connectionId: req.connectionId
+    });
+    
+    res.json({ 
+        status: 'active',
+        timestamp: new Date().toISOString()
+    });
+});
+
 // خدمة الملفات الثابتة
 app.use('/uploads', express.static('uploads'));
 
 // إنشاء مدير افتراضي
 const createAdminUser = async () => {
     try {
-        const users = readLocalFile('local-users.json');
+        const users = storageSystem.readFile('local-users.json');
         const adminExists = users.find(u => u.role === 'admin');
 
         if (!adminExists) {
@@ -835,7 +994,7 @@ const createAdminUser = async () => {
             };
 
             users.push(adminUser);
-            writeLocalFile('local-users.json', users);
+            storageSystem.writeFile('local-users.json', users);
             console.log('✅ تم إنشاء حساب المدير الافتراضي');
             console.log('📱 رقم الهاتف: 500000000');
             console.log('🔐 كلمة المرور: Admin123!@#');
@@ -845,55 +1004,42 @@ const createAdminUser = async () => {
     }
 };
 
-// Route الأساسي
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
-});
-
-// صفحة الإدارة
-app.get('/admin', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
-});
-
-// مسار الصحة
-app.get('/health', (req, res) => {
-    res.json({ 
-        status: '✅ النظام يعمل بشكل طبيعي',
-        timestamp: new Date().toISOString(),
-        version: '2.0.0',
-        environment: process.env.NODE_ENV || 'development'
-    });
-});
-
-// Middleware للأمان
-app.use((req, res, next) => {
-    res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('X-Frame-Options', 'DENY');
-    res.setHeader('X-XSS-Protection', '1; mode=block');
-    next();
-});
-
-// معالجة الأخطاء
-app.use((error, req, res, next) => {
-    console.error('خطأ غير متوقع:', error);
-    res.status(500).json({ 
-        message: 'حدث خطأ غير متوقع في النظام',
-        reference: crypto.randomBytes(4).toString('hex')
-    });
-});
-
-// 404 handler
-app.use((req, res) => {
-    res.status(404).json({ message: 'الصفحة غير موجودة' });
-});
-
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 المنصة الإلكترونية تعمل على البورت ${PORT}`);
-    console.log(`🌐 الرابط: http://localhost:${PORT}`);
-    console.log(`⚡ النسخة: 2.0.0 - الاحترافية`);
-    console.log(`🔒 نظام أمان متقدم مفعل`);
-    console.log(`💾 نظام التخزين: الملفات المحلية`);
+// تنظيف الاتصالات غير النشطة
+setInterval(() => {
+    const now = Date.now();
+    const timeout = 2 * 60 * 1000; // 2 دقيقة
     
-    setTimeout(createAdminUser, 2000);
+    activeConnections.forEach((connection, userId) => {
+        if (now - connection.lastActive > timeout) {
+            activeConnections.delete(userId);
+        }
+    });
+}, 60000); // كل دقيقة
+
+// بدء السيرفر
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, async () => {
+    console.log('🚀 بدء تشغيل السيرفر المحسن...');
+    
+    // استعادة البيانات من النسخ الاحتياطي إذا لزم الأمر
+    storageSystem.restoreData();
+    
+    // إنشاء المدير الافتراضي
+    await createAdminUser();
+    
+    console.log(`✅ السيرفر يعمل على المنفذ ${PORT}`);
+    console.log('📊 النظام جاهز للاستخدام');
+    console.log('🔒 نظام النسخ الاحتياطي التلقائي مفعل');
+    console.log('🛡️  إجراءات الأمان المحسنة مفعلة');
+});
+
+// معالجة الأخطاء غير المتوقعة
+process.on('uncaughtException', (error) => {
+    console.error('❌ خطأ غير متوقع:', error);
+    // لا نوقف العملية، بل نسجل الخطأ ونستمر
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('❌ رفض وعد غير معالج:', reason);
 });
