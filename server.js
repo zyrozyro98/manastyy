@@ -6,7 +6,6 @@ const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
-const sqlite3 = require('sqlite3').verbose();
 require('dotenv').config();
 
 const app = express();
@@ -16,108 +15,61 @@ app.use(cors({
     origin: process.env.ALLOWED_ORIGINS || true,
     credentials: true
 }));
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.use(express.json({ limit: '10mb' }));
 app.use(express.static(__dirname));
 
 // معدلات الأمان
 app.disable('x-powered-by');
 
-// تهيئة قاعدة البيانات
-const db = new sqlite3.Database('./platform.db', (err) => {
-    if (err) {
-        console.error('❌ خطأ في فتح قاعدة البيانات:', err.message);
-    } else {
-        console.log('✅ تم الاتصال بقاعدة البيانات SQLite');
-        initializeDatabase();
-    }
-});
-
-// إنشاء الجداول
-function initializeDatabase() {
-    // جدول المستخدمين
-    db.run(`CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        _id TEXT UNIQUE NOT NULL,
-        fullName TEXT NOT NULL,
-        phone TEXT UNIQUE NOT NULL,
-        university TEXT NOT NULL,
-        major TEXT NOT NULL,
-        batch TEXT NOT NULL,
-        password TEXT NOT NULL,
-        role TEXT DEFAULT 'student',
-        isActive BOOLEAN DEFAULT 1,
-        profileImage TEXT,
-        createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-        lastLogin DATETIME,
-        lastUpdated DATETIME DEFAULT CURRENT_TIMESTAMP
-    )`);
-
-    // جدول الرسائل
-    db.run(`CREATE TABLE IF NOT EXISTS messages (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        _id TEXT UNIQUE NOT NULL,
-        senderId TEXT NOT NULL,
-        senderName TEXT NOT NULL,
-        receiverId TEXT NOT NULL,
-        text TEXT,
-        image TEXT,
-        emoji TEXT,
-        messageType TEXT DEFAULT 'text',
-        isBroadcast BOOLEAN DEFAULT 0,
-        read BOOLEAN DEFAULT 0,
-        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (senderId) REFERENCES users (_id),
-        FOREIGN KEY (receiverId) REFERENCES users (_id)
-    )`);
-
-    // جدول الصور
-    db.run(`CREATE TABLE IF NOT EXISTS images (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        _id TEXT UNIQUE NOT NULL,
-        userId TEXT NOT NULL,
-        userName TEXT NOT NULL,
-        userPhone TEXT NOT NULL,
-        imageName TEXT NOT NULL,
-        originalName TEXT NOT NULL,
-        url TEXT NOT NULL,
-        description TEXT,
-        sentBy TEXT NOT NULL,
-        sentAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-        fileSize INTEGER,
-        mimeType TEXT,
-        isBroadcast BOOLEAN DEFAULT 0,
-        FOREIGN KEY (userId) REFERENCES users (_id),
-        FOREIGN KEY (sentBy) REFERENCES users (_id)
-    )`);
-
-    // جدول الإحصائيات
-    db.run(`CREATE TABLE IF NOT EXISTS statistics (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        key TEXT UNIQUE NOT NULL,
-        value TEXT NOT NULL,
-        updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
-    )`);
-
-    // إنشاء المدير الافتراضي
-    createAdminUser();
+// تهيئة الملفات والمجلدات
+function initializeApp() {
+    const files = ['local-users.json', 'local-messages.json', 'local-images.json'];
+    const folders = ['uploads', 'temp'];
+    
+    files.forEach(file => {
+        if (!fs.existsSync(file)) {
+            fs.writeFileSync(file, '[]');
+            console.log(`✅ تم إنشاء ${file}`);
+        }
+    });
+    
+    folders.forEach(folder => {
+        if (!fs.existsSync(folder)) {
+            fs.mkdirSync(folder);
+            console.log(`✅ تم إنشاء مجلد ${folder}`);
+        }
+    });
 }
+
+initializeApp();
 
 // مفتاح JWT آمن
 const JWT_SECRET = process.env.JWT_SECRET || crypto.randomBytes(64).toString('hex');
 
-// تخزين متقدم للصور والملفات
+// دوال مساعدة للتخزين المحلي
+function readLocalFile(filename) {
+    try {
+        const data = fs.readFileSync(filename, 'utf8');
+        return JSON.parse(data);
+    } catch (error) {
+        return [];
+    }
+}
+
+function writeLocalFile(filename, data) {
+    try {
+        fs.writeFileSync(filename, JSON.stringify(data, null, 2));
+        return true;
+    } catch (error) {
+        console.error('خطأ في الكتابة:', error);
+        return false;
+    }
+}
+
+// تخزين متقدم للصور
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        let folder = 'uploads/';
-        if (file.fieldname === 'profileImage') {
-            folder = 'profile-pictures/';
-        }
-        // التأكد من وجود المجلد
-        if (!fs.existsSync(folder)) {
-            fs.mkdirSync(folder, { recursive: true });
-        }
-        cb(null, folder);
+        cb(null, 'uploads/');
     },
     filename: (req, file, cb) => {
         const uniqueSuffix = crypto.randomBytes(8).toString('hex');
@@ -129,14 +81,14 @@ const storage = multer.diskStorage({
 const upload = multer({
     storage: storage,
     limits: {
-        fileSize: 20 * 1024 * 1024, // 20MB
+        fileSize: 10 * 1024 * 1024, // 10MB
         files: 10
     },
     fileFilter: (req, file, cb) => {
-        if (file.mimetype.startsWith('image/') || file.mimetype.startsWith('application/')) {
+        if (file.mimetype.startsWith('image/')) {
             cb(null, true);
         } else {
-            cb(new Error('يسمح برفع الصور وملفات CSV فقط'), false);
+            cb(new Error('يسمح برفع الصور فقط'), false);
         }
     }
 });
@@ -166,65 +118,46 @@ const requireAdmin = (req, res, next) => {
     next();
 };
 
-// دوال مساعدة لقاعدة البيانات
-function dbGet(query, params = []) {
-    return new Promise((resolve, reject) => {
-        db.get(query, params, (err, row) => {
-            if (err) reject(err);
-            else resolve(row);
-        });
-    });
-}
+// معدل للوقاية من هجمات Brute Force
+const loginAttempts = new Map();
+const MAX_LOGIN_ATTEMPTS = 5;
+const LOCKOUT_TIME = 15 * 60 * 1000; // 15 دقيقة
 
-function dbAll(query, params = []) {
-    return new Promise((resolve, reject) => {
-        db.all(query, params, (err, rows) => {
-            if (err) reject(err);
-            else resolve(rows);
+const checkLoginAttempts = (req, res, next) => {
+    const ip = req.ip;
+    const attempts = loginAttempts.get(ip) || { count: 0, lastAttempt: Date.now() };
+    
+    if (attempts.count >= MAX_LOGIN_ATTEMPTS && Date.now() - attempts.lastAttempt < LOCKOUT_TIME) {
+        return res.status(429).json({ 
+            message: 'تم تجاوز عدد المحاولات المسموح بها. الرجاء المحاولة لاحقاً' 
         });
-    });
-}
+    }
+    next();
+};
 
-function dbRun(query, params = []) {
-    return new Promise((resolve, reject) => {
-        db.run(query, params, function(err) {
-            if (err) reject(err);
-            else resolve({ id: this.lastID, changes: this.changes });
-        });
-    });
-}
-
-// إنشاء مدير افتراضي
-async function createAdminUser() {
-    try {
-        const adminExists = await dbGet("SELECT * FROM users WHERE role = 'admin'");
+function updateLoginAttempts(ip, success) {
+    const attempts = loginAttempts.get(ip) || { count: 0, lastAttempt: Date.now() };
+    
+    if (success) {
+        loginAttempts.delete(ip);
+    } else {
+        attempts.count++;
+        attempts.lastAttempt = Date.now();
+        loginAttempts.set(ip, attempts);
         
-        if (!adminExists) {
-            const hashedPassword = await bcrypt.hash('Admin123!@#', 12);
-            const adminId = 'admin-' + crypto.randomBytes(8).toString('hex');
-            
-            await dbRun(
-                `INSERT INTO users (_id, fullName, phone, university, major, batch, password, role) 
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-                [adminId, 'مدير النظام', '500000000', 'الإدارة العامة', 'نظم المعلومات', '2024', hashedPassword, 'admin']
-            );
-            
-            console.log('✅ تم إنشاء حساب المدير الافتراضي');
-            console.log('📱 رقم الهاتف: 500000000');
-            console.log('🔐 كلمة المرور: Admin123!@#');
-        } else {
-            console.log('✅ حساب المدير موجود بالفعل');
-        }
-    } catch (error) {
-        console.error('خطأ في إنشاء المدير:', error);
+        // تنظيف المحاولات القديمة
+        setTimeout(() => {
+            loginAttempts.delete(ip);
+        }, LOCKOUT_TIME);
     }
 }
 
-// المسارات الأساسية
+// المسارات
 app.post('/api/auth/register', async (req, res) => {
     try {
         const { fullName, phone, university, major, batch, password } = req.body;
 
+        // تحقق مكثف من البيانات
         if (!fullName || !phone || !university || !major || !batch || !password) {
             return res.status(400).json({ message: 'جميع الحقول مطلوبة' });
         }
@@ -235,31 +168,41 @@ app.post('/api/auth/register', async (req, res) => {
 
         const saudiPhoneRegex = /^5\d{8}$/;
         if (!saudiPhoneRegex.test(phone)) {
-            return res.status(400).json({ message: 'رقم الهاتف غير صحيح' });
+            return res.status(400).json({ 
+                message: 'رقم الهاتف غير صحيح' 
+            });
         }
 
-        // التحقق من وجود المستخدم
-        const existingUser = await dbGet("SELECT * FROM users WHERE phone = ?", [phone]);
-        if (existingUser) {
+        const users = readLocalFile('local-users.json');
+        if (users.find(u => u.phone === phone)) {
             return res.status(400).json({ message: 'رقم الهاتف مسجل مسبقاً' });
         }
 
         const hashedPassword = await bcrypt.hash(password, 12);
-        const userId = crypto.randomBytes(16).toString('hex');
+        const newUser = {
+            _id: crypto.randomBytes(16).toString('hex'),
+            fullName: fullName.trim(),
+            phone,
+            university,
+            major,
+            batch,
+            password: hashedPassword,
+            role: 'student',
+            isActive: true,
+            createdAt: new Date().toISOString(),
+            lastLogin: null
+        };
 
-        await dbRun(
-            `INSERT INTO users (_id, fullName, phone, university, major, batch, password) 
-             VALUES (?, ?, ?, ?, ?, ?, ?)`,
-            [userId, fullName.trim(), phone, university, major, batch, hashedPassword]
-        );
+        users.push(newUser);
+        writeLocalFile('local-users.json', users);
 
         res.status(201).json({ 
             message: 'تم إنشاء الحساب بنجاح',
             user: {
-                _id: userId,
-                fullName: fullName.trim(),
-                phone: phone,
-                university: university
+                _id: newUser._id,
+                fullName: newUser.fullName,
+                phone: newUser.phone,
+                university: newUser.university
             }
         });
     } catch (error) {
@@ -268,27 +211,34 @@ app.post('/api/auth/register', async (req, res) => {
     }
 });
 
-app.post('/api/auth/login', async (req, res) => {
+app.post('/api/auth/login', checkLoginAttempts, async (req, res) => {
     try {
         const { phone, password } = req.body;
+        const ip = req.ip;
 
         if (!phone || !password) {
             return res.status(400).json({ message: 'رقم الهاتف وكلمة المرور مطلوبان' });
         }
 
-        const user = await dbGet("SELECT * FROM users WHERE phone = ? AND isActive = 1", [phone]);
+        const users = readLocalFile('local-users.json');
+        const user = users.find(u => u.phone === phone && u.isActive !== false);
 
         if (!user) {
+            updateLoginAttempts(ip, false);
             return res.status(400).json({ message: 'بيانات الدخول غير صحيحة' });
         }
 
         const validPassword = await bcrypt.compare(password, user.password);
         if (!validPassword) {
+            updateLoginAttempts(ip, false);
             return res.status(400).json({ message: 'بيانات الدخول غير صحيحة' });
         }
 
         // تحديث آخر دخول
-        await dbRun("UPDATE users SET lastLogin = CURRENT_TIMESTAMP WHERE _id = ?", [user._id]);
+        user.lastLogin = new Date().toISOString();
+        writeLocalFile('local-users.json', users);
+
+        updateLoginAttempts(ip, true);
 
         const token = jwt.sign(
             { 
@@ -298,7 +248,7 @@ app.post('/api/auth/login', async (req, res) => {
                 role: user.role 
             },
             JWT_SECRET,
-            { expiresIn: '30d' }
+            { expiresIn: '7d' }
         );
 
         res.json({
@@ -311,8 +261,7 @@ app.post('/api/auth/login', async (req, res) => {
                 major: user.major,
                 batch: user.batch,
                 role: user.role,
-                lastLogin: user.lastLogin,
-                profileImage: user.profileImage
+                lastLogin: user.lastLogin
             }
         });
     } catch (error) {
@@ -321,45 +270,56 @@ app.post('/api/auth/login', async (req, res) => {
     }
 });
 
-// نظام الدردشة المتقدم مع الصور والإيموجي
+// نظام الدردشة المتقدم
 app.post('/api/chat/send', authenticateToken, async (req, res) => {
     try {
-        const { text, receiverId, image, emoji, messageType = 'text' } = req.body;
+        const { text, receiverId } = req.body;
 
-        if (!text && !image && !emoji && messageType === 'text') {
+        if (!text || text.trim().length === 0) {
             return res.status(400).json({ message: 'الرسالة لا يمكن أن تكون فارغة' });
         }
 
-        if (text && text.length > 2000) {
+        if (text.length > 1000) {
             return res.status(400).json({ message: 'الرسالة طويلة جداً' });
         }
 
-        const sender = await dbGet("SELECT * FROM users WHERE _id = ?", [req.user._id]);
+        const messages = readLocalFile('local-messages.json');
+        const users = readLocalFile('local-users.json');
+        
+        const sender = users.find(u => u._id === req.user._id);
         if (!sender) {
             return res.status(404).json({ message: 'المستخدم غير موجود' });
         }
 
-        let actualReceiverId = receiverId;
-        if (req.user.role === 'student') {
-            // الطلاب يرسلون فقط للمدير
-            const admin = await dbGet("SELECT _id FROM users WHERE role = 'admin' LIMIT 1");
-            actualReceiverId = admin._id;
-        } else if (req.user.role === 'admin' && !receiverId) {
-            return res.status(400).json({ message: 'يجب تحديد مستلم للرسالة' });
+        // تحديد المستلم بناءً على دور المرسل
+        let actualReceiverId;
+        if (req.user.role === 'admin') {
+            // المدير يرسل لمستخدم محدد
+            if (!receiverId) {
+                return res.status(400).json({ message: 'معرف المستلم مطلوب للمدير' });
+            }
+            actualReceiverId = receiverId;
+        } else {
+            // المستخدم العادي يرسل للمدير
+            actualReceiverId = 'admin';
         }
 
-        const messageId = crypto.randomBytes(16).toString('hex');
-        const finalMessageType = image ? 'image' : (emoji ? 'emoji' : 'text');
+        const newMessage = {
+            _id: crypto.randomBytes(16).toString('hex'),
+            senderId: req.user._id,
+            senderName: sender.fullName,
+            receiverId: actualReceiverId,
+            text: text.trim(),
+            timestamp: new Date().toISOString(),
+            read: false
+        };
 
-        await dbRun(
-            `INSERT INTO messages (_id, senderId, senderName, receiverId, text, image, emoji, messageType) 
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-            [messageId, req.user._id, sender.fullName, actualReceiverId, text, image, emoji, finalMessageType]
-        );
+        messages.push(newMessage);
+        writeLocalFile('local-messages.json', messages);
 
         res.json({ 
             message: 'تم إرسال الرسالة',
-            messageId: messageId
+            messageId: newMessage._id
         });
     } catch (error) {
         console.error('خطأ إرسال الرسالة:', error);
@@ -367,68 +327,60 @@ app.post('/api/chat/send', authenticateToken, async (req, res) => {
     }
 });
 
-// رفع صورة في الدردشة
-app.post('/api/chat/upload-image', authenticateToken, upload.single('image'), async (req, res) => {
-    try {
-        if (!req.file) {
-            return res.status(400).json({ message: 'لم يتم رفع أي صورة' });
-        }
-
-        res.json({
-            success: true,
-            imageUrl: `/uploads/${req.file.filename}`,
-            fileName: req.file.filename
-        });
-    } catch (error) {
-        console.error('خطأ رفع الصورة:', error);
-        res.status(500).json({ message: 'خطأ في رفع الصورة' });
-    }
-});
-
 // إرسال رسالة من المدير
 app.post('/api/admin/send-message', authenticateToken, requireAdmin, async (req, res) => {
     try {
-        const { text, receiverId, isBroadcast, image, emoji } = req.body;
+        const { text, receiverId, isBroadcast } = req.body;
 
-        if (!text && !image && !emoji) {
+        if (!text || text.trim().length === 0) {
             return res.status(400).json({ message: 'الرسالة لا يمكن أن تكون فارغة' });
         }
 
+        const messages = readLocalFile('local-messages.json');
+        const users = readLocalFile('local-users.json');
+
         if (isBroadcast) {
             // إرسال جماعي
-            const users = await dbAll("SELECT _id, fullName FROM users WHERE role = 'student' AND isActive = 1");
-            
-            for (const user of users) {
-                const messageId = crypto.randomBytes(16).toString('hex');
-                const messageType = image ? 'image' : (emoji ? 'emoji' : 'text');
-                
-                await dbRun(
-                    `INSERT INTO messages (_id, senderId, senderName, receiverId, text, image, emoji, messageType, isBroadcast) 
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                    [messageId, req.user._id, 'مدير النظام', user._id, text, image, emoji, messageType, 1]
-                );
-            }
+            users.forEach(user => {
+                if (user.role === 'student' && user.isActive !== false) {
+                    const broadcastMessage = {
+                        _id: crypto.randomBytes(16).toString('hex'),
+                        senderId: 'admin',
+                        senderName: 'مدير النظام',
+                        receiverId: user._id,
+                        text: text.trim(),
+                        timestamp: new Date().toISOString(),
+                        read: false,
+                        isBroadcast: true
+                    };
+                    messages.push(broadcastMessage);
+                }
+            });
         } else {
             // إرسال فردي
             if (!receiverId) {
                 return res.status(400).json({ message: 'معرف المستخدم مطلوب' });
             }
 
-            const receiver = await dbGet("SELECT * FROM users WHERE _id = ?", [receiverId]);
+            const receiver = users.find(u => u._id === receiverId);
             if (!receiver) {
                 return res.status(404).json({ message: 'المستخدم غير موجود' });
             }
 
-            const messageId = crypto.randomBytes(16).toString('hex');
-            const messageType = image ? 'image' : (emoji ? 'emoji' : 'text');
-            
-            await dbRun(
-                `INSERT INTO messages (_id, senderId, senderName, receiverId, text, image, emoji, messageType) 
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-                [messageId, req.user._id, 'مدير النظام', receiverId, text, image, emoji, messageType]
-            );
+            const directMessage = {
+                _id: crypto.randomBytes(16).toString('hex'),
+                senderId: 'admin',
+                senderName: 'مدير النظام',
+                receiverId: receiverId,
+                text: text.trim(),
+                timestamp: new Date().toISOString(),
+                read: false,
+                isBroadcast: false
+            };
+            messages.push(directMessage);
         }
 
+        writeLocalFile('local-messages.json', messages);
         res.json({ 
             message: isBroadcast ? 'تم الإرسال الجماعي بنجاح' : 'تم إرسال الرسالة بنجاح'
         });
@@ -445,37 +397,47 @@ app.get('/api/chat/conversations', authenticateToken, async (req, res) => {
             return res.status(403).json({ message: 'صلاحيات غير كافية' });
         }
 
-        const conversations = await dbAll(`
-            SELECT 
-                u._id as userId,
-                u.fullName as userName,
-                u.phone as userPhone,
-                u.university,
-                u.major,
-                u.batch,
-                u.profileImage,
-                u.lastLogin,
-                (SELECT text FROM messages 
-                 WHERE (senderId = u._id AND receiverId = 'admin') 
-                 OR (senderId = 'admin' AND receiverId = u._id)
-                 ORDER BY timestamp DESC LIMIT 1) as lastMessage,
-                (SELECT timestamp FROM messages 
-                 WHERE (senderId = u._id AND receiverId = 'admin') 
-                 OR (senderId = 'admin' AND receiverId = u._id)
-                 ORDER BY timestamp DESC LIMIT 1) as lastMessageTime,
-                (SELECT COUNT(*) FROM messages 
-                 WHERE receiverId = 'admin' AND senderId = u._id AND read = 0) as unreadCount
-            FROM users u
-            WHERE u.role = 'student' AND u.isActive = 1
-            AND EXISTS (
-                SELECT 1 FROM messages 
-                WHERE (senderId = u._id AND receiverId = 'admin') 
-                OR (senderId = 'admin' AND receiverId = u._id)
-            )
-            ORDER BY lastMessageTime DESC
-        `);
+        const messages = readLocalFile('local-messages.json');
+        const users = readLocalFile('local-users.json');
+        
+        const userConversations = {};
+        
+        // جمع جميع المحادثات مع المستخدمين
+        messages.forEach(msg => {
+            const otherUserId = msg.senderId === 'admin' ? msg.receiverId : msg.senderId;
+            
+            // تجاهل الرسائل التي ليس لها مستخدم
+            if (otherUserId === 'admin') return;
+            
+            if (!userConversations[otherUserId]) {
+                const user = users.find(u => u._id === otherUserId);
+                if (user) {
+                    // جمع رسائل هذا المستخدم
+                    const userMessages = messages.filter(m => 
+                        (m.senderId === 'admin' && m.receiverId === otherUserId) ||
+                        (m.senderId === otherUserId && m.receiverId === 'admin')
+                    );
+                    
+                    const lastMessage = userMessages[userMessages.length - 1];
+                    const unreadCount = userMessages.filter(m => 
+                        m.receiverId === 'admin' && 
+                        m.senderId === otherUserId && 
+                        !m.read
+                    ).length;
 
-        res.json(conversations);
+                    userConversations[otherUserId] = {
+                        userId: user._id,
+                        userName: user.fullName,
+                        userPhone: user.phone,
+                        lastMessage: lastMessage?.text || 'لا توجد رسائل',
+                        lastMessageTime: lastMessage?.timestamp || new Date().toISOString(),
+                        unreadCount: unreadCount
+                    };
+                }
+            }
+        });
+        
+        res.json(Object.values(userConversations));
     } catch (error) {
         console.error('خطأ جلب المحادثات:', error);
         res.status(500).json({ message: 'خطأ في الخادم' });
@@ -486,33 +448,39 @@ app.get('/api/chat/conversations', authenticateToken, async (req, res) => {
 app.get('/api/chat/conversation/:userId', authenticateToken, async (req, res) => {
     try {
         const { userId } = req.params;
+        const messages = readLocalFile('local-messages.json');
         
-        let messages;
+        let conversationMessages;
         if (req.user.role === 'admin') {
-            messages = await dbAll(`
-                SELECT * FROM messages 
-                WHERE (senderId = ? AND receiverId = ?) OR (senderId = ? AND receiverId = ?)
-                ORDER BY timestamp ASC
-            `, [req.user._id, userId, userId, req.user._id]);
+            conversationMessages = messages.filter(msg => 
+                (msg.senderId === 'admin' && msg.receiverId === userId) ||
+                (msg.senderId === userId && msg.receiverId === 'admin')
+            );
         } else {
-            if (userId !== req.user._id) {
+            // للمستخدم العادي: التأكد أنه يطلب محادثته فقط
+            if (userId !== req.user._id && userId !== 'admin') {
                 return res.status(403).json({ message: 'غير مصرح' });
             }
-            const admin = await dbGet("SELECT _id FROM users WHERE role = 'admin' LIMIT 1");
-            messages = await dbAll(`
-                SELECT * FROM messages 
-                WHERE (senderId = ? AND receiverId = ?) OR (senderId = ? AND receiverId = ?)
-                ORDER BY timestamp ASC
-            `, [req.user._id, admin._id, admin._id, req.user._id]);
+            conversationMessages = messages.filter(msg => 
+                (msg.senderId === req.user._id && msg.receiverId === 'admin') ||
+                (msg.senderId === 'admin' && msg.receiverId === req.user._id)
+            );
         }
         
-        // تحديث حالة القراءة للمرسل إليه
-        await dbRun(`
-            UPDATE messages SET read = 1 
-            WHERE receiverId = ? AND senderId = ? AND read = 0
-        `, [req.user._id, userId]);
+        // تحديث حالة القراءة
+        let updated = false;
+        conversationMessages.forEach(msg => {
+            if (msg.receiverId === req.user._id && !msg.read) {
+                msg.read = true;
+                updated = true;
+            }
+        });
         
-        res.json(messages);
+        if (updated) {
+            writeLocalFile('local-messages.json', messages);
+        }
+        
+        res.json(conversationMessages.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)));
     } catch (error) {
         console.error('خطأ جلب الرسائل:', error);
         res.status(500).json({ message: 'خطأ في الخادم' });
@@ -522,207 +490,34 @@ app.get('/api/chat/conversation/:userId', authenticateToken, async (req, res) =>
 // الحصول على جميع الرسائل (للمستخدم العادي)
 app.get('/api/chat/messages', authenticateToken, async (req, res) => {
     try {
-        const admin = await dbGet("SELECT _id FROM users WHERE role = 'admin' LIMIT 1");
-        const messages = await dbAll(`
-            SELECT * FROM messages 
-            WHERE (senderId = ? AND receiverId = ?) OR (senderId = ? AND receiverId = ?)
-            ORDER BY timestamp ASC
-        `, [req.user._id, admin._id, admin._id, req.user._id]);
+        const messages = readLocalFile('local-messages.json');
+        
+        const userMessages = messages.filter(msg => 
+            (msg.senderId === req.user._id && msg.receiverId === 'admin') ||
+            (msg.senderId === 'admin' && msg.receiverId === req.user._id)
+        );
         
         // تحديث حالة القراءة
-        await dbRun(`
-            UPDATE messages SET read = 1 
-            WHERE receiverId = ? AND read = 0
-        `, [req.user._id]);
+        let updated = false;
+        userMessages.forEach(msg => {
+            if (msg.receiverId === req.user._id && !msg.read) {
+                msg.read = true;
+                updated = true;
+            }
+        });
         
-        res.json(messages);
+        if (updated) {
+            writeLocalFile('local-messages.json', messages);
+        }
+        
+        res.json(userMessages.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)));
     } catch (error) {
         console.error('خطأ جلب الرسائل:', error);
         res.status(500).json({ message: 'خطأ في الخادم' });
     }
 });
 
-// إدارة المستخدمين المتقدمة
-app.get('/api/admin/users', authenticateToken, requireAdmin, async (req, res) => {
-    try {
-        const { page = 1, limit = 50, search = '', sortBy = 'createdAt', sortOrder = 'desc' } = req.query;
-        
-        const offset = (page - 1) * limit;
-        let whereClause = "WHERE role = 'student'";
-        let params = [];
-
-        if (search) {
-            whereClause += ` AND (fullName LIKE ? OR phone LIKE ? OR university LIKE ? OR major LIKE ?)`;
-            const searchTerm = `%${search}%`;
-            params = [searchTerm, searchTerm, searchTerm, searchTerm];
-        }
-
-        const users = await dbAll(`
-            SELECT 
-                _id, fullName, phone, university, major, batch, 
-                isActive, createdAt, lastLogin, profileImage
-            FROM users 
-            ${whereClause}
-            ORDER BY ${sortBy} ${sortOrder}
-            LIMIT ? OFFSET ?
-        `, [...params, limit, offset]);
-
-        const totalResult = await dbGet(`SELECT COUNT(*) as count FROM users ${whereClause}`, params);
-        const totalUsers = totalResult.count;
-
-        res.json({
-            users: users,
-            totalUsers: totalUsers,
-            totalPages: Math.ceil(totalUsers / limit),
-            currentPage: parseInt(page)
-        });
-    } catch (error) {
-        console.error('خطأ جلب المستخدمين:', error);
-        res.status(500).json({ message: 'خطأ في الخادم' });
-    }
-});
-
-// تحديث بيانات المستخدم
-app.put('/api/admin/users/:userId', authenticateToken, requireAdmin, async (req, res) => {
-    try {
-        const { userId } = req.params;
-        const { fullName, university, major, batch, isActive } = req.body;
-
-        const user = await dbGet("SELECT * FROM users WHERE _id = ?", [userId]);
-        if (!user) {
-            return res.status(404).json({ message: 'المستخدم غير موجود' });
-        }
-
-        const updates = [];
-        const params = [];
-
-        if (fullName) { updates.push("fullName = ?"); params.push(fullName); }
-        if (university) { updates.push("university = ?"); params.push(university); }
-        if (major) { updates.push("major = ?"); params.push(major); }
-        if (batch) { updates.push("batch = ?"); params.push(batch); }
-        if (typeof isActive === 'boolean') { updates.push("isActive = ?"); params.push(isActive); }
-
-        if (updates.length > 0) {
-            updates.push("lastUpdated = CURRENT_TIMESTAMP");
-            params.push(userId);
-
-            await dbRun(
-                `UPDATE users SET ${updates.join(', ')} WHERE _id = ?`,
-                params
-            );
-        }
-
-        const updatedUser = await dbGet("SELECT * FROM users WHERE _id = ?", [userId]);
-
-        res.json({ 
-            message: 'تم تحديث بيانات المستخدم بنجاح',
-            user: updatedUser
-        });
-    } catch (error) {
-        console.error('خطأ تحديث المستخدم:', error);
-        res.status(500).json({ message: 'خطأ في الخادم' });
-    }
-});
-
-// حذف المستخدم
-app.delete('/api/admin/users/:userId', authenticateToken, requireAdmin, async (req, res) => {
-    try {
-        const { userId } = req.params;
-
-        const user = await dbGet("SELECT * FROM users WHERE _id = ?", [userId]);
-        if (!user) {
-            return res.status(404).json({ message: 'المستخدم غير موجود' });
-        }
-
-        if (user.role === 'admin') {
-            return res.status(400).json({ message: 'لا يمكن حذف حساب المدير' });
-        }
-
-        await dbRun("DELETE FROM users WHERE _id = ?", [userId]);
-        // حذف الرسائل والصور المرتبطة
-        await dbRun("DELETE FROM messages WHERE senderId = ? OR receiverId = ?", [userId, userId]);
-        await dbRun("DELETE FROM images WHERE userId = ?", [userId]);
-
-        res.json({ message: 'تم حذف المستخدم بنجاح' });
-    } catch (error) {
-        console.error('خطأ حذف المستخدم:', error);
-        res.status(500).json({ message: 'خطأ في الخادم' });
-    }
-});
-
-// تحديث صورة الملف الشخصي
-app.post('/api/user/profile-image', authenticateToken, upload.single('profileImage'), async (req, res) => {
-    try {
-        if (!req.file) {
-            return res.status(400).json({ message: 'لم يتم رفع أي صورة' });
-        }
-
-        const user = await dbGet("SELECT * FROM users WHERE _id = ?", [req.user._id]);
-        if (!user) {
-            return res.status(404).json({ message: 'المستخدم غير موجود' });
-        }
-
-        // حذف الصورة القديمة إذا كانت موجودة
-        if (user.profileImage) {
-            const oldImagePath = path.join(__dirname, user.profileImage);
-            if (fs.existsSync(oldImagePath)) {
-                fs.unlinkSync(oldImagePath);
-            }
-        }
-
-        await dbRun(
-            "UPDATE users SET profileImage = ?, lastUpdated = CURRENT_TIMESTAMP WHERE _id = ?",
-            [`/profile-pictures/${req.file.filename}`, req.user._id]
-        );
-
-        const updatedUser = await dbGet("SELECT * FROM users WHERE _id = ?", [req.user._id]);
-
-        res.json({
-            message: 'تم تحديث الصورة الشخصية بنجاح',
-            profileImage: updatedUser.profileImage
-        });
-    } catch (error) {
-        console.error('خطأ تحديث الصورة:', error);
-        res.status(500).json({ message: 'خطأ في تحديث الصورة' });
-    }
-});
-
-// إحصائيات النظام المتقدمة
-app.get('/api/admin/stats', authenticateToken, requireAdmin, async (req, res) => {
-    try {
-        const totalUsers = await dbGet("SELECT COUNT(*) as count FROM users WHERE role = 'student'");
-        const activeUsers = await dbGet("SELECT COUNT(*) as count FROM users WHERE role = 'student' AND isActive = 1");
-        const totalMessages = await dbGet("SELECT COUNT(*) as count FROM messages");
-        const unreadMessages = await dbGet("SELECT COUNT(*) as count FROM messages WHERE receiverId = 'admin' AND read = 0");
-        const totalImages = await dbGet("SELECT COUNT(*) as count FROM images");
-        
-        const today = new Date().toISOString().split('T')[0];
-        const messagesToday = await dbGet("SELECT COUNT(*) as count FROM messages WHERE DATE(timestamp) = ?", [today]);
-        
-        const lastWeek = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-        const newUsersThisWeek = await dbGet("SELECT COUNT(*) as count FROM users WHERE role = 'student' AND DATE(createdAt) >= ?", [lastWeek]);
-        const activeUsersThisWeek = await dbGet("SELECT COUNT(*) as count FROM users WHERE role = 'student' AND lastLogin IS NOT NULL AND DATE(lastLogin) >= ?", [lastWeek]);
-
-        const stats = {
-            totalUsers: totalUsers.count,
-            activeUsers: activeUsers.count,
-            newUsersThisWeek: newUsersThisWeek.count,
-            activeUsersThisWeek: activeUsersThisWeek.count,
-            totalMessages: totalMessages.count,
-            unreadMessages: unreadMessages.count,
-            totalImages: totalImages.count,
-            messagesToday: messagesToday.count,
-            storageUsed: 0
-        };
-
-        res.json(stats);
-    } catch (error) {
-        console.error('خطأ جلب الإحصائيات:', error);
-        res.status(500).json({ message: 'خطأ في الخادم' });
-    }
-});
-
-// إدارة الصور
+// إدارة الصور المتقدمة
 app.post('/api/admin/send-image', authenticateToken, requireAdmin, upload.single('image'), async (req, res) => {
     try {
         const { receiverId, description } = req.body;
@@ -735,34 +530,48 @@ app.post('/api/admin/send-image', authenticateToken, requireAdmin, upload.single
             return res.status(400).json({ message: 'معرف المستلم مطلوب' });
         }
 
-        const receiver = await dbGet("SELECT * FROM users WHERE _id = ?", [receiverId]);
+        const users = readLocalFile('local-users.json');
+        const receiver = users.find(u => u._id === receiverId);
+        
         if (!receiver) {
+            // حذف الصورة المرفوعة إذا فشل الإرسال
             if (fs.existsSync(req.file.path)) {
                 fs.unlinkSync(req.file.path);
             }
             return res.status(404).json({ message: 'المستخدم غير موجود' });
         }
 
-        const imageId = crypto.randomBytes(16).toString('hex');
+        const images = readLocalFile('local-images.json');
+        const newImage = {
+            _id: crypto.randomBytes(16).toString('hex'),
+            userId: receiverId,
+            userName: receiver.fullName,
+            userPhone: receiver.phone,
+            imageName: req.file.filename,
+            originalName: req.file.originalname,
+            url: `/uploads/${req.file.filename}`,
+            description: description || '',
+            sentBy: req.user._id,
+            sentAt: new Date().toISOString(),
+            fileSize: req.file.size,
+            mimeType: req.file.mimetype
+        };
 
-        await dbRun(
-            `INSERT INTO images (_id, userId, userName, userPhone, imageName, originalName, url, description, sentBy, fileSize, mimeType) 
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [imageId, receiverId, receiver.fullName, receiver.phone, req.file.filename, req.file.originalname, 
-             `/uploads/${req.file.filename}`, description, req.user._id, req.file.size, req.file.mimetype]
-        );
+        images.push(newImage);
+        writeLocalFile('local-images.json', images);
 
         res.json({ 
             message: 'تم إرسال الصورة بنجاح',
             image: {
-                id: imageId,
-                url: `/uploads/${req.file.filename}`,
-                userName: receiver.fullName,
-                sentAt: new Date().toISOString()
+                id: newImage._id,
+                url: newImage.url,
+                userName: newImage.userName,
+                sentAt: newImage.sentAt
             }
         });
     } catch (error) {
         console.error('خطأ إرسال الصورة:', error);
+        // تنظيف الصورة المرفوعة في حالة الخطأ
         if (req.file && fs.existsSync(req.file.path)) {
             fs.unlinkSync(req.file.path);
         }
@@ -779,20 +588,33 @@ app.post('/api/admin/broadcast-image', authenticateToken, requireAdmin, upload.s
             return res.status(400).json({ message: 'لم يتم رفع أي صورة' });
         }
 
-        const users = await dbAll("SELECT _id, fullName, phone FROM users WHERE role = 'student' AND isActive = 1");
+        const users = readLocalFile('local-users.json');
+        const images = readLocalFile('local-images.json');
         let successCount = 0;
 
-        for (const user of users) {
-            const imageId = crypto.randomBytes(16).toString('hex');
-            await dbRun(
-                `INSERT INTO images (_id, userId, userName, userPhone, imageName, originalName, url, description, sentBy, fileSize, mimeType, isBroadcast) 
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                [imageId, user._id, user.fullName, user.phone, req.file.filename, req.file.originalname, 
-                 `/uploads/${req.file.filename}`, description || 'إرسال جماعي', req.user._id, req.file.size, req.file.mimetype, 1]
-            );
-            successCount++;
-        }
+        users.forEach(user => {
+            if (user.role === 'student' && user.isActive !== false) {
+                const newImage = {
+                    _id: crypto.randomBytes(16).toString('hex'),
+                    userId: user._id,
+                    userName: user.fullName,
+                    userPhone: user.phone,
+                    imageName: req.file.filename,
+                    originalName: req.file.originalname,
+                    url: `/uploads/${req.file.filename}`,
+                    description: description || 'إرسال جماعي',
+                    sentBy: req.user._id,
+                    sentAt: new Date().toISOString(),
+                    fileSize: req.file.size,
+                    mimeType: req.file.mimetype,
+                    isBroadcast: true
+                };
+                images.push(newImage);
+                successCount++;
+            }
+        });
 
+        writeLocalFile('local-images.json', images);
         res.json({ 
             message: `تم إرسال الصورة إلى ${successCount} مستخدم`,
             successCount
@@ -806,13 +628,107 @@ app.post('/api/admin/broadcast-image', authenticateToken, requireAdmin, upload.s
     }
 });
 
+// إرسال مجلد الصور بناءً على أسماء الملفات (أرقام الهواتف)
+app.post('/api/admin/send-batch-images', authenticateToken, requireAdmin, upload.array('images', 50), async (req, res) => {
+    try {
+        if (!req.files || req.files.length === 0) {
+            return res.status(400).json({ message: 'لم يتم رفع أي صور' });
+        }
+
+        const users = readLocalFile('local-users.json');
+        const images = readLocalFile('local-images.json');
+        
+        const results = {
+            success: 0,
+            failed: 0,
+            details: []
+        };
+
+        for (const file of req.files) {
+            try {
+                // استخراج رقم الهاتف من اسم الملف (إزالة الامتداد)
+                const phoneFromFilename = file.originalname.replace(/\.[^/.]+$/, "");
+                
+                // البحث عن المستخدم برقم الهاتف
+                const user = users.find(u => u.phone === phoneFromFilename);
+                
+                if (user) {
+                    const newImage = {
+                        _id: crypto.randomBytes(16).toString('hex'),
+                        userId: user._id,
+                        userName: user.fullName,
+                        userPhone: user.phone,
+                        imageName: file.filename,
+                        originalName: file.originalname,
+                        url: `/uploads/${file.filename}`,
+                        description: `مرسل تلقائي من المجلد - ${file.originalname}`,
+                        sentBy: req.user._id,
+                        sentAt: new Date().toISOString(),
+                        fileSize: file.size,
+                        mimeType: file.mimetype,
+                        isBatch: true
+                    };
+
+                    images.push(newImage);
+                    results.success++;
+                    results.details.push({
+                        file: file.originalname,
+                        status: 'success',
+                        message: `تم الإرسال إلى ${user.fullName} (${user.phone})`
+                    });
+                } else {
+                    results.failed++;
+                    results.details.push({
+                        file: file.originalname,
+                        status: 'failed',
+                        message: `لا يوجد مستخدم برقم الهاتف ${phoneFromFilename}`
+                    });
+                    
+                    // حذف الصورة إذا لم يكن هناك مستخدم
+                    if (fs.existsSync(file.path)) {
+                        fs.unlinkSync(file.path);
+                    }
+                }
+            } catch (fileError) {
+                console.error(`خطأ في معالجة الملف ${file.originalname}:`, fileError);
+                results.failed++;
+                results.details.push({
+                    file: file.originalname,
+                    status: 'failed',
+                    message: 'خطأ في معالجة الملف'
+                });
+            }
+        }
+
+        // حفظ التحديثات
+        writeLocalFile('local-images.json', images);
+
+        res.json({
+            message: `تم معالجة ${req.files.length} صورة`,
+            results: results
+        });
+
+    } catch (error) {
+        console.error('خطأ إرسال مجلد الصور:', error);
+        
+        // تنظيف جميع الصور المرفوعة في حالة الخطأ
+        if (req.files) {
+            req.files.forEach(file => {
+                if (fs.existsSync(file.path)) {
+                    fs.unlinkSync(file.path);
+                }
+            });
+        }
+        
+        res.status(500).json({ message: 'خطأ في الخادم' });
+    }
+});
+
 app.get('/api/images', authenticateToken, async (req, res) => {
     try {
-        const images = await dbAll(`
-            SELECT * FROM images 
-            WHERE userId = ? 
-            ORDER BY sentAt DESC
-        `, [req.user._id]);
+        const images = readLocalFile('local-images.json')
+            .filter(img => img.userId === req.user._id)
+            .sort((a, b) => new Date(b.sentAt) - new Date(a.sentAt));
         
         res.json(images);
     } catch (error) {
@@ -821,20 +737,113 @@ app.get('/api/images', authenticateToken, async (req, res) => {
     }
 });
 
-// مسار لتحميل الملفات
-app.get('/api/files/*', (req, res) => {
-    const filePath = path.join(__dirname, req.path.replace('/api/files', ''));
-    
-    if (fs.existsSync(filePath)) {
-        res.sendFile(filePath);
-    } else {
-        res.status(404).json({ message: 'الملف غير موجود' });
+// إدارة المستخدمين للمدير
+app.get('/api/admin/users', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const users = readLocalFile('local-users.json')
+            .filter(user => user.role === 'student')
+            .map(user => ({
+                _id: user._id,
+                fullName: user.fullName,
+                phone: user.phone,
+                university: user.university,
+                major: user.major,
+                batch: user.batch,
+                isActive: user.isActive,
+                createdAt: user.createdAt,
+                lastLogin: user.lastLogin
+            }));
+        
+        res.json(users);
+    } catch (error) {
+        console.error('خطأ جلب المستخدمين:', error);
+        res.status(500).json({ message: 'خطأ في الخادم' });
+    }
+});
+
+// الحصول على معلومات مستخدم محدد
+app.get('/api/admin/user/:userId', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const users = readLocalFile('local-users.json');
+        const user = users.find(u => u._id === userId);
+        
+        if (!user) {
+            return res.status(404).json({ message: 'المستخدم غير موجود' });
+        }
+
+        res.json({
+            _id: user._id,
+            fullName: user.fullName,
+            phone: user.phone,
+            university: user.university,
+            major: user.major,
+            batch: user.batch
+        });
+    } catch (error) {
+        console.error('خطأ جلب معلومات المستخدم:', error);
+        res.status(500).json({ message: 'خطأ في الخادم' });
+    }
+});
+
+// إحصائيات النظام
+app.get('/api/admin/stats', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const users = readLocalFile('local-users.json');
+        const messages = readLocalFile('local-messages.json');
+        const images = readLocalFile('local-images.json');
+
+        const stats = {
+            totalUsers: users.filter(u => u.role === 'student').length,
+            activeUsers: users.filter(u => u.isActive !== false && u.role === 'student').length,
+            totalMessages: messages.length,
+            unreadMessages: messages.filter(m => m.receiverId === 'admin' && !m.read).length,
+            totalImages: images.length,
+            storageUsed: images.reduce((total, img) => total + (img.fileSize || 0), 0)
+        };
+
+        res.json(stats);
+    } catch (error) {
+        console.error('خطأ جلب الإحصائيات:', error);
+        res.status(500).json({ message: 'خطأ في الخادم' });
     }
 });
 
 // خدمة الملفات الثابتة
 app.use('/uploads', express.static('uploads'));
-app.use('/profile-pictures', express.static('profile-pictures'));
+
+// إنشاء مدير افتراضي
+const createAdminUser = async () => {
+    try {
+        const users = readLocalFile('local-users.json');
+        const adminExists = users.find(u => u.role === 'admin');
+
+        if (!adminExists) {
+            const hashedPassword = await bcrypt.hash('Admin123!@#', 12);
+            const adminUser = {
+                _id: 'admin-' + crypto.randomBytes(8).toString('hex'),
+                fullName: 'مدير النظام',
+                phone: '500000000',
+                university: 'الإدارة العامة',
+                major: 'نظم المعلومات',
+                batch: '2024',
+                password: hashedPassword,
+                role: 'admin',
+                isActive: true,
+                createdAt: new Date().toISOString(),
+                lastLogin: null
+            };
+
+            users.push(adminUser);
+            writeLocalFile('local-users.json', users);
+            console.log('✅ تم إنشاء حساب المدير الافتراضي');
+            console.log('📱 رقم الهاتف: 500000000');
+            console.log('🔐 كلمة المرور: Admin123!@#');
+        }
+    } catch (error) {
+        console.error('خطأ في إنشاء المدير:', error);
+    }
+};
 
 // Route الأساسي
 app.get('/', (req, res) => {
@@ -851,9 +860,8 @@ app.get('/health', (req, res) => {
     res.json({ 
         status: '✅ النظام يعمل بشكل طبيعي',
         timestamp: new Date().toISOString(),
-        version: '3.1.0',
-        environment: process.env.NODE_ENV || 'development',
-        database: 'SQLite'
+        version: '2.0.0',
+        environment: process.env.NODE_ENV || 'development'
     });
 });
 
@@ -862,7 +870,6 @@ app.use((req, res, next) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('X-Frame-Options', 'DENY');
     res.setHeader('X-XSS-Protection', '1; mode=block');
-    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
     next();
 });
 
@@ -884,20 +891,9 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 المنصة الإلكترونية تعمل على البورت ${PORT}`);
     console.log(`🌐 الرابط: http://localhost:${PORT}`);
-    console.log(`⚡ النسخة: 3.1.0 - نظام محسن`);
-    console.log(`💾 قاعدة البيانات: SQLite (platform.db)`);
+    console.log(`⚡ النسخة: 2.0.0 - الاحترافية`);
     console.log(`🔒 نظام أمان متقدم مفعل`);
-    console.log(`🎯 الميزات: دردشة محسنة، إيموجي، إدارة متكاملة`);
-});
-
-// إغلاق قاعدة البيانات عند إيقاف السيرفر
-process.on('SIGINT', () => {
-    db.close((err) => {
-        if (err) {
-            console.error('❌ خطأ في إغلاق قاعدة البيانات:', err.message);
-        } else {
-            console.log('✅ تم إغلاق قاعدة البيانات');
-        }
-        process.exit(0);
-    });
+    console.log(`💾 نظام التخزين: الملفات المحلية`);
+    
+    setTimeout(createAdminUser, 2000);
 });
