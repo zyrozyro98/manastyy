@@ -3,41 +3,40 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>إديوتك - نظام الدردشة المتطور</title>
+    <title>المنصة التعليمية - نظام الدردشة المتطور</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&display=swap" rel="stylesheet">
     <style>
         :root {
-            --primary: #4361ee;
-            --primary-dark: #3a56d4;
-            --primary-light: #4895ef;
-            --secondary: #7209b7;
-            --accent: #f72585;
-            --success: #4cc9f0;
-            --warning: #f8961e;
-            --danger: #e63946;
-            --dark: #1d3557;
+            --primary: #2c5aa0;
+            --primary-dark: #1e3d72;
+            --primary-light: #4a7bc8;
+            --secondary: #00b4d8;
+            --accent: #ff6b6b;
+            --success: #28a745;
+            --warning: #ffc107;
+            --danger: #dc3545;
+            --dark: #2d3748;
             --light: #f8f9fa;
             --gray: #6c757d;
             --border: #e2e8f0;
-            --shadow: 0 8px 30px rgba(0,0,0,0.12);
-            --shadow-lg: 0 20px 40px rgba(0,0,0,0.15);
-            --gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            --gradient-primary: linear-gradient(135deg, var(--primary), var(--secondary));
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            --story-gradient: linear-gradient(45deg, #ff6b6b, #4ecdc4, #45b7d1, #96ceb4, #feca57);
         }
 
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-            font-family: 'Tajawal', sans-serif;
+            font-family: 'Segoe UI', 'Tahoma', 'Geneva', 'Verdana', sans-serif;
         }
 
         body {
-            background: var(--gradient);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: var(--dark);
             line-height: 1.6;
             min-height: 100vh;
+            overflow-x: hidden;
         }
 
         .app-container {
@@ -46,15 +45,15 @@
             flex-direction: column;
         }
 
-        /* الهيدر المحسن */
+        /* Header Styles */
         .header {
-            background: rgba(255,255,255,0.98);
-            backdrop-filter: blur(20px);
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
             box-shadow: var(--shadow);
             position: sticky;
             top: 0;
             z-index: 1000;
-            border-bottom: 1px solid rgba(255,255,255,0.2);
+            border-bottom: 1px solid var(--border);
         }
 
         .header-content {
@@ -72,32 +71,30 @@
             display: flex;
             align-items: center;
             gap: 0.75rem;
-            text-decoration: none;
+            flex-shrink: 0;
         }
 
         .logo-icon {
-            width: 50px;
-            height: 50px;
-            background: var(--gradient-primary);
-            border-radius: 12px;
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            border-radius: 10px;
             display: flex;
             align-items: center;
             justify-content: center;
             color: white;
-            font-size: 1.5rem;
+            font-size: 1.2rem;
         }
 
         .logo-text {
-            font-size: 1.8rem;
-            font-weight: 900;
-            background: var(--gradient-primary);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--primary);
         }
 
         .nav {
             display: flex;
-            gap: 0.5rem;
+            gap: 1rem;
             align-items: center;
             flex-wrap: wrap;
         }
@@ -105,19 +102,19 @@
         .nav-item {
             color: var(--dark);
             text-decoration: none;
-            font-weight: 600;
-            padding: 0.75rem 1.5rem;
-            border-radius: 12px;
+            font-weight: 500;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
             transition: all 0.3s ease;
             display: flex;
             align-items: center;
             gap: 0.5rem;
+            white-space: nowrap;
         }
 
         .nav-item:hover {
-            background: var(--primary);
+            background: var(--primary-light);
             color: white;
-            transform: translateY(-2px);
         }
 
         .nav-item.hidden {
@@ -128,116 +125,332 @@
             display: flex;
             align-items: center;
             gap: 1rem;
-            padding: 0.75rem 1.5rem;
-            background: rgba(67,97,238,0.1);
-            border-radius: 12px;
-            font-weight: 600;
+            padding: 0.5rem 1rem;
+            background: var(--light);
+            border-radius: 8px;
+            font-weight: 500;
+            flex-wrap: wrap;
         }
 
-        .user-avatar {
+        /* Main Content */
+        .main-content {
+            flex: 1;
+            padding: 2rem;
+            max-width: 1400px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        /* Page Styles */
+        .page {
+            display: none;
+            animation: fadeIn 0.5s ease-in;
+            min-height: 60vh;
+        }
+
+        .page.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* أنماط نظام الـ Stories */
+        .stories-container {
+            display: flex;
+            gap: 1.5rem;
+            padding: 1.5rem;
+            overflow-x: auto;
+            background: white;
+            border-radius: 20px;
+            margin-bottom: 2rem;
+            box-shadow: var(--shadow);
+            scrollbar-width: none;
+        }
+
+        .stories-container::-webkit-scrollbar {
+            display: none;
+        }
+
+        .story-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            cursor: pointer;
+            min-width: 80px;
+            position: relative;
+        }
+
+        .story-avatar {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            background: var(--story-gradient);
+            padding: 3px;
+            margin-bottom: 0.5rem;
+            position: relative;
+        }
+
+        .story-avatar img {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            border: 3px solid white;
+            object-fit: cover;
+        }
+
+        .story-avatar::before {
+            content: '';
+            position: absolute;
+            top: -3px;
+            left: -3px;
+            right: -3px;
+            bottom: -3px;
+            background: var(--story-gradient);
+            border-radius: 50%;
+            z-index: -1;
+        }
+
+        .story-username {
+            font-size: 0.8rem;
+            font-weight: 500;
+            color: var(--dark);
+            text-align: center;
+            max-width: 80px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .story-add-btn {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            background: var(--light);
+            border: 2px dashed var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--gray);
+            font-size: 1.5rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .story-add-btn:hover {
+            background: var(--primary-light);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        /* نافذة الـ Story */
+        .story-viewer {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            z-index: 4000;
+            display: none;
+            flex-direction: column;
+        }
+
+        .story-viewer.active {
+            display: flex;
+        }
+
+        .story-progress {
+            display: flex;
+            gap: 5px;
+            padding: 1rem;
+            background: rgba(0, 0, 0, 0.5);
+        }
+
+        .story-progress-bar {
+            flex: 1;
+            height: 3px;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .story-progress-fill {
+            height: 100%;
+            background: white;
+            width: 0%;
+            transition: width 0.1s linear;
+        }
+
+        .story-content {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        .story-media {
+            max-width: 100%;
+            max-height: 100%;
+            border-radius: 10px;
+        }
+
+        .story-nav {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 50%;
+            cursor: pointer;
+        }
+
+        .story-prev {
+            left: 0;
+        }
+
+        .story-next {
+            right: 0;
+        }
+
+        .story-info {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            left: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            color: white;
+        }
+
+        .story-user-avatar {
             width: 40px;
             height: 40px;
             border-radius: 50%;
-            background: var(--gradient-primary);
+            border: 2px solid white;
+        }
+
+        .story-close {
+            position: absolute;
+            top: 1rem;
+            left: 1rem;
+            color: white;
+            background: rgba(0, 0, 0, 0.5);
+            border: none;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 1.2rem;
+        }
+
+        /* نظام الدردشة المتطور */
+        .modern-chat-container {
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            gap: 1.5rem;
+            height: 75vh;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: var(--shadow);
+            overflow: hidden;
+            backdrop-filter: blur(10px);
+        }
+
+        .chat-sidebar {
+            background: var(--light);
+            border-left: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chat-header {
+            padding: 1.5rem;
+            background: var(--primary);
+            color: white;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .user-status {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.9rem;
+        }
+
+        .status-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--success);
+        }
+
+        .status-indicator.offline {
+            background: var(--gray);
+        }
+
+        .conversations-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1rem;
+        }
+
+        .conversation-item {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 1rem;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 0.5rem;
+        }
+
+        .conversation-item:hover {
+            background: rgba(44, 90, 160, 0.1);
+        }
+
+        .conversation-item.active {
+            background: rgba(44, 90, 160, 0.15);
+            border-right: 3px solid var(--primary);
+        }
+
+        .conversation-avatar {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: var(--primary);
             display: flex;
             align-items: center;
             justify-content: center;
             color: white;
             font-weight: 600;
-            font-size: 1.1rem;
+            position: relative;
         }
 
-        .user-avatar img {
+        .conversation-avatar img {
             width: 100%;
             height: 100%;
             border-radius: 50%;
             object-fit: cover;
         }
 
-        /* نظام الدردشة المتطور */
-        .chat-app {
-            display: grid;
-            grid-template-columns: 400px 1fr;
-            height: calc(100vh - 80px);
-            background: rgba(255,255,255,0.95);
-            backdrop-filter: blur(20px);
-        }
-
-        /* الشريط الجانبي */
-        .sidebar {
-            border-left: 1px solid var(--border);
-            background: var(--light);
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-        }
-
-        .sidebar-header {
-            padding: 1.5rem;
-            background: var(--gradient-primary);
-            color: white;
-        }
-
-        .search-box {
-            padding: 1rem;
-            border-bottom: 1px solid var(--border);
-        }
-
-        .search-input {
-            width: 100%;
-            padding: 0.75rem 1rem;
-            border: 2px solid var(--border);
-            border-radius: 25px;
-            font-size: 0.9rem;
-            transition: all 0.3s ease;
-        }
-
-        .search-input:focus {
-            outline: none;
-            border-color: var(--primary);
-        }
-
-        .conversations-list {
-            flex: 1;
-            overflow-y: auto;
-            padding: 0.5rem;
-        }
-
-        .conversation-item {
-            padding: 1rem;
-            border-radius: 12px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            margin-bottom: 0.5rem;
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-            border: 2px solid transparent;
-        }
-
-        .conversation-item:hover {
-            background: rgba(67,97,238,0.05);
-            transform: translateX(-5px);
-        }
-
-        .conversation-item.active {
-            background: rgba(67,97,238,0.1);
-            border-color: var(--primary);
-        }
-
-        .conversation-avatar {
-            position: relative;
-        }
-
-        .online-status {
+        .online-indicator {
             position: absolute;
             bottom: 2px;
-            left: 2px;
+            right: 2px;
             width: 12px;
             height: 12px;
+            border-radius: 50%;
             background: var(--success);
             border: 2px solid white;
-            border-radius: 50%;
         }
 
         .conversation-info {
@@ -245,29 +458,17 @@
             min-width: 0;
         }
 
-        .conversation-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 0.25rem;
-        }
-
         .conversation-name {
-            font-weight: 700;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .conversation-time {
-            font-size: 0.8rem;
-            color: var(--gray);
-            white-space: nowrap;
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
         }
 
         .conversation-preview {
-            font-size: 0.9rem;
             color: var(--gray);
+            font-size: 0.9rem;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
@@ -278,6 +479,11 @@
             flex-direction: column;
             align-items: flex-end;
             gap: 0.25rem;
+        }
+
+        .conversation-time {
+            font-size: 0.8rem;
+            color: var(--gray);
         }
 
         .unread-badge {
@@ -292,49 +498,9 @@
         }
 
         /* منطقة الدردشة الرئيسية */
-        .chat-area {
+        .chat-main {
             display: flex;
             flex-direction: column;
-            background: white;
-        }
-
-        .chat-header {
-            padding: 1.5rem;
-            border-bottom: 1px solid var(--border);
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            background: var(--light);
-        }
-
-        .chat-user-info {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-        }
-
-        .chat-actions {
-            display: flex;
-            gap: 0.5rem;
-        }
-
-        .action-btn {
-            width: 40px;
-            height: 40px;
-            border: none;
-            border-radius: 50%;
-            background: transparent;
-            color: var(--gray);
-            cursor: pointer;
-            transition: all 0.3s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .action-btn:hover {
-            background: rgba(67,97,238,0.1);
-            color: var(--primary);
         }
 
         .chat-messages {
@@ -344,7 +510,7 @@
             display: flex;
             flex-direction: column;
             gap: 1rem;
-            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" opacity="0.05"><rect width="100" height="100" fill="%234361ee"/></svg>');
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" fill="%23f8f9fa"/><path d="M0 0L100 100M100 0L0 100" stroke="%23e2e8f0" stroke-width="0.5"/></svg>');
         }
 
         .message {
@@ -353,12 +519,17 @@
             border-radius: 18px;
             position: relative;
             animation: messageSlide 0.3s ease-out;
-            box-shadow: var(--shadow);
+            word-wrap: break-word;
+        }
+
+        @keyframes messageSlide {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
         }
 
         .message.sent {
             align-self: flex-end;
-            background: var(--gradient-primary);
+            background: linear-gradient(135deg, var(--primary), var(--primary-light));
             color: white;
             border-bottom-right-radius: 5px;
         }
@@ -367,8 +538,9 @@
             align-self: flex-start;
             background: white;
             color: var(--dark);
-            border: 1px solid var(--border);
             border-bottom-left-radius: 5px;
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow);
         }
 
         .message-header {
@@ -380,222 +552,16 @@
         }
 
         .message-sender {
-            font-weight: 700;
+            font-weight: 600;
             font-size: 0.9rem;
         }
 
         .message-time {
             font-size: 0.8rem;
-            opacity: 0.8;
+            opacity: 0.7;
         }
 
-        .message-content {
-            word-wrap: break-word;
-            line-height: 1.5;
-        }
-
-        .message-actions {
-            position: absolute;
-            top: -10px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: white;
-            border: 1px solid var(--border);
-            border-radius: 20px;
-            padding: 0.25rem;
-            display: none;
-            gap: 0.25rem;
-            box-shadow: var(--shadow);
-        }
-
-        .message:hover .message-actions {
-            display: flex;
-        }
-
-        .message-action {
-            width: 30px;
-            height: 30px;
-            border: none;
-            border-radius: 50%;
-            background: transparent;
-            color: var(--gray);
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.3s ease;
-        }
-
-        .message-action:hover {
-            background: var(--primary);
-            color: white;
-        }
-
-        .typing-indicator {
-            padding: 1rem;
-            color: var(--gray);
-            font-style: italic;
-            display: none;
-        }
-
-        .typing-indicator.active {
-            display: block;
-            animation: pulse 1.5s infinite;
-        }
-
-        .chat-input-area {
-            padding: 1.5rem;
-            border-top: 1px solid var(--border);
-            background: var(--light);
-        }
-
-        .input-toolbar {
-            display: flex;
-            gap: 0.5rem;
-            margin-bottom: 1rem;
-        }
-
-        .toolbar-btn {
-            width: 40px;
-            height: 40px;
-            border: none;
-            border-radius: 50%;
-            background: transparent;
-            color: var(--gray);
-            cursor: pointer;
-            transition: all 0.3s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .toolbar-btn:hover {
-            background: rgba(67,97,238,0.1);
-            color: var(--primary);
-        }
-
-        .chat-input-wrapper {
-            display: flex;
-            gap: 1rem;
-            align-items: flex-end;
-        }
-
-        .chat-input {
-            flex: 1;
-            padding: 1rem 1.25rem;
-            border: 2px solid var(--border);
-            border-radius: 25px;
-            font-size: 1rem;
-            transition: all 0.3s ease;
-            resize: none;
-            min-height: 50px;
-            max-height: 120px;
-            font-family: inherit;
-        }
-
-        .chat-input:focus {
-            outline: none;
-            border-color: var(--primary);
-        }
-
-        .send-btn {
-            width: 50px;
-            height: 50px;
-            border: none;
-            border-radius: 50%;
-            background: var(--gradient-primary);
-            color: white;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .send-btn:hover:not(:disabled) {
-            transform: scale(1.1);
-            box-shadow: var(--shadow);
-        }
-
-        .send-btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
-        /* المرفقات */
-        .attachments-preview {
-            display: flex;
-            gap: 0.5rem;
-            margin-bottom: 1rem;
-            flex-wrap: wrap;
-        }
-
-        .attachment-item {
-            position: relative;
-            width: 80px;
-            height: 80px;
-            border-radius: 10px;
-            overflow: hidden;
-            border: 2px solid var(--border);
-        }
-
-        .attachment-item img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-
-        .attachment-remove {
-            position: absolute;
-            top: 5px;
-            left: 5px;
-            width: 20px;
-            height: 20px;
-            background: var(--danger);
-            color: white;
-            border: none;
-            border-radius: 50%;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 0.8rem;
-        }
-
-        /* الإيموجي */
-        .emoji-picker {
-            position: absolute;
-            bottom: 100%;
-            left: 0;
-            background: white;
-            border-radius: 15px;
-            box-shadow: var(--shadow-lg);
-            padding: 1rem;
-            display: none;
-            grid-template-columns: repeat(8, 1fr);
-            gap: 0.5rem;
-            z-index: 1000;
-            max-width: 300px;
-            border: 1px solid var(--border);
-        }
-
-        .emoji-btn {
-            font-size: 1.5rem;
-            background: none;
-            border: none;
-            cursor: pointer;
-            padding: 0.5rem;
-            border-radius: 8px;
-            transition: all 0.3s ease;
-        }
-
-        .emoji-btn:hover {
-            background: var(--light);
-            transform: scale(1.2);
-        }
-
-        /* التفاعلات */
-        .reactions {
+        .message-reactions {
             display: flex;
             gap: 0.25rem;
             margin-top: 0.5rem;
@@ -603,22 +569,196 @@
         }
 
         .reaction {
-            background: rgba(255,255,255,0.9);
-            border: 1px solid var(--border);
-            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.2);
             padding: 0.25rem 0.5rem;
+            border-radius: 12px;
             font-size: 0.8rem;
             display: flex;
             align-items: center;
             gap: 0.25rem;
         }
 
-        .message.sent .reaction {
-            background: rgba(255,255,255,0.2);
-            border-color: rgba(255,255,255,0.3);
+        .typing-indicator {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 1rem;
+            color: var(--gray);
+            font-style: italic;
         }
 
-        /* التنبيهات */
+        .typing-dots {
+            display: flex;
+            gap: 2px;
+        }
+
+        .typing-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--gray);
+            animation: typing 1.4s infinite ease-in-out;
+        }
+
+        .typing-dot:nth-child(1) { animation-delay: -0.32s; }
+        .typing-dot:nth-child(2) { animation-delay: -0.16s; }
+
+        @keyframes typing {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1); }
+        }
+
+        .chat-input-area {
+            padding: 1.5rem;
+            border-top: 1px solid var(--border);
+            background: white;
+            display: flex;
+            gap: 1rem;
+            align-items: flex-end;
+        }
+
+        .chat-input-wrapper {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .chat-input {
+            padding: 0.75rem 1rem;
+            border: 2px solid var(--border);
+            border-radius: 25px;
+            font-size: 1rem;
+            transition: border-color 0.3s ease;
+            resize: none;
+            min-height: 50px;
+            max-height: 120px;
+        }
+
+        .chat-input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .chat-actions {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
+
+        .chat-action-btn {
+            width: 40px;
+            height: 40px;
+            border: none;
+            border-radius: 50%;
+            background: var(--light);
+            color: var(--gray);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+        }
+
+        .chat-action-btn:hover {
+            background: var(--primary);
+            color: white;
+        }
+
+        .send-btn {
+            background: var(--primary);
+            color: white;
+        }
+
+        .send-btn:hover {
+            background: var(--primary-dark);
+            transform: scale(1.05);
+        }
+
+        .send-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* الأنماط الأساسية الأخرى تبقى كما هي */
+        .auth-container {
+            max-width: 500px;
+            margin: 2rem auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: var(--shadow-lg);
+            overflow: hidden;
+            backdrop-filter: blur(10px);
+        }
+
+        .auth-header {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            padding: 2rem;
+            text-align: center;
+        }
+
+        .auth-body {
+            padding: 2rem;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: var(--dark);
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            border: 2px solid var(--border);
+            border-radius: 10px;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(44, 90, 160, 0.1);
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            border: 2px solid transparent;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary), var(--primary-light));
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .btn-block {
+            width: 100%;
+        }
+
         .alert {
             padding: 1rem 1.5rem;
             border-radius: 10px;
@@ -627,87 +767,24 @@
             display: flex;
             align-items: center;
             gap: 0.75rem;
-            animation: slideIn 0.3s ease;
         }
 
         .alert-success {
-            background: rgba(76,201,240,0.1);
+            background: rgba(40, 167, 69, 0.1);
             color: var(--success);
-            border: 1px solid rgba(76,201,240,0.2);
+            border: 1px solid rgba(40, 167, 69, 0.2);
         }
 
         .alert-error {
-            background: rgba(230,57,70,0.1);
+            background: rgba(220, 53, 69, 0.1);
             color: var(--danger);
-            border: 1px solid rgba(230,57,70,0.2);
+            border: 1px solid rgba(220, 53, 69, 0.2);
         }
 
-        /* مؤشر الاتصال */
-        .connection-status {
-            position: fixed;
-            top: 20px;
-            left: 20px;
-            background: var(--success);
-            color: white;
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-size: 0.8rem;
-            z-index: 1001;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            box-shadow: var(--shadow);
-        }
-
-        .connection-status.offline {
-            background: var(--danger);
-        }
-
-        /* الأنيميشن */
-        @keyframes messageSlide {
-            from {
-                opacity: 0;
-                transform: translateY(20px) scale(0.9);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0) scale(1);
-            }
-        }
-
-        @keyframes slideIn {
-            from {
-                transform: translateX(100%);
-                opacity: 0;
-            }
-            to {
-                transform: translateX(0);
-                opacity: 1;
-            }
-        }
-
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
-
-        /* التجاوب */
-        @media (max-width: 768px) {
-            .chat-app {
-                grid-template-columns: 1fr;
-            }
-            
-            .sidebar {
-                display: none;
-            }
-            
-            .message {
-                max-width: 90%;
-            }
-            
-            .header-content {
-                padding: 1rem;
-            }
+        .alert-info {
+            background: rgba(0, 180, 216, 0.1);
+            color: var(--secondary);
+            border: 1px solid rgba(0, 180, 216, 0.2);
         }
 
         .hidden {
@@ -725,6 +802,94 @@
         .mb-3 {
             margin-bottom: 1rem;
         }
+
+        .loading {
+            opacity: 0.6;
+            pointer-events: none;
+        }
+
+        .connection-status {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            background: var(--success);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 0.8rem;
+            z-index: 1001;
+            display: none;
+        }
+        
+        .connection-status.offline {
+            background: var(--danger);
+        }
+
+        /* Responsive Design */
+        @media (max-width: 1200px) {
+            .modern-chat-container {
+                grid-template-columns: 300px 1fr;
+            }
+        }
+
+        @media (max-width: 992px) {
+            .modern-chat-container {
+                grid-template-columns: 1fr;
+                height: 80vh;
+            }
+            
+            .chat-sidebar {
+                display: none;
+            }
+            
+            .chat-sidebar.mobile-visible {
+                display: flex;
+                position: fixed;
+                top: 0;
+                right: 0;
+                width: 100%;
+                height: 100%;
+                z-index: 2000;
+                background: white;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .message {
+                max-width: 90%;
+            }
+            
+            .chat-input-area {
+                padding: 1rem;
+                flex-direction: column;
+                gap: 1rem;
+            }
+            
+            .stories-container {
+                padding: 1rem;
+                gap: 1rem;
+            }
+            
+            .story-avatar {
+                width: 60px;
+                height: 60px;
+            }
+        }
+
+        @media (max-width: 576px) {
+            .main-content {
+                padding: 1rem;
+            }
+            
+            .auth-container {
+                margin: 1rem;
+            }
+            
+            .story-avatar {
+                width: 50px;
+                height: 50px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -732,39 +897,65 @@
         <i class="fas fa-wifi"></i> متصل
     </div>
 
+    <!-- نافذة الـ Story -->
+    <div class="story-viewer" id="storyViewer">
+        <div class="story-progress" id="storyProgress"></div>
+        <div class="story-content">
+            <img class="story-media" id="storyMedia" src="" alt="Story">
+            <div class="story-nav story-prev" id="storyPrev"></div>
+            <div class="story-nav story-next" id="storyNext"></div>
+            <button class="story-close" id="storyClose">
+                <i class="fas fa-times"></i>
+            </button>
+            <div class="story-info">
+                <img class="story-user-avatar" id="storyUserAvatar" src="" alt="User">
+                <div>
+                    <div id="storyUserName"></div>
+                    <div id="storyTime"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="app-container">
-        <!-- الهيدر -->
+        <!-- Header -->
         <header class="header">
             <div class="header-content">
-                <div class="logo" onclick="showPage('landingPage')">
+                <div class="logo">
                     <div class="logo-icon">
                         <i class="fas fa-graduation-cap"></i>
                     </div>
-                    <div class="logo-text">إديوتك</div>
+                    <div class="logo-text">المنصة التعليمية</div>
                 </div>
                 
                 <nav class="nav">
-                    <a href="#" class="nav-item" onclick="showPage('landingPage')">
+                    <a href="#" class="nav-item" id="homeLink">
                         <i class="fas fa-home"></i> الرئيسية
                     </a>
-                    <a href="#" class="nav-item" onclick="showPage('loginPage')">
+                    <a href="#" class="nav-item" id="loginLink">
                         <i class="fas fa-sign-in-alt"></i> تسجيل الدخول
                     </a>
-                    <a href="#" class="nav-item" onclick="showPage('registerPage')">
+                    <a href="#" class="nav-item" id="registerLink">
                         <i class="fas fa-user-plus"></i> إنشاء حساب
                     </a>
-                    <a href="#" class="nav-item hidden" onclick="showPage('chatPage')">
+                    <a href="#" class="nav-item hidden" id="dashboardLink">
+                        <i class="fas fa-tachometer-alt"></i> لوحة التحكم
+                    </a>
+                    <a href="#" class="nav-item hidden" id="chatLink">
                         <i class="fas fa-comments"></i> الدردشة
                     </a>
-                    <a href="#" class="nav-item hidden" onclick="showPage('adminPage')">
+                    <a href="#" class="nav-item hidden" id="storiesLink">
+                        <i class="fas fa-history"></i> Stories
+                    </a>
+                    <a href="#" class="nav-item hidden" id="imagesLink">
+                        <i class="fas fa-images"></i> الصور
+                    </a>
+                    <a href="#" class="nav-item hidden" id="adminLink">
                         <i class="fas fa-cogs"></i> الإدارة
                     </a>
                     <div class="user-info hidden" id="userInfo">
-                        <div class="user-avatar" id="userAvatar">
-                            <i class="fas fa-user"></i>
-                        </div>
                         <span id="userName"></span>
-                        <a href="#" class="nav-item" onclick="logout()">
+                        <a href="#" class="nav-item" id="logoutLink">
                             <i class="fas fa-sign-out-alt"></i> خروج
                         </a>
                     </div>
@@ -772,163 +963,1167 @@
             </div>
         </header>
 
-        <!-- المحتوى الرئيسي -->
+        <!-- Main Content -->
         <main class="main-content">
-            <!-- الصفحة الرئيسية -->
-            <div class="page active" id="landingPage">
-                <div style="min-height: 80vh; display: flex; align-items: center; justify-content: center; background: var(--gradient); color: white; text-align: center; padding: 2rem;">
-                    <div style="max-width: 800px;">
-                        <h1 style="font-size: 3.5rem; font-weight: 800; margin-bottom: 1rem;">نظام الدردشة المتطور</h1>
-                        <p style="font-size: 1.4rem; margin-bottom: 3rem; opacity: 0.9;">تجربة دردشة فريدة مع أحدث التقنيات والميزات</p>
-                        
-                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 2rem; margin-bottom: 3rem;">
-                            <div style="background: rgba(255,255,255,0.1); padding: 2rem; border-radius: 20px; backdrop-filter: blur(10px);">
-                                <i class="fas fa-bolt" style="font-size: 3rem; margin-bottom: 1rem;"></i>
-                                <h3 style="margin-bottom: 1rem;">في الوقت الحقيقي</h3>
-                                <p>دردشة فورية مع تقنية WebSocket</p>
-                            </div>
-                            <div style="background: rgba(255,255,255,0.1); padding: 2rem; border-radius: 20px; backdrop-filter: blur(10px);">
-                                <i class="fas fa-share-alt" style="font-size: 3rem; margin-bottom: 1rem;"></i>
-                                <h3 style="margin-bottom: 1rem;">مشاركة متعددة</h3>
-                                <p>رفع الصور، الفيديوهات، والملفات</p>
-                            </div>
-                            <div style="background: rgba(255,255,255,0.1); padding: 2rem; border-radius: 20px; backdrop-filter: blur(10px);">
-                                <i class="fas fa-mobile-alt" style="font-size: 3rem; margin-bottom: 1rem;"></i>
-                                <h3 style="margin-bottom: 1rem;">متجاوب</h3>
-                                <p>تصميم يعمل على جميع الأجهزة</p>
-                            </div>
+            <!-- Home Page -->
+            <div class="page active" id="homePage">
+                <div class="auth-container">
+                    <div class="auth-header">
+                        <h1><i class="fas fa-graduation-cap"></i> المنصة التعليمية</h1>
+                        <p>نظام متكامل لإدارة الطلاب والتواصل الأكاديمي</p>
+                    </div>
+                    <div class="auth-body">
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle"></i>
+                            نظام آمن ومحكم للتواصل بين الطلاب والإدارة
                         </div>
-                        
-                        <div style="display: flex; gap: 1.5rem; justify-content: center; flex-wrap: wrap;">
-                            <button class="btn btn-primary" onclick="showPage('loginPage')" style="background: white; color: var(--primary); border: none; padding: 1rem 2rem; border-radius: 12px; font-size: 1.1rem; font-weight: 600; cursor: pointer;">
-                                <i class="fas fa-sign-in-alt"></i> بدء الدردشة
+                        <div class="text-center mt-3">
+                            <button class="btn btn-primary btn-block" id="homeLoginBtn">
+                                <i class="fas fa-sign-in-alt"></i> تسجيل الدخول
                             </button>
-                            <button class="btn btn-outline" onclick="showPage('registerPage')" style="background: transparent; border: 2px solid white; color: white; padding: 1rem 2rem; border-radius: 12px; font-size: 1.1rem; font-weight: 600; cursor: pointer;">
-                                <i class="fas fa-user-plus"></i> إنشاء حساب
+                            <button class="btn btn-outline btn-block mt-3" id="homeRegisterBtn">
+                                <i class="fas fa-user-plus"></i> إنشاء حساب جديد
                             </button>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- تسجيل الدخول -->
+            <!-- Login Page -->
             <div class="page" id="loginPage">
-                <div style="max-width: 500px; margin: 2rem auto; background: rgba(255,255,255,0.95); border-radius: 20px; box-shadow: var(--shadow); overflow: hidden;">
-                    <div style="background: var(--gradient-primary); color: white; padding: 2rem; text-align: center;">
+                <div class="auth-container">
+                    <div class="auth-header">
                         <h1><i class="fas fa-sign-in-alt"></i> تسجيل الدخول</h1>
-                        <p>ادخل إلى نظام الدردشة المتطور</p>
+                        <p>ادخل إلى حسابك في المنصة</p>
                     </div>
-                    <div style="padding: 2rem;">
+                    <div class="auth-body">
                         <div id="loginAlert"></div>
                         <form id="loginForm">
-                            <div style="margin-bottom: 1.5rem;">
-                                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">رقم الهاتف</label>
-                                <input type="tel" style="width: 100%; padding: 1rem; border: 2px solid var(--border); border-radius: 10px; font-size: 1rem;" 
-                                       id="loginPhone" placeholder="5XXXXXXXX" required>
+                            <div class="form-group">
+                                <label class="form-label" for="loginPhone">
+                                    <i class="fas fa-phone"></i> رقم الهاتف
+                                </label>
+                                <input type="tel" class="form-control" id="loginPhone" 
+                                       placeholder="5XXXXXXXX" required>
                             </div>
-                            <div style="margin-bottom: 1.5rem;">
-                                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">كلمة المرور</label>
-                                <input type="password" style="width: 100%; padding: 1rem; border: 2px solid var(--border); border-radius: 10px; font-size: 1rem;" 
-                                       id="loginPassword" required>
+                            <div class="form-group">
+                                <label class="form-label" for="loginPassword">
+                                    <i class="fas fa-lock"></i> كلمة المرور
+                                </label>
+                                <input type="password" class="form-control" id="loginPassword" required>
                             </div>
-                            <button type="submit" style="width: 100%; padding: 1rem; background: var(--gradient-primary); color: white; border: none; border-radius: 10px; font-size: 1.1rem; font-weight: 600; cursor: pointer;">
-                                <i class="fas fa-sign-in-alt"></i> دخول إلى النظام
+                            <button type="submit" class="btn btn-primary btn-block">
+                                <i class="fas fa-sign-in-alt"></i> دخول
                             </button>
                         </form>
-                        <div style="text-align: center; margin-top: 1rem;">
-                            <a href="#" onclick="showPage('registerPage')" style="color: var(--primary); text-decoration: none; font-weight: 600;">ليس لديك حساب؟ سجل الآن</a>
+                        <div class="text-center mt-3">
+                            <a href="#" id="toRegister">ليس لديك حساب؟ سجل الآن</a>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- التسجيل -->
+            <!-- Register Page -->
             <div class="page" id="registerPage">
-                <div style="max-width: 500px; margin: 2rem auto; background: rgba(255,255,255,0.95); border-radius: 20px; box-shadow: var(--shadow); overflow: hidden;">
-                    <div style="background: var(--gradient-primary); color: white; padding: 2rem; text-align: center;">
+                <div class="auth-container">
+                    <div class="auth-header">
                         <h1><i class="fas fa-user-plus"></i> إنشاء حساب جديد</h1>
                         <p>انضم إلى مجتمعنا التعليمي</p>
                     </div>
-                    <div style="padding: 2rem;">
+                    <div class="auth-body">
                         <div id="registerAlert"></div>
                         <form id="registerForm">
-                            <div style="margin-bottom: 1.5rem;">
-                                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">الاسم الكامل</label>
-                                <input type="text" style="width: 100%; padding: 1rem; border: 2px solid var(--border); border-radius: 10px; font-size: 1rem;" 
-                                       id="fullName" required>
+                            <div class="form-group">
+                                <label class="form-label" for="fullName">
+                                    <i class="fas fa-user"></i> الاسم الكامل
+                                </label>
+                                <input type="text" class="form-control" id="fullName" required>
                             </div>
-                            <div style="margin-bottom: 1.5rem;">
-                                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">رقم الهاتف</label>
-                                <input type="tel" style="width: 100%; padding: 1rem; border: 2px solid var(--border); border-radius: 10px; font-size: 1rem;" 
-                                       id="phone" placeholder="5XXXXXXXX" required>
+                            <div class="form-group">
+                                <label class="form-label" for="phone">
+                                    <i class="fas fa-phone"></i> رقم الهاتف السعودي
+                                </label>
+                                <input type="tel" class="form-control" id="phone" 
+                                       placeholder="5XXXXXXXX" required>
                             </div>
-                            <div style="margin-bottom: 1.5rem;">
-                                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">الجامعة</label>
-                                <select style="width: 100%; padding: 1rem; border: 2px solid var(--border); border-radius: 10px; font-size: 1rem;" id="university" required>
+                            <div class="form-group">
+                                <label class="form-label" for="university">
+                                    <i class="fas fa-university"></i> الجامعة
+                                </label>
+                                <select class="form-control" id="university" required>
                                     <option value="">اختر الجامعة</option>
                                     <option value="جامعة الملك سعود">جامعة الملك سعود</option>
-                                    <option value="جامعة الباحة">جامعة الباحة</option>
+                                    <option value="جامعة الملك عبدالعزيز">جامعة الملك عبدالعزيز</option>
+                                    <option value="جامعة الإمام محمد بن سعود">جامعة الإمام محمد بن سعود</option>
+                                    <option value="جامعة الأميرة نورة">جامعة الأميرة نورة</option>
                                 </select>
                             </div>
-                            <div style="margin-bottom: 1.5rem;">
-                                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">التخصص</label>
-                                <select style="width: 100%; padding: 1rem; border: 2px solid var(--border); border-radius: 10px; font-size: 1rem;" id="major" required>
+                            <div class="form-group">
+                                <label class="form-label" for="major">
+                                    <i class="fas fa-book"></i> التخصص
+                                </label>
+                                <select class="form-control" id="major" required>
                                     <option value="">اختر التخصص</option>
-                                    <option value="حاسب آلي">حاسب آلي</option>
-                                    <option value="أمن سيبراني">أمن سيبراني</option>
+                                    <option value="هندسة الحاسب">هندسة الحاسب</option>
+                                    <option value="علوم الحاسب">علوم الحاسب</option>
+                                    <option value="نظم المعلومات">نظم المعلومات</option>
+                                    <option value="الطب">الطب</option>
+                                    <option value="الصيدلة">الصيدلة</option>
                                 </select>
                             </div>
-                            <div style="margin-bottom: 1.5rem;">
-                                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">الدفعة</label>
-                                <select style="width: 100%; padding: 1rem; border: 2px solid var(--border); border-radius: 10px; font-size: 1rem;" id="batch" required>
+                            <div class="form-group">
+                                <label class="form-label" for="batch">
+                                    <i class="fas fa-graduation-cap"></i> الدفعة
+                                </label>
+                                <select class="form-control" id="batch" required>
                                     <option value="">اختر الدفعة</option>
-                                    <option value="2024">2024</option>
+                                    <option value="2020">2020</option>
+                                    <option value="2021">2021</option>
+                                    <option value="2022">2022</option>
                                     <option value="2023">2023</option>
+                                    <option value="2024">2024</option>
                                 </select>
                             </div>
-                            <div style="margin-bottom: 1.5rem;">
-                                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">كلمة المرور</label>
-                                <input type="password" style="width: 100%; padding: 1rem; border: 2px solid var(--border); border-radius: 10px; font-size: 1rem;" 
-                                       id="password" required>
+                            <div class="form-group">
+                                <label class="form-label" for="password">
+                                    <i class="fas fa-lock"></i> كلمة المرور
+                                </label>
+                                <input type="password" class="form-control" id="password" required>
                             </div>
-                            <button type="submit" style="width: 100%; padding: 1rem; background: var(--gradient-primary); color: white; border: none; border-radius: 10px; font-size: 1.1rem; font-weight: 600; cursor: pointer;">
+                            <div class="form-group">
+                                <label class="form-label" for="confirmPassword">
+                                    <i class="fas fa-lock"></i> تأكيد كلمة المرور
+                                </label>
+                                <input type="password" class="form-control" id="confirmPassword" required>
+                            </div>
+                            <button type="submit" class="btn btn-primary btn-block">
                                 <i class="fas fa-user-plus"></i> إنشاء الحساب
                             </button>
                         </form>
-                        <div style="text-align: center; margin-top: 1rem;">
-                            <a href="#" onclick="showPage('loginPage')" style="color: var(--primary); text-decoration: none; font-weight: 600;">لديك حساب؟ سجل الدخول</a>
+                        <div class="text-center mt-3">
+                            <a href="#" id="toLogin">لديك حساب بالفعل؟ سجل الدخول</a>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- نظام الدردشة -->
+            <!-- Dashboard Page -->
+            <div class="page" id="dashboardPage">
+                <div class="dashboard">
+                    <div class="welcome-section">
+                        <h1>مرحباً بك، <span id="dashboardUserName"></span></h1>
+                        <p>لوحة التحكم الشخصية - يمكنك الوصول إلى جميع خدمات المنصة من هنا</p>
+                    </div>
+
+                    <!-- نظام الـ Stories -->
+                    <div class="stories-container" id="storiesContainer">
+                        <!-- سيتم إضافة الـ Stories هنا ديناميكياً -->
+                    </div>
+
+                    <div class="stats-grid" id="userStats">
+                        <div class="stat-card">
+                            <div class="stat-icon">
+                                <i class="fas fa-university"></i>
+                            </div>
+                            <div class="stat-value" id="userUniversity"></div>
+                            <div class="stat-label">الجامعة</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">
+                                <i class="fas fa-book"></i>
+                            </div>
+                            <div class="stat-value" id="userMajor"></div>
+                            <div class="stat-label">التخصص</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">
+                                <i class="fas fa-graduation-cap"></i>
+                            </div>
+                            <div class="stat-value" id="userBatch"></div>
+                            <div class="stat-label">الدفعة</div>
+                        </div>
+                    </div>
+
+                    <div class="features-grid">
+                        <div class="feature-card" id="goToChatCard">
+                            <div class="feature-icon">
+                                <i class="fas fa-comments"></i>
+                            </div>
+                            <h3>نظام الدردشة المتطور</h3>
+                            <p>تواصل مباشر في الوقت الحقيقي مع إدارة المنصة والطلاب</p>
+                            <button class="btn btn-primary mt-3" id="goToChat">
+                                <i class="fas fa-arrow-left"></i> الانتقال للدردشة
+                            </button>
+                        </div>
+                        <div class="feature-card" id="goToStoriesCard">
+                            <div class="feature-icon">
+                                <i class="fas fa-history"></i>
+                            </div>
+                            <h3>نظام الـ Stories</h3>
+                            <p>شارك لحظاتك مع المجتمع التعليمي لمدة 24 ساعة</p>
+                            <button class="btn btn-primary mt-3" id="goToStories">
+                                <i class="fas fa-arrow-left"></i> مشاهدة الـ Stories
+                            </button>
+                        </div>
+                        <div class="feature-card" id="goToImagesCard">
+                            <div class="feature-icon">
+                                <i class="fas fa-images"></i>
+                            </div>
+                            <h3>معرض الصور</h3>
+                            <p>عرض الصور والملفات المرسلة لك من قبل إدارة المنصة</p>
+                            <button class="btn btn-primary mt-3" id="goToImages">
+                                <i class="fas fa-arrow-left"></i> عرض الصور
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Chat Page -->
             <div class="page" id="chatPage">
-                <div class="chat-app" id="chatApp">
-                    <!-- سيتم تحميل واجهة الدردشة هنا عبر JavaScript -->
-                </div>
-            </div>
+                <div class="modern-chat-container">
+                    <!-- الشريط الجانبي للمحادثات -->
+                    <div class="chat-sidebar" id="chatSidebar">
+                        <div class="chat-header">
+                            <div class="user-avatar">
+                                <i class="fas fa-user"></i>
+                            </div>
+                            <div>
+                                <h3 id="currentUserName"></h3>
+                                <div class="user-status">
+                                    <span class="status-indicator" id="userStatusIndicator"></span>
+                                    <span id="userStatusText">متصل</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="conversations-list" id="conversationsList">
+                            <!-- المحادثات ستظهر هنا -->
+                        </div>
+                    </div>
 
-            <!-- لوحة الإدارة -->
-            <div class="page" id="adminPage">
-                <div style="max-width: 1200px; margin: 0 auto; padding: 2rem;">
-                    <div style="background: rgba(255,255,255,0.95); border-radius: 20px; padding: 2rem; box-shadow: var(--shadow);">
-                        <h1 style="color: var(--primary); margin-bottom: 2rem;"><i class="fas fa-cogs"></i> لوحة الإدارة المتقدمة</h1>
-                        <div id="adminContent">
-                            <!-- سيتم تحميل محتوى الإدارة هنا -->
+                    <!-- منطقة الدردشة الرئيسية -->
+                    <div class="chat-main">
+                        <div class="chat-header">
+                            <div class="user-avatar">
+                                <i class="fas fa-user-tie"></i>
+                            </div>
+                            <div>
+                                <h3 id="chatWithName">اختر محادثة</h3>
+                                <div class="user-status">
+                                    <span class="status-indicator offline" id="chatStatusIndicator"></span>
+                                    <span id="chatStatusText">غير متصل</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="chat-messages" id="chatMessages">
+                            <div class="chat-placeholder">
+                                <i class="fas fa-comments"></i>
+                                <h3>مرحباً بك في نظام الدردشة المتطور</h3>
+                                <p>اختر محادثة من القائمة الجانبية لبدء المحادثة</p>
+                            </div>
+                        </div>
+
+                        <div class="typing-indicator hidden" id="typingIndicator">
+                            <div class="typing-dots">
+                                <div class="typing-dot"></div>
+                                <div class="typing-dot"></div>
+                                <div class="typing-dot"></div>
+                            </div>
+                            <span id="typingUser"></span> يكتب...
+                        </div>
+
+                        <div class="chat-input-area">
+                            <div class="chat-input-wrapper">
+                                <textarea class="chat-input" id="messageInput" 
+                                          placeholder="اكتب رسالتك هنا..." rows="1"></textarea>
+                            </div>
+                            <div class="chat-actions">
+                                <button class="chat-action-btn" id="attachBtn">
+                                    <i class="fas fa-paperclip"></i>
+                                </button>
+                                <button class="chat-action-btn" id="emojiBtn">
+                                    <i class="fas fa-smile"></i>
+                                </button>
+                                <button class="chat-action-btn send-btn" id="sendMessage" disabled>
+                                    <i class="fas fa-paper-plane"></i>
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
+
+            <!-- Stories Page -->
+            <div class="page" id="storiesPage">
+                <div class="dashboard">
+                    <div class="welcome-section">
+                        <h1><i class="fas fa-history"></i> الـ Stories</h1>
+                        <p>شارك لحظاتك مع المجتمع التعليمي</p>
+                    </div>
+                    <div class="stories-container" id="storiesPageContainer">
+                        <!-- Stories ستظهر هنا -->
+                    </div>
+                    <div class="text-center mt-3">
+                        <button class="btn btn-primary" id="addStoryBtn">
+                            <i class="fas fa-plus"></i> إضافة Story جديد
+                        </button>
+                        <input type="file" id="storyInput" accept="image/*,video/*" style="display: none;">
+                    </div>
+                </div>
+            </div>
+
+            <!-- باقي الصفحات (Images, Admin) تبقى كما هي -->
+            <!-- [يتم الحفاظ على الصفحات الأخرى من الإصدار السابق] -->
+
         </main>
     </div>
 
-    <!-- Socket.IO -->
     <script src="/socket.io/socket.io.js"></script>
     <script>
-        // سيكون هنا كود JavaScript الكامل للنظام
-        // تم تقصير الإجابة للالتزام بالحد الأقصى
-        console.log('نظام الدردشة المتطور جاهز للتحميل...');
+        // التهيئة الأساسية
+        const API_BASE = window.location.origin + '/api';
+        let currentUser = null;
+        let socket = null;
+        let currentConversation = null;
+        let stories = [];
+        let currentStoryIndex = 0;
+        let currentStoryUserIndex = 0;
+        let storyInterval = null;
+
+        // تهيئة التطبيق
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeApp();
+        });
+
+        function initializeApp() {
+            setupEventListeners();
+            checkAuthStatus();
+            setupChatUI();
+            setupStories();
+            
+            // اختبار الاتصال
+            setTimeout(() => {
+                testConnection();
+            }, 1000);
+        }
+
+        function setupEventListeners() {
+            // روابط التنقل
+            document.getElementById('homeLink').addEventListener('click', (e) => { e.preventDefault(); showHome(); });
+            document.getElementById('loginLink').addEventListener('click', (e) => { e.preventDefault(); showLogin(); });
+            document.getElementById('registerLink').addEventListener('click', (e) => { e.preventDefault(); showRegister(); });
+            document.getElementById('dashboardLink').addEventListener('click', (e) => { e.preventDefault(); showDashboard(); });
+            document.getElementById('chatLink').addEventListener('click', (e) => { e.preventDefault(); showChat(); });
+            document.getElementById('storiesLink').addEventListener('click', (e) => { e.preventDefault(); showStories(); });
+            document.getElementById('imagesLink').addEventListener('click', (e) => { e.preventDefault(); showImages(); });
+            document.getElementById('adminLink').addEventListener('click', (e) => { e.preventDefault(); showAdminPanel(); });
+            document.getElementById('logoutLink').addEventListener('click', (e) => { e.preventDefault(); logout(); });
+
+            // أزرار الصفحة الرئيسية
+            document.getElementById('homeLoginBtn').addEventListener('click', showLogin);
+            document.getElementById('homeRegisterBtn').addEventListener('click', showRegister);
+
+            // نماذج
+            document.getElementById('loginForm').addEventListener('submit', handleLogin);
+            document.getElementById('registerForm').addEventListener('submit', handleRegister);
+
+            // روابط التنقل بين النماذج
+            document.getElementById('toLogin').addEventListener('click', (e) => { e.preventDefault(); showLogin(); });
+            document.getElementById('toRegister').addEventListener('click', (e) => { e.preventDefault(); showRegister(); });
+
+            // أزرار لوحة التحكم
+            document.getElementById('goToChat').addEventListener('click', showChat);
+            document.getElementById('goToStories').addEventListener('click', showStories);
+            document.getElementById('goToImages').addEventListener('click', showImages);
+
+            // نظام الدردشة
+            document.getElementById('sendMessage').addEventListener('click', sendMessage);
+            document.getElementById('messageInput').addEventListener('input', handleMessageInput);
+            document.getElementById('messageInput').addEventListener('keypress', handleMessageKeypress);
+
+            // نظام الـ Stories
+            document.getElementById('addStoryBtn').addEventListener('click', () => {
+                document.getElementById('storyInput').click();
+            });
+            document.getElementById('storyInput').addEventListener('change', handleStoryUpload);
+            document.getElementById('storyClose').addEventListener('click', closeStoryViewer);
+        }
+
+        function setupChatUI() {
+            const messageInput = document.getElementById('messageInput');
+            
+            messageInput.addEventListener('input', function() {
+                this.style.height = 'auto';
+                this.style.height = (this.scrollHeight) + 'px';
+                
+                const hasText = this.value.trim().length > 0;
+                document.getElementById('sendMessage').disabled = !hasText;
+            });
+        }
+
+        function setupStories() {
+            // إعداد أحداث الـ Stories
+            document.getElementById('storyPrev').addEventListener('click', showPreviousStory);
+            document.getElementById('storyNext').addEventListener('click', showNextStory);
+            
+            // إغلاق الـ Story عند النقر خارج المحتوى
+            document.getElementById('storyViewer').addEventListener('click', function(e) {
+                if (e.target === this) {
+                    closeStoryViewer();
+                }
+            });
+        }
+
+        async function testConnection() {
+            try {
+                const response = await fetch(`${API_BASE}/health`);
+                const statusElement = document.getElementById('connectionStatus');
+                
+                if (response.ok) {
+                    statusElement.style.display = 'block';
+                    statusElement.className = 'connection-status';
+                    statusElement.innerHTML = '<i class="fas fa-wifi"></i> متصل';
+                    return true;
+                } else {
+                    throw new Error('Connection failed');
+                }
+            } catch (error) {
+                const statusElement = document.getElementById('connectionStatus');
+                statusElement.style.display = 'block';
+                statusElement.className = 'connection-status offline';
+                statusElement.innerHTML = '<i class="fas fa-wifi-slash"></i> غير متصل';
+                return false;
+            }
+        }
+
+        // نظام المصادقة وإدارة الحالة
+        function checkAuthStatus() {
+            const token = localStorage.getItem('token');
+            const userData = localStorage.getItem('user');
+            
+            if (token && userData) {
+                try {
+                    currentUser = JSON.parse(userData);
+                    updateNavigation(true, currentUser.role === 'admin');
+                    initializeSocket();
+                    
+                    if (currentUser.role === 'admin') {
+                        showAdminPanel();
+                    } else {
+                        showDashboard();
+                    }
+                } catch (error) {
+                    console.error('Error parsing user data:', error);
+                    logout();
+                }
+            } else {
+                showHome();
+            }
+        }
+
+        function initializeSocket() {
+            if (socket) {
+                socket.disconnect();
+            }
+
+            socket = io();
+
+            socket.on('connect', () => {
+                console.log('Connected to server');
+                socket.emit('authenticate', currentUser);
+            });
+
+            socket.on('disconnect', () => {
+                console.log('Disconnected from server');
+            });
+
+            // استقبال الرسائل
+            socket.on('new_message', (message) => {
+                if (currentConversation === message.senderId || currentConversation === message.receiverId) {
+                    displayNewMessage(message);
+                }
+            });
+
+            // تحديث حالة المستخدمين
+            socket.on('user_online', (user) => {
+                updateUserOnlineStatus(user.userId, true);
+            });
+
+            socket.on('user_offline', (user) => {
+                updateUserOnlineStatus(user.userId, false);
+            });
+
+            // مؤشر الكتابة
+            socket.on('user_typing', (data) => {
+                if (currentConversation === data.userId) {
+                    showTypingIndicator(data.userName);
+                }
+            });
+
+            socket.on('user_stop_typing', (data) => {
+                if (currentConversation === data.userId) {
+                    hideTypingIndicator();
+                }
+            });
+
+            // الـ Stories
+            socket.on('new_story', (story) => {
+                loadStories();
+            });
+
+            socket.on('story_viewed', (data) => {
+                // يمكن إضافة إشعارات للمستخدم
+                console.log('Story viewed by:', data.viewer.userName);
+            });
+        }
+
+        // نظام الدردشة
+        function handleMessageInput() {
+            if (currentConversation) {
+                socket.emit('typing_start', {
+                    senderId: currentUser._id,
+                    senderName: currentUser.fullName,
+                    receiverId: currentConversation
+                });
+                
+                clearTimeout(window.typingTimeout);
+                window.typingTimeout = setTimeout(() => {
+                    socket.emit('typing_stop', {
+                        senderId: currentUser._id,
+                        receiverId: currentConversation
+                    });
+                }, 1000);
+            }
+        }
+
+        function handleMessageKeypress(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        }
+
+        async function sendMessage() {
+            const messageInput = document.getElementById('messageInput');
+            const text = messageInput.value.trim();
+            
+            if (!text || !currentConversation) return;
+
+            try {
+                socket.emit('send_message', {
+                    text: text,
+                    receiverId: currentConversation
+                });
+
+                messageInput.value = '';
+                messageInput.style.height = 'auto';
+                document.getElementById('sendMessage').disabled = true;
+                
+            } catch (error) {
+                console.error('Error sending message:', error);
+                showAlert('chatPage', 'خطأ في إرسال الرسالة', 'error');
+            }
+        }
+
+        function displayNewMessage(message) {
+            const messagesContainer = document.getElementById('chatMessages');
+            const placeholder = messagesContainer.querySelector('.chat-placeholder');
+            
+            if (placeholder) {
+                placeholder.remove();
+            }
+
+            const messageElement = document.createElement('div');
+            messageElement.className = `message ${message.senderId === currentUser._id ? 'sent' : 'received'}`;
+            
+            const messageTime = new Date(message.timestamp).toLocaleTimeString('ar-SA', {
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+
+            messageElement.innerHTML = `
+                <div class="message-header">
+                    <span class="message-sender">${message.senderName}</span>
+                    <span class="message-time">${messageTime}</span>
+                </div>
+                <div>${message.text}</div>
+                ${message.reactions && message.reactions.length > 0 ? `
+                    <div class="message-reactions">
+                        ${message.reactions.map(reaction => 
+                            `<span class="reaction">${reaction.emoji}</span>`
+                        ).join('')}
+                    </div>
+                ` : ''}
+            `;
+
+            messagesContainer.appendChild(messageElement);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        function showTypingIndicator(userName) {
+            const indicator = document.getElementById('typingIndicator');
+            const typingUser = document.getElementById('typingUser');
+            
+            typingUser.textContent = userName;
+            indicator.classList.remove('hidden');
+        }
+
+        function hideTypingIndicator() {
+            const indicator = document.getElementById('typingIndicator');
+            indicator.classList.add('hidden');
+        }
+
+        // نظام الـ Stories
+        async function loadStories() {
+            try {
+                const response = await fetch(`${API_BASE}/stories`, {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    }
+                });
+
+                if (response.ok) {
+                    stories = await response.json();
+                    displayStories();
+                }
+            } catch (error) {
+                console.error('Error loading stories:', error);
+            }
+        }
+
+        function displayStories() {
+            const container = document.getElementById('storiesContainer');
+            const pageContainer = document.getElementById('storiesPageContainer');
+            
+            [container, pageContainer].forEach(cont => {
+                if (!cont) return;
+                
+                cont.innerHTML = '';
+                
+                // زر إضافة Story
+                const addStoryItem = document.createElement('div');
+                addStoryItem.className = 'story-item';
+                addStoryItem.innerHTML = `
+                    <div class="story-add-btn" onclick="document.getElementById('storyInput').click()">
+                        <i class="fas fa-plus"></i>
+                    </div>
+                    <div class="story-username">أضف Story</div>
+                `;
+                cont.appendChild(addStoryItem);
+
+                // Stories المستخدمين
+                stories.forEach(userStories => {
+                    const storyItem = document.createElement('div');
+                    storyItem.className = 'story-item';
+                    
+                    const hasUnviewed = userStories.stories.some(story => 
+                        !story.views.some(view => view.userId === currentUser._id)
+                    );
+                    
+                    storyItem.innerHTML = `
+                        <div class="story-avatar ${hasUnviewed ? 'unviewed' : ''}">
+                            <img src="${userStories.user.avatar || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZGRkIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzk5OSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPuWNleivleS4rTwvdGV4dD48L3N2Zz4='}" 
+                                 alt="${userStories.user.fullName}">
+                        </div>
+                        <div class="story-username">${userStories.user.fullName}</div>
+                    `;
+                    
+                    storyItem.addEventListener('click', () => {
+                        openStoriesViewer(userStories);
+                    });
+                    
+                    cont.appendChild(storyItem);
+                });
+            });
+        }
+
+        function openStoriesViewer(userStories) {
+            currentStoryUserIndex = stories.findIndex(s => s.user._id === userStories.user._id);
+            currentStoryIndex = 0;
+            
+            showStory(stories[currentStoryUserIndex], currentStoryIndex);
+        }
+
+        function showStory(userStories, storyIndex) {
+            const story = userStories.stories[storyIndex];
+            if (!story) return;
+
+            const viewer = document.getElementById('storyViewer');
+            const media = document.getElementById('storyMedia');
+            const userAvatar = document.getElementById('storyUserAvatar');
+            const userName = document.getElementById('storyUserName');
+            const storyTime = document.getElementById('storyTime');
+            const progressContainer = document.getElementById('storyProgress');
+
+            // تعيين البيانات
+            media.src = `${API_BASE}${story.mediaUrl}`;
+            userAvatar.src = userStories.user.avatar || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZGRkIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzk5OSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPuWNleivleS4rTwvdGV4dD48L3N2Zz4=';
+            userName.textContent = userStories.user.fullName;
+            storyTime.textContent = new Date(story.createdAt).toLocaleTimeString('ar-SA');
+
+            // إعداد شريط التقدم
+            progressContainer.innerHTML = '';
+            userStories.stories.forEach((s, index) => {
+                const progressBar = document.createElement('div');
+                progressBar.className = 'story-progress-bar';
+                const progressFill = document.createElement('div');
+                progressFill.className = 'story-progress-fill';
+                progressBar.appendChild(progressFill);
+                progressContainer.appendChild(progressBar);
+            });
+
+            // بدء التقدم
+            startStoryProgress(userStories, storyIndex);
+
+            // تسجيل المشاهدة
+            recordStoryView(story._id);
+
+            // إظهار النافذة
+            viewer.classList.add('active');
+        }
+
+        function startStoryProgress(userStories, storyIndex) {
+            if (storyInterval) {
+                clearInterval(storyInterval);
+            }
+
+            const progressBars = document.querySelectorAll('.story-progress-fill');
+            const currentProgress = progressBars[storyIndex];
+            let progress = 0;
+            const story = userStories.stories[storyIndex];
+            const duration = story.duration * 1000; // تحويل إلى ملي ثانية
+
+            storyInterval = setInterval(() => {
+                progress += 10;
+                currentProgress.style.width = `${(progress / duration) * 100}%`;
+
+                if (progress >= duration) {
+                    clearInterval(storyInterval);
+                    showNextStory();
+                }
+            }, 10);
+        }
+
+        function showNextStory() {
+            const currentUserStories = stories[currentStoryUserIndex];
+            
+            if (currentStoryIndex < currentUserStories.stories.length - 1) {
+                currentStoryIndex++;
+                showStory(currentUserStories, currentStoryIndex);
+            } else if (currentStoryUserIndex < stories.length - 1) {
+                currentStoryUserIndex++;
+                currentStoryIndex = 0;
+                showStory(stories[currentStoryUserIndex], currentStoryIndex);
+            } else {
+                closeStoryViewer();
+            }
+        }
+
+        function showPreviousStory() {
+            if (currentStoryIndex > 0) {
+                currentStoryIndex--;
+                showStory(stories[currentStoryUserIndex], currentStoryIndex);
+            } else if (currentStoryUserIndex > 0) {
+                currentStoryUserIndex--;
+                currentStoryIndex = stories[currentStoryUserIndex].stories.length - 1;
+                showStory(stories[currentStoryUserIndex], currentStoryIndex);
+            }
+        }
+
+        function closeStoryViewer() {
+            if (storyInterval) {
+                clearInterval(storyInterval);
+            }
+            document.getElementById('storyViewer').classList.remove('active');
+        }
+
+        async function recordStoryView(storyId) {
+            try {
+                await fetch(`${API_BASE}/stories/${storyId}/view`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    }
+                });
+            } catch (error) {
+                console.error('Error recording story view:', error);
+            }
+        }
+
+        async function handleStoryUpload(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const formData = new FormData();
+            formData.append('story', file);
+
+            try {
+                const response = await fetch(`${API_BASE}/stories`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    },
+                    body: formData
+                });
+
+                if (response.ok) {
+                    showAlert('storiesPage', 'تم نشر الـ Story بنجاح', 'success');
+                    loadStories();
+                } else {
+                    const data = await response.json();
+                    showAlert('storiesPage', data.message, 'error');
+                }
+            } catch (error) {
+                console.error('Error uploading story:', error);
+                showAlert('storiesPage', 'خطأ في رفع الـ Story', 'error');
+            }
+
+            e.target.value = '';
+        }
+
+        // دوال المساعدة
+        function showAlert(containerId, message, type = 'info') {
+            // تنفيذ دالة showAlert كما في الإصدار السابق
+        }
+
+        function updateNavigation(isLoggedIn, isAdmin = false) {
+            // تنفيذ دالة updateNavigation كما في الإصدار السابق
+        }
+
+        function showPage(pageId) {
+            document.querySelectorAll('.page').forEach(page => {
+                page.classList.remove('active');
+            });
+            document.getElementById(pageId).classList.add('active');
+        }
+
+        function showHome() {
+            showPage('homePage');
+            updateNavigation(false);
+        }
+
+        function showLogin() {
+            showPage('loginPage');
+        }
+
+        function showRegister() {
+            showPage('registerPage');
+        }
+
+        function showDashboard() {
+            if (!currentUser) return;
+            showPage('dashboardPage');
+            updateNavigation(true, currentUser.role === 'admin');
+            loadStories();
+        }
+
+        function showChat() {
+            if (!currentUser) return;
+            showPage('chatPage');
+            updateNavigation(true, currentUser.role === 'admin');
+            loadConversations();
+        }
+
+        function showStories() {
+            if (!currentUser) return;
+            showPage('storiesPage');
+            updateNavigation(true, currentUser.role === 'admin');
+            loadStories();
+        }
+
+        function showImages() {
+            if (!currentUser) return;
+            showPage('imagesPage');
+            updateNavigation(true, currentUser.role === 'admin');
+            loadUserImages();
+        }
+
+        function showAdminPanel() {
+            if (!currentUser || currentUser.role !== 'admin') return;
+            showPage('adminPage');
+            updateNavigation(true, true);
+            loadAdminStats();
+        }
+
+        function logout() {
+            if (socket) {
+                socket.disconnect();
+            }
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            currentUser = null;
+            showHome();
+        }
+
+        // دوال إضافية للدردشة
+        async function loadConversations() {
+            try {
+                const response = await fetch(`${API_BASE}/chat/conversations`, {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    }
+                });
+
+                if (response.ok) {
+                    const conversations = await response.json();
+                    displayConversations(conversations);
+                }
+            } catch (error) {
+                console.error('Error loading conversations:', error);
+            }
+        }
+
+        function displayConversations(conversations) {
+            const container = document.getElementById('conversationsList');
+            if (!container) return;
+
+            container.innerHTML = '';
+
+            conversations.forEach(conv => {
+                const convElement = document.createElement('div');
+                convElement.className = `conversation-item ${currentConversation === conv.userId ? 'active' : ''}`;
+                
+                const lastMessageTime = new Date(conv.lastMessageTime).toLocaleTimeString('ar-SA', {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+
+                convElement.innerHTML = `
+                    <div class="conversation-avatar">
+                        <img src="${conv.userAvatar || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZGRkIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzk5OSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPuWNleivleS4rTwvdGV4dD48L3N2Zz4='}" 
+                             alt="${conv.userName}">
+                        ${conv.isOnline ? '<div class="online-indicator"></div>' : ''}
+                    </div>
+                    <div class="conversation-info">
+                        <div class="conversation-name">
+                            ${conv.userName}
+                        </div>
+                        <div class="conversation-preview">${conv.lastMessage}</div>
+                    </div>
+                    <div class="conversation-meta">
+                        <div class="conversation-time">${lastMessageTime}</div>
+                        ${conv.unreadCount > 0 ? `<div class="unread-badge">${conv.unreadCount}</div>` : ''}
+                    </div>
+                `;
+
+                convElement.addEventListener('click', () => {
+                    selectConversation(conv.userId, conv.userName);
+                });
+
+                container.appendChild(convElement);
+            });
+        }
+
+        function selectConversation(userId, userName) {
+            currentConversation = userId;
+            
+            // تحديث الواجهة
+            document.getElementById('chatWithName').textContent = userName;
+            document.getElementById('chatStatusText').textContent = 'متصل الآن';
+            document.getElementById('chatStatusIndicator').className = 'status-indicator';
+            
+            // تحميل الرسائل
+            loadConversationMessages(userId);
+            
+            // تحديث قائمة المحادثات
+            document.querySelectorAll('.conversation-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            document.querySelector(`.conversation-item[data-user-id="${userId}"]`)?.classList.add('active');
+        }
+
+        async function loadConversationMessages(userId) {
+            try {
+                const response = await fetch(`${API_BASE}/chat/conversation/${userId}`, {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    }
+                });
+
+                if (response.ok) {
+                    const messages = await response.json();
+                    displayMessages(messages);
+                }
+            } catch (error) {
+                console.error('Error loading conversation messages:', error);
+            }
+        }
+
+        function displayMessages(messages) {
+            const container = document.getElementById('chatMessages');
+            container.innerHTML = '';
+
+            messages.forEach(message => {
+                displayNewMessage(message);
+            });
+        }
+
+        function updateUserOnlineStatus(userId, isOnline) {
+            const conversationItem = document.querySelector(`.conversation-item[data-user-id="${userId}"]`);
+            if (conversationItem) {
+                const indicator = conversationItem.querySelector('.online-indicator');
+                if (indicator) {
+                    indicator.style.display = isOnline ? 'block' : 'none';
+                }
+            }
+
+            if (currentConversation === userId) {
+                document.getElementById('chatStatusText').textContent = isOnline ? 'متصل الآن' : 'غير متصل';
+                document.getElementById('chatStatusIndicator').className = `status-indicator ${isOnline ? '' : 'offline'}`;
+            }
+        }
+
+        // دوال التسجيل والدخول
+        async function handleLogin(e) {
+            e.preventDefault();
+            const phone = document.getElementById('loginPhone').value;
+            const password = document.getElementById('loginPassword').value;
+
+            if (!phone || !password) {
+                showAlert('loginAlert', 'جميع الحقول مطلوبة', 'error');
+                return;
+            }
+
+            const btn = e.target.querySelector('button[type="submit"]') || e.target;
+            btn.classList.add('loading');
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري الدخول...';
+
+            try {
+                const response = await fetch(`${API_BASE}/auth/login`, {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ phone, password })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    localStorage.setItem('token', data.token);
+                    localStorage.setItem('user', JSON.stringify(data.user));
+                    currentUser = data.user;
+                    
+                    showAlert('loginAlert', 'تم تسجيل الدخول بنجاح', 'success');
+                    setTimeout(() => {
+                        if (currentUser.role === 'admin') {
+                            showAdminPanel();
+                        } else {
+                            showDashboard();
+                        }
+                    }, 1000);
+                } else {
+                    showAlert('loginAlert', data.message, 'error');
+                }
+            } catch (error) {
+                console.error('Login error:', error);
+                showAlert('loginAlert', 'خطأ في الاتصال بالخادم', 'error');
+            } finally {
+                btn.classList.remove('loading');
+                btn.innerHTML = '<i class="fas fa-sign-in-alt"></i> دخول';
+            }
+        }
+
+        async function handleRegister(e) {
+            e.preventDefault();
+            const formData = {
+                fullName: document.getElementById('fullName').value,
+                phone: document.getElementById('phone').value,
+                university: document.getElementById('university').value,
+                major: document.getElementById('major').value,
+                batch: document.getElementById('batch').value,
+                password: document.getElementById('password').value
+            };
+
+            // التحقق من البيانات
+            if (!formData.fullName || !formData.phone || !formData.university || !formData.major || !formData.batch || !formData.password) {
+                showAlert('registerAlert', 'جميع الحقول مطلوبة', 'error');
+                return;
+            }
+
+            if (formData.password !== document.getElementById('confirmPassword').value) {
+                showAlert('registerAlert', 'كلمتا المرور غير متطابقتين', 'error');
+                return;
+            }
+
+            if (formData.password.length < 6) {
+                showAlert('registerAlert', 'كلمة المرور يجب أن تكون 6 أحرف على الأقل', 'error');
+                return;
+            }
+
+            const btn = e.target.querySelector('button[type="submit"]') || e.target;
+            btn.classList.add('loading');
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري إنشاء الحساب...';
+
+            try {
+                const response = await fetch(`${API_BASE}/auth/register`, {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(formData)
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showAlert('registerAlert', 'تم إنشاء الحساب بنجاح', 'success');
+                    setTimeout(() => showLogin(), 2000);
+                } else {
+                    showAlert('registerAlert', data.message, 'error');
+                }
+            } catch (error) {
+                console.error('Register error:', error);
+                showAlert('registerAlert', 'خطأ في الاتصال بالخادم', 'error');
+            } finally {
+                btn.classList.remove('loading');
+                btn.innerHTML = '<i class="fas fa-user-plus"></i> إنشاء الحساب';
+            }
+        }
+
+        // دوال إضافية للصور والإدارة
+        async function loadUserImages() {
+            try {
+                const response = await fetch(`${API_BASE}/images`, {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    }
+                });
+
+                if (response.ok) {
+                    const images = await response.json();
+                    displayImages(images);
+                }
+            } catch (error) {
+                console.error('Error loading images:', error);
+            }
+        }
+
+        async function loadAdminStats() {
+            try {
+                const response = await fetch(`${API_BASE}/admin/stats`, {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    }
+                });
+
+                if (response.ok) {
+                    const stats = await response.json();
+                    displayAdminStats(stats);
+                }
+            } catch (error) {
+                console.error('Error loading admin stats:', error);
+            }
+        }
+
+        function displayAdminStats(stats) {
+            // تنفيذ عرض إحصائيات الإدارة
+        }
+
+        function displayImages(images) {
+            // تنفيذ عرض الصور
+        }
     </script>
 </body>
 </html>
