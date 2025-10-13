@@ -17,7 +17,7 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIo(server, {
   cors: {
-    origin: process.env.ALLOWED_ORIGINS || true,
+    origin: process.env.ALLOWED_ORIGINS || "*",
     methods: ["GET", "POST"],
     credentials: true
   }
@@ -25,7 +25,7 @@ const io = socketIo(server, {
 
 // Middleware
 app.use(cors({
-    origin: process.env.ALLOWED_ORIGINS || true,
+    origin: process.env.ALLOWED_ORIGINS || "*",
     credentials: true
 }));
 app.use(express.json({ limit: '50mb' }));
@@ -66,6 +66,7 @@ function readLocalFile(filename) {
         const data = fs.readFileSync(filename, 'utf8');
         return JSON.parse(data);
     } catch (error) {
+        console.error(`Error reading ${filename}:`, error);
         return [];
     }
 }
@@ -152,13 +153,18 @@ io.on('connection', (socket) => {
             userId: userData._id,
             fullName: userData.fullName
         });
+        
+        console.log(`✅ المستخدم ${userData.fullName} تم توثيقه`);
     });
 
     // إرسال رسالة فورية
     socket.on('send_message', async (data) => {
         try {
             const user = connectedUsers.get(socket.id);
-            if (!user) return;
+            if (!user) {
+                socket.emit('message_error', { error: 'المستخدم غير معتمد' });
+                return;
+            }
 
             const messages = readLocalFile('local-messages.json');
             const newMessage = {
@@ -183,6 +189,15 @@ io.on('connection', (socket) => {
             }
 
             socket.emit('message_sent', newMessage);
+            
+            // إرسال إشعار للمستخدم
+            if (receiverSocketId) {
+                io.to(receiverSocketId).emit('message_notification', {
+                    from: user.fullName,
+                    message: data.text.substring(0, 50) + '...',
+                    timestamp: new Date().toISOString()
+                });
+            }
         } catch (error) {
             console.error('خطأ إرسال الرسالة:', error);
             socket.emit('message_error', { error: 'فشل إرسال الرسالة' });
@@ -532,6 +547,25 @@ app.get('/api/chat/conversations', authenticateToken, async (req, res) => {
     }
 });
 
+// الحصول على رسائل محادثة محددة
+app.get('/api/chat/conversation/:userId', authenticateToken, async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const messages = readLocalFile('local-messages.json');
+        
+        const conversationMessages = messages.filter(msg => 
+            !msg.channelId && // استبعاد رسائل القنوات
+            ((msg.senderId === req.user._id && msg.receiverId === userId) ||
+             (msg.senderId === userId && msg.receiverId === req.user._id))
+        ).sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+        
+        res.json(conversationMessages);
+    } catch (error) {
+        console.error('خطأ جلب رسائل المحادثة:', error);
+        res.status(500).json({ message: 'خطأ في الخادم' });
+    }
+});
+
 // المسارات الأساسية (التسجيل، الدخول، إلخ)
 app.post('/api/auth/register', async (req, res) => {
     try {
@@ -825,7 +859,7 @@ app.get('/health', (req, res) => {
     res.json({ 
         status: '✅ النظام يعمل بشكل طبيعي',
         timestamp: new Date().toISOString(),
-        version: '3.0.0',
+        version: '3.1.0',
         environment: process.env.NODE_ENV || 'development',
         onlineUsers: connectedUsers.size
     });
@@ -857,7 +891,7 @@ const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 المنصة الإلكترونية تعمل على البورت ${PORT}`);
     console.log(`🌐 الرابط: http://localhost:${PORT}`);
-    console.log(`⚡ النسخة: 3.0.0 - نظام الدردشة المتطور`);
+    console.log(`⚡ النسخة: 3.1.0 - نظام الدردشة المتطور`);
     console.log(`🔒 نظام أمان متقدم مفعل`);
     console.log(`💬 نظام الدردشة في الوقت الحقيقي مفعل`);
     console.log(`📱 نظام الـ Stories مفعل`);
