@@ -1,0 +1,290 @@
+/* أنماط متقدمة لتجربة مستخدم محسنة */
+
+/* تأثيرات الحركة والانتقالات */
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+}
+
+@keyframes slideInRight {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes slideInLeft {
+    from { transform: translateX(-100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes bounce {
+    0%, 20%, 53%, 80%, 100% { transform: translate3d(0,0,0); }
+    40%, 43% { transform: translate3d(0,-30px,0); }
+    70% { transform: translate3d(0,-15px,0); }
+    90% { transform: translate3d(0,-4px,0); }
+}
+
+/* تأثيرات خاصة للرسائل */
+.message.sent {
+    animation: slideInLeft 0.3s ease-out;
+}
+
+.message.received {
+    animation: slideInRight 0.3s ease-out;
+}
+
+.message.highlight {
+    animation: pulse 0.5s ease-in-out;
+    background: linear-gradient(135deg, var(--primary), var(--accent)) !important;
+}
+
+/* تأثيرات الـ Stories */
+.story-avatar:hover {
+    animation: pulse 0.5s ease-in-out;
+}
+
+.story-avatar::after {
+    content: '';
+    position: absolute;
+    top: -2px;
+    left: -2px;
+    right: -2px;
+    bottom: -2px;
+    background: var(--story-gradient);
+    border-radius: 50%;
+    z-index: -1;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.story-avatar:hover::after {
+    opacity: 1;
+}
+
+/* تأثيرات الأزرار */
+.btn-primary:hover {
+    animation: bounce 0.5s ease-in-out;
+}
+
+.chat-action-btn:hover {
+    animation: pulse 0.3s ease-in-out;
+}
+
+/* تأثيرات التحميل */
+.loading-spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid var(--border);
+    border-top: 4px solid var(--primary);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 2rem auto;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* تأثيرات التنقل بين الصفحات */
+.page {
+    transition: transform 0.3s ease, opacity 0.3s ease;
+}
+
+.page.slide-out {
+    transform: translateX(-100%);
+    opacity: 0;
+}
+
+.page.slide-in {
+    transform: translateX(0);
+    opacity: 1;
+}
+
+/* تأثيرات الظل والعمق */
+.feature-card, .stat-card {
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.feature-card::before, .stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, var(--primary), var(--secondary));
+    border-radius: 15px;
+    z-index: -1;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.feature-card:hover::before, .stat-card:hover::before {
+    opacity: 0.1;
+}
+
+/* تأثيرات النص */
+.text-gradient {
+    background: linear-gradient(135deg, var(--primary), var(--secondary));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+/* تأثيرات الإشعارات */
+.notification {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: white;
+    padding: 1rem 1.5rem;
+    border-radius: 10px;
+    box-shadow: var(--shadow-lg);
+    border-right: 4px solid var(--primary);
+    z-index: 5000;
+    animation: slideInRight 0.3s ease-out;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    max-width: 400px;
+}
+
+.notification.success {
+    border-right-color: var(--success);
+}
+
+.notification.error {
+    border-right-color: var(--danger);
+}
+
+.notification.warning {
+    border-right-color: var(--warning);
+}
+
+/* تأثيرات الوسائط */
+.media-container {
+    position: relative;
+    overflow: hidden;
+    border-radius: 10px;
+}
+
+.media-container img, .media-container video {
+    transition: transform 0.3s ease;
+}
+
+.media-container:hover img, .media-container:hover video {
+    transform: scale(1.05);
+}
+
+.media-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.media-container:hover .media-overlay {
+    opacity: 1;
+}
+
+/* تأثيرات شريط التمرير المخصص */
+.chat-messages::-webkit-scrollbar {
+    width: 6px;
+}
+
+.chat-messages::-webkit-scrollbar-track {
+    background: var(--light);
+    border-radius: 3px;
+}
+
+.chat-messages::-webkit-scrollbar-thumb {
+    background: var(--primary);
+    border-radius: 3px;
+}
+
+.chat-messages::-webkit-scrollbar-thumb:hover {
+    background: var(--primary-dark);
+}
+
+/* تأثيرات الاستجابة لللمس */
+@media (hover: hover) {
+    .conversation-item:hover {
+        transform: translateX(5px);
+    }
+    
+    .feature-card:hover {
+        transform: translateY(-5px) scale(1.02);
+    }
+}
+
+/* تأثيرات للأجهزة المحمولة */
+@media (max-width: 768px) {
+    .message {
+        max-width: 85%;
+    }
+    
+    .chat-input-area {
+        padding: 1rem;
+    }
+    
+    .stories-container {
+        padding: 1rem;
+    }
+}
+
+/* تأثيرات الوضع الليلي */
+@media (prefers-color-scheme: dark) {
+    .dark-mode {
+        --primary: #3b82f6;
+        --primary-dark: #1e40af;
+        --primary-light: #60a5fa;
+        --secondary: #06b6d4;
+        --accent: #f97316;
+        --dark: #f8fafc;
+        --light: #1e293b;
+        --gray: #94a3b8;
+        --border: #334155;
+    }
+}
+
+/* تأثيرات خاصة للعطل والأحداث */
+.holiday-theme {
+    --primary: #dc2626;
+    --primary-dark: #b91c1c;
+    --primary-light: #ef4444;
+    --secondary: #ea580c;
+}
+
+.holiday-theme .feature-card:hover {
+    background: linear-gradient(135deg, #dc2626, #ea580c);
+    color: white;
+}
+
+/* تأثيرات الوصولية */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+/* تأثيرات الطباعة */
+@media print {
+    .header, .chat-input-area, .stories-container {
+        display: none !important;
+    }
+    
+    .page {
+        display: block !important;
+    }
+}
