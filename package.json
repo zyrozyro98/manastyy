@@ -1,6 +1,6 @@
 {
   "name": "student-platform-pro",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "description": "منصة طلاب إلكترونية احترافية - نظام متكامل للإدارة والتواصل مع دردشة متطورة",
   "main": "server.js",
   "scripts": {
