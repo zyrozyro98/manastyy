@@ -9,6 +9,13 @@ const crypto = require('crypto');
 require('dotenv').config();
 
 const app = express();
+const http = require('http').createServer(app);
+const io = require('socket.io')(http, {
+    cors: {
+        origin: "*",
+        methods: ["GET", "POST"]
+    }
+});
 
 // Middleware
 app.use(cors());
@@ -16,15 +23,15 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(express.static(__dirname));
 
-// نظام التخزين
-class StorageSystem {
+// نظام التخزين المحسن
+class AdvancedStorage {
     constructor() {
         this.init();
     }
 
     init() {
-        const files = ['users.json', 'messages.json', 'images.json'];
-        const folders = ['uploads', 'backups'];
+        const files = ['users.json', 'conversations.json', 'messages.json', 'files.json'];
+        const folders = ['uploads', 'avatars', 'backups'];
         
         files.forEach(file => {
             if (!fs.existsSync(file)) {
@@ -42,8 +49,7 @@ class StorageSystem {
     readFile(filename) {
         try {
             if (fs.existsSync(filename)) {
-                const data = fs.readFileSync(filename, 'utf8');
-                return JSON.parse(data);
+                return JSON.parse(fs.readFileSync(filename, 'utf8'));
             }
             return [];
         } catch (error) {
@@ -61,26 +67,38 @@ class StorageSystem {
     }
 }
 
-const storageSystem = new StorageSystem();
-const JWT_SECRET = process.env.JWT_SECRET || 'edutech-secret-key-2024';
+const storageSystem = new AdvancedStorage();
+const JWT_SECRET = process.env.JWT_SECRET || 'edutech-super-secure-key-2024';
 
-// تخزين الصور
+// تخزين متقدم للملفات
 const storage = multer.diskStorage({
-    destination: 'uploads/',
+    destination: (req, file, cb) => {
+        const folder = file.fieldname === 'avatar' ? 'avatars' : 'uploads';
+        cb(null, folder + '/');
+    },
     filename: (req, file, cb) => {
         const uniqueSuffix = crypto.randomBytes(8).toString('hex');
-        cb(null, uniqueSuffix + path.extname(file.originalname));
+        const ext = path.extname(file.originalname);
+        cb(null, uniqueSuffix + ext);
     }
 });
 
 const upload = multer({
     storage: storage,
-    limits: { fileSize: 10 * 1024 * 1024 },
+    limits: { 
+        fileSize: 15 * 1024 * 1024,
+        files: 10
+    },
     fileFilter: (req, file, cb) => {
-        if (file.mimetype.startsWith('image/')) {
+        if (file.mimetype.startsWith('image/') || 
+            file.mimetype.startsWith('video/') ||
+            file.mimetype.startsWith('audio/') ||
+            file.mimetype === 'application/pdf' ||
+            file.mimetype.includes('document') ||
+            file.mimetype.includes('spreadsheet')) {
             cb(null, true);
         } else {
-            cb(new Error('يسمح برفع الصور فقط'), false);
+            cb(new Error('نوع الملف غير مدعوم'), false);
         }
     }
 });
@@ -102,13 +120,184 @@ const adminOnly = (req, res, next) => {
     next();
 };
 
-// المسارات
+// نظام إدارة الاتصالات المباشرة
+const connectedUsers = new Map();
+const typingUsers = new Map();
+
+// Socket.IO للدردشة في الوقت الحقيقي
+io.on('connection', (socket) => {
+    console.log('👤 مستخدم متصل:', socket.id);
+
+    socket.on('authenticate', (userData) => {
+        connectedUsers.set(socket.id, userData);
+        socket.userData = userData;
+        
+        // إعلام الجميع بتحديث حالة الاتصال
+        io.emit('userStatusUpdate', {
+            userId: userData._id,
+            status: 'online',
+            lastSeen: new Date().toISOString()
+        });
+    });
+
+    // إرسال رسالة
+    socket.on('sendMessage', async (data) => {
+        try {
+            const { conversationId, text, attachments = [], replyTo = null } = data;
+            const sender = socket.userData;
+
+            if (!sender) return;
+
+            const messages = storageSystem.readFile('messages.json');
+            const conversations = storageSystem.readFile('conversations.json');
+            
+            const conversation = conversations.find(c => c._id === conversationId);
+            if (!conversation) return;
+
+            const newMessage = {
+                _id: crypto.randomBytes(16).toString('hex'),
+                conversationId,
+                senderId: sender._id,
+                senderName: sender.fullName,
+                senderAvatar: sender.avatar,
+                text: text?.trim(),
+                attachments,
+                replyTo,
+                timestamp: new Date().toISOString(),
+                readBy: [sender._id],
+                reactions: [],
+                isEdited: false,
+                type: attachments.length > 0 ? 'file' : 'text'
+            };
+
+            messages.push(newMessage);
+            storageSystem.writeFile('messages.json', messages);
+
+            // تحديث آخر رسالة في المحادثة
+            conversation.lastMessage = {
+                text: text || '📎 مرفق',
+                timestamp: newMessage.timestamp,
+                senderId: sender._id
+            };
+            conversation.updatedAt = newMessage.timestamp;
+            storageSystem.writeFile('conversations.json', conversations);
+
+            // إرسال الرسالة لجميع المشاركين في المحادثة
+            io.to(conversationId).emit('newMessage', newMessage);
+            io.emit('conversationUpdated', conversation);
+
+        } catch (error) {
+            socket.emit('error', { message: 'فشل في إرسال الرسالة' });
+        }
+    });
+
+    // الكتابة
+    socket.on('typingStart', (data) => {
+        const { conversationId } = data;
+        typingUsers.set(socket.id, { conversationId, userId: socket.userData?._id });
+        socket.to(conversationId).emit('userTyping', { 
+            userId: socket.userData?._id, 
+            userName: socket.userData?.fullName 
+        });
+    });
+
+    socket.on('typingStop', (data) => {
+        const { conversationId } = data;
+        typingUsers.delete(socket.id);
+        socket.to(conversationId).emit('userStopTyping', { 
+            userId: socket.userData?._id 
+        });
+    });
+
+    // قراءة الرسائل
+    socket.on('markAsRead', async (data) => {
+        const { messageIds, conversationId } = data;
+        const userId = socket.userData?._id;
+
+        const messages = storageSystem.readFile('messages.json');
+        let updated = false;
+
+        messages.forEach(msg => {
+            if (messageIds.includes(msg._id) && !msg.readBy.includes(userId)) {
+                msg.readBy.push(userId);
+                updated = true;
+            }
+        });
+
+        if (updated) {
+            storageSystem.writeFile('messages.json', messages);
+            socket.to(conversationId).emit('messagesRead', { 
+                messageIds, 
+                userId,
+                conversationId 
+            });
+        }
+    });
+
+    // التفاعل مع الرسائل
+    socket.on('reactToMessage', async (data) => {
+        const { messageId, reaction, conversationId } = data;
+        const userId = socket.userData?._id;
+
+        const messages = storageSystem.readFile('messages.json');
+        const message = messages.find(m => m._id === messageId);
+        
+        if (message) {
+            // إزالة التفاعل السابق للمستخدم
+            message.reactions = message.reactions.filter(r => r.userId !== userId);
+            
+            // إضافة التفاعل الجديد
+            if (reaction) {
+                message.reactions.push({ userId, reaction, timestamp: new Date().toISOString() });
+            }
+            
+            storageSystem.writeFile('messages.json', messages);
+            io.to(conversationId).emit('messageReaction', {
+                messageId,
+                reactions: message.reactions,
+                userId
+            });
+        }
+    });
+
+    // الانضمام للمحادثة
+    socket.on('joinConversation', (conversationId) => {
+        socket.join(conversationId);
+    });
+
+    // مغادرة المحادثة
+    socket.on('leaveConversation', (conversationId) => {
+        socket.leave(conversationId);
+    });
+
+    socket.on('disconnect', () => {
+        const userData = connectedUsers.get(socket.id);
+        if (userData) {
+            // إعلام الجميع بتحديث حالة الاتصال
+            io.emit('userStatusUpdate', {
+                userId: userData._id,
+                status: 'offline',
+                lastSeen: new Date().toISOString()
+            });
+        }
+        connectedUsers.delete(socket.id);
+        typingUsers.delete(socket.id);
+        console.log('👤 مستخدم انقطع:', socket.id);
+    });
+});
+
+// المسارات الأساسية
 app.get('/api/health', (req, res) => {
-    res.json({ status: 'connected', message: 'النظام يعمل بشكل طبيعي' });
+    res.json({ 
+        status: 'connected', 
+        message: '✅ النظام يعمل بشكل طبيعي',
+        timestamp: new Date().toISOString(),
+        connectedUsers: connectedUsers.size
+    });
 });
 
 // التسجيل
-app.post('/api/auth/register', async (req, res) => {
+app.post('/api/auth/register', upload.single('avatar'), async (req, res) => {
     try {
         const { fullName, phone, university, major, batch, password } = req.body;
 
@@ -128,19 +317,57 @@ app.post('/api/auth/register', async (req, res) => {
         const hashedPassword = await bcrypt.hash(password, 12);
         const newUser = {
             _id: crypto.randomBytes(16).toString('hex'),
-            fullName, phone, university, major, batch,
+            fullName, 
+            phone, 
+            university, 
+            major, 
+            batch,
             password: hashedPassword,
+            avatar: req.file ? `/avatars/${req.file.filename}` : null,
             role: 'student',
             isActive: true,
-            createdAt: new Date().toISOString()
+            isOnline: false,
+            lastSeen: new Date().toISOString(),
+            createdAt: new Date().toISOString(),
+            settings: {
+                notifications: true,
+                sound: true,
+                theme: 'light'
+            }
         };
 
         users.push(newUser);
         storageSystem.writeFile('users.json', users);
 
+        // إنشاء محادثة مع المدير تلقائياً
+        const conversations = storageSystem.readFile('conversations.json');
+        const adminUser = users.find(u => u.role === 'admin');
+        
+        if (adminUser) {
+            const newConversation = {
+                _id: crypto.randomBytes(16).toString('hex'),
+                type: 'direct',
+                participants: [
+                    { userId: newUser._id, role: 'student', joinedAt: new Date().toISOString() },
+                    { userId: adminUser._id, role: 'admin', joinedAt: new Date().toISOString() }
+                ],
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+                lastMessage: null
+            };
+            conversations.push(newConversation);
+            storageSystem.writeFile('conversations.json', conversations);
+        }
+
         res.status(201).json({ 
             message: 'تم إنشاء الحساب بنجاح',
-            user: { _id: newUser._id, fullName, phone, university }
+            user: { 
+                _id: newUser._id, 
+                fullName, 
+                phone, 
+                university,
+                avatar: newUser.avatar
+            }
         });
     } catch (error) {
         res.status(500).json({ message: 'خطأ في الخادم' });
@@ -162,8 +389,19 @@ app.post('/api/auth/login', async (req, res) => {
             return res.status(400).json({ message: 'بيانات الدخول غير صحيحة' });
         }
 
+        // تحديث حالة المستخدم
+        user.lastSeen = new Date().toISOString();
+        user.isOnline = true;
+        storageSystem.writeFile('users.json', users);
+
         const token = jwt.sign(
-            { _id: user._id, fullName: user.fullName, phone: user.phone, role: user.role },
+            { 
+                _id: user._id, 
+                fullName: user.fullName, 
+                phone: user.phone, 
+                role: user.role,
+                avatar: user.avatar
+            },
             JWT_SECRET,
             { expiresIn: '30d' }
         );
@@ -177,7 +415,11 @@ app.post('/api/auth/login', async (req, res) => {
                 university: user.university,
                 major: user.major,
                 batch: user.batch,
-                role: user.role
+                role: user.role,
+                avatar: user.avatar,
+                settings: user.settings,
+                isOnline: true,
+                lastSeen: user.lastSeen
             }
         });
     } catch (error) {
@@ -185,193 +427,335 @@ app.post('/api/auth/login', async (req, res) => {
     }
 });
 
-// إرسال رسالة
-app.post('/api/chat/send', auth, async (req, res) => {
+// جلب المحادثات
+app.get('/api/chat/conversations', auth, async (req, res) => {
     try {
-        const { text, receiverId } = req.body;
-        if (!text?.trim()) return res.status(400).json({ message: 'الرسالة لا يمكن أن تكون فارغة' });
-
-        const messages = storageSystem.readFile('messages.json');
+        const conversations = storageSystem.readFile('conversations.json');
         const users = storageSystem.readFile('users.json');
-        const sender = users.find(u => u._id === req.user._id);
-        if (!sender) return res.status(404).json({ message: 'المستخدم غير موجود' });
+        const messages = storageSystem.readFile('messages.json');
 
-        const actualReceiverId = req.user.role === 'admin' ? receiverId : 'admin';
-        const receiver = users.find(u => u._id === actualReceiverId);
-        
-        const newMessage = {
-            _id: crypto.randomBytes(16).toString('hex'),
-            senderId: req.user._id,
-            senderName: sender.fullName,
-            receiverId: actualReceiverId,
-            receiverName: receiver?.fullName || 'مدير النظام',
-            text: text.trim(),
-            timestamp: new Date().toISOString(),
-            read: false
-        };
+        const userConversations = conversations.filter(conv => 
+            conv.participants.some(p => p.userId === req.user._id)
+        ).map(conv => {
+            const otherParticipant = conv.participants.find(p => p.userId !== req.user._id);
+            const user = users.find(u => u._id === otherParticipant?.userId);
+            
+            // حساب الرسائل غير المقروءة
+            const unreadCount = messages.filter(msg => 
+                msg.conversationId === conv._id && 
+                !msg.readBy.includes(req.user._id)
+            ).length;
 
-        messages.push(newMessage);
-        storageSystem.writeFile('messages.json', messages);
+            return {
+                ...conv,
+                otherUser: user ? {
+                    _id: user._id,
+                    fullName: user.fullName,
+                    avatar: user.avatar,
+                    role: user.role,
+                    isOnline: user.isOnline,
+                    lastSeen: user.lastSeen
+                } : null,
+                unreadCount,
+                isActive: user?.isActive
+            };
+        }).sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
 
-        res.json({ message: 'تم إرسال الرسالة', messageId: newMessage._id });
+        res.json(userConversations);
     } catch (error) {
         res.status(500).json({ message: 'خطأ في الخادم' });
     }
 });
 
-// جلب الرسائل
-app.get('/api/chat/messages', auth, async (req, res) => {
+// جلب رسائل المحادثة
+app.get('/api/chat/conversations/:conversationId/messages', auth, async (req, res) => {
     try {
+        const { conversationId } = req.params;
+        const { page = 1, limit = 50 } = req.query;
+
         const messages = storageSystem.readFile('messages.json');
-        const userMessages = messages.filter(msg => 
-            (msg.senderId === req.user._id && msg.receiverId === 'admin') ||
-            (msg.senderId === 'admin' && msg.receiverId === req.user._id)
-        ).sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-        
-        res.json(userMessages);
-    } catch (error) {
-        res.status(500).json({ message: 'خطأ في الخادم' });
-    }
-});
+        const conversationMessages = messages
+            .filter(msg => msg.conversationId === conversationId)
+            .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
-// المحادثات (للمدير)
-app.get('/api/chat/conversations', auth, adminOnly, async (req, res) => {
-    try {
-        const messages = storageSystem.readFile('messages.json');
-        const users = storageSystem.readFile('users.json');
-        const conversations = {};
+        // ترقيم الصفحات
+        const startIndex = (page - 1) * limit;
+        const endIndex = page * limit;
+        const paginatedMessages = conversationMessages.slice(startIndex, endIndex);
 
-        messages.forEach(msg => {
-            const otherUserId = msg.senderId === 'admin' ? msg.receiverId : msg.senderId;
-            if (otherUserId === 'admin') return;
-
-            if (!conversations[otherUserId]) {
-                const user = users.find(u => u._id === otherUserId);
-                if (user) {
-                    const userMessages = messages.filter(m => 
-                        (m.senderId === 'admin' && m.receiverId === otherUserId) ||
-                        (m.senderId === otherUserId && m.receiverId === 'admin')
-                    );
-                    
-                    conversations[otherUserId] = {
-                        userId: user._id,
-                        userName: user.fullName,
-                        lastMessage: userMessages[userMessages.length - 1]?.text || 'لا توجد رسائل',
-                        unreadCount: userMessages.filter(m => m.receiverId === 'admin' && !m.read).length
-                    };
-                }
+        res.json({
+            messages: paginatedMessages.reverse(), // الأقدم أولاً
+            pagination: {
+                currentPage: parseInt(page),
+                totalPages: Math.ceil(conversationMessages.length / limit),
+                totalMessages: conversationMessages.length,
+                hasMore: endIndex < conversationMessages.length
             }
         });
+    } catch (error) {
+        res.status(500).json({ message: 'خطأ في الخادم' });
+    }
+});
+
+// إنشاء محادثة جديدة (للمدير)
+app.post('/api/chat/conversations', auth, adminOnly, async (req, res) => {
+    try {
+        const { userId } = req.body;
         
-        res.json(Object.values(conversations));
-    } catch (error) {
-        res.status(500).json({ message: 'خطأ في الخادم' });
-    }
-});
-
-// الإرسال الجماعي
-app.post('/api/admin/broadcast', auth, adminOnly, async (req, res) => {
-    try {
-        const { text } = req.body;
-        if (!text?.trim()) return res.status(400).json({ message: 'الرسالة لا يمكن أن تكون فارغة' });
-
-        const messages = storageSystem.readFile('messages.json');
         const users = storageSystem.readFile('users.json');
-
-        users.forEach(user => {
-            if (user.role === 'student' && user.isActive !== false) {
-                messages.push({
-                    _id: crypto.randomBytes(16).toString('hex'),
-                    senderId: 'admin',
-                    senderName: 'مدير النظام',
-                    receiverId: user._id,
-                    receiverName: user.fullName,
-                    text: text.trim(),
-                    timestamp: new Date().toISOString(),
-                    read: false,
-                    isBroadcast: true
-                });
-            }
-        });
-
-        storageSystem.writeFile('messages.json', messages);
-        res.json({ message: 'تم الإرسال الجماعي بنجاح' });
-    } catch (error) {
-        res.status(500).json({ message: 'خطأ في الخادم' });
-    }
-});
-
-// رفع مجلد الصور
-app.post('/api/admin/upload-batch', auth, adminOnly, upload.array('images', 50), async (req, res) => {
-    try {
-        if (!req.files?.length) return res.status(400).json({ message: 'لم يتم رفع أي صور' });
-
-        const users = storageSystem.readFile('users.json');
-        const images = storageSystem.readFile('images.json');
-        const results = { success: 0, failed: 0, details: [] };
-
-        for (const file of req.files) {
-            try {
-                const phoneFromFilename = file.originalname.replace(/\.[^/.]+$/, "");
-                const user = users.find(u => u.phone === phoneFromFilename);
-                
-                if (user) {
-                    images.push({
-                        _id: crypto.randomBytes(16).toString('hex'),
-                        userId: user._id,
-                        userName: user.fullName,
-                        imageName: file.filename,
-                        originalName: file.originalname,
-                        url: `/uploads/${file.filename}`,
-                        sentAt: new Date().toISOString(),
-                        fileSize: file.size
-                    });
-                    results.success++;
-                    results.details.push({
-                        file: file.originalname,
-                        status: 'success',
-                        message: `تم الإرسال إلى ${user.fullName}`
-                    });
-                } else {
-                    results.failed++;
-                    results.details.push({
-                        file: file.originalname,
-                        status: 'failed',
-                        message: `لا يوجد مستخدم برقم ${phoneFromFilename}`
-                    });
-                    fs.unlinkSync(file.path);
-                }
-            } catch (error) {
-                results.failed++;
-                results.details.push({
-                    file: file.originalname,
-                    status: 'failed',
-                    message: 'خطأ في المعالجة'
-                });
-            }
+        const conversations = storageSystem.readFile('conversations.json');
+        
+        const user = users.find(u => u._id === userId && u.role === 'student');
+        if (!user) {
+            return res.status(404).json({ message: 'المستخدم غير موجود' });
         }
 
-        storageSystem.writeFile('images.json', images);
-        res.json({ message: `تم معالجة ${req.files.length} صورة`, results });
+        // التحقق من وجود محادثة سابقة
+        const existingConversation = conversations.find(conv => 
+            conv.participants.some(p => p.userId === userId) &&
+            conv.participants.some(p => p.userId === req.user._id)
+        );
+
+        if (existingConversation) {
+            return res.json(existingConversation);
+        }
+
+        const newConversation = {
+            _id: crypto.randomBytes(16).toString('hex'),
+            type: 'direct',
+            participants: [
+                { userId: user._id, role: 'student', joinedAt: new Date().toISOString() },
+                { userId: req.user._id, role: 'admin', joinedAt: new Date().toISOString() }
+            ],
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            lastMessage: null
+        };
+
+        conversations.push(newConversation);
+        storageSystem.writeFile('conversations.json', conversations);
+
+        res.status(201).json(newConversation);
     } catch (error) {
         res.status(500).json({ message: 'خطأ في الخادم' });
     }
 });
 
-// جلب الصور
-app.get('/api/images', auth, async (req, res) => {
+// رفع الملفات
+app.post('/api/chat/upload', auth, upload.array('files', 10), async (req, res) => {
     try {
-        const images = storageSystem.readFile('images.json')
-            .filter(img => img.userId === req.user._id)
-            .sort((a, b) => new Date(b.sentAt) - new Date(a.sentAt));
-        res.json(images);
+        if (!req.files || req.files.length === 0) {
+            return res.status(400).json({ message: 'لم يتم رفع أي ملفات' });
+        }
+
+        const files = req.files.map(file => ({
+            _id: crypto.randomBytes(16).toString('hex'),
+            originalName: file.originalname,
+            filename: file.filename,
+            path: `/${file.destination}/${file.filename}`,
+            size: file.size,
+            mimetype: file.mimetype,
+            uploadedBy: req.user._id,
+            uploadedAt: new Date().toISOString()
+        }));
+
+        // حفظ معلومات الملفات
+        const allFiles = storageSystem.readFile('files.json');
+        allFiles.push(...files);
+        storageSystem.writeFile('files.json', allFiles);
+
+        res.json({ files });
     } catch (error) {
-        res.status(500).json({ message: 'خطأ في الخادم' });
+        res.status(500).json({ message: 'خطأ في رفع الملفات' });
+    }
+});
+
+// الإرسال الجماعي (للمدير)
+app.post('/api/admin/broadcast', auth, adminOnly, async (req, res) => {
+    try {
+        const { text, attachments = [] } = req.body;
+        if (!text?.trim() && attachments.length === 0) {
+            return res.status(400).json({ message: 'الرسالة لا يمكن أن تكون فارغة' });
+        }
+
+        const users = storageSystem.readFile('users.json');
+        const conversations = storageSystem.readFile('conversations.json');
+        const messages = storageSystem.readFile('messages.json');
+
+        const students = users.filter(u => u.role === 'student' && u.isActive !== false);
+        let successCount = 0;
+
+        for (const student of students) {
+            // البحث عن محادثة موجودة أو إنشاء جديدة
+            let conversation = conversations.find(conv => 
+                conv.participants.some(p => p.userId === student._id) &&
+                conv.participants.some(p => p.userId === req.user._id)
+            );
+
+            if (!conversation) {
+                conversation = {
+                    _id: crypto.randomBytes(16).toString('hex'),
+                    type: 'direct',
+                    participants: [
+                        { userId: student._id, role: 'student', joinedAt: new Date().toISOString() },
+                        { userId: req.user._id, role: 'admin', joinedAt: new Date().toISOString() }
+                    ],
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
+                    lastMessage: null
+                };
+                conversations.push(conversation);
+            }
+
+            const broadcastMessage = {
+                _id: crypto.randomBytes(16).toString('hex'),
+                conversationId: conversation._id,
+                senderId: req.user._id,
+                senderName: 'مدير النظام',
+                senderAvatar: null,
+                text: text?.trim(),
+                attachments,
+                timestamp: new Date().toISOString(),
+                readBy: [req.user._id],
+                reactions: [],
+                isEdited: false,
+                type: attachments.length > 0 ? 'file' : 'text',
+                isBroadcast: true
+            };
+
+            messages.push(broadcastMessage);
+
+            // تحديث المحادثة
+            conversation.lastMessage = {
+                text: text || '📎 مرفق',
+                timestamp: broadcastMessage.timestamp,
+                senderId: req.user._id
+            };
+            conversation.updatedAt = broadcastMessage.timestamp;
+
+            successCount++;
+
+            // إرسال عبر WebSocket
+            io.to(conversation._id).emit('newMessage', broadcastMessage);
+            io.emit('conversationUpdated', conversation);
+        }
+
+        storageSystem.writeFile('conversations.json', conversations);
+        storageSystem.writeFile('messages.json', messages);
+
+        res.json({ 
+            message: `تم الإرسال الجماعي إلى ${successCount} مستخدم`,
+            successCount 
+        });
+    } catch (error) {
+        res.status(500).json({ message: 'خطأ في الإرسال الجماعي' });
+    }
+});
+
+// جلب الإحصائيات (للمدير)
+app.get('/api/admin/stats', auth, adminOnly, async (req, res) => {
+    try {
+        const users = storageSystem.readFile('users.json');
+        const conversations = storageSystem.readFile('conversations.json');
+        const messages = storageSystem.readFile('messages.json');
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        const stats = {
+            totalUsers: users.filter(u => u.role === 'student').length,
+            activeUsers: users.filter(u => u.isOnline).length,
+            totalConversations: conversations.length,
+            totalMessages: messages.length,
+            todayMessages: messages.filter(msg => new Date(msg.timestamp) >= today).length,
+            unreadMessages: messages.filter(msg => !msg.readBy.includes(req.user._id)).length,
+            storageUsed: messages.reduce((total, msg) => total + (msg.attachments?.reduce((sum, att) => sum + (att.size || 0), 0) || 0), 0),
+            onlineAdmins: Array.from(connectedUsers.values()).filter(u => u.role === 'admin').length
+        };
+
+        res.json(stats);
+    } catch (error) {
+        res.status(500).json({ message: 'خطأ في جلب الإحصائيات' });
+    }
+});
+
+// تحديث إعدادات المستخدم
+app.put('/api/user/settings', auth, async (req, res) => {
+    try {
+        const { settings } = req.body;
+        const users = storageSystem.readFile('users.json');
+        const userIndex = users.findIndex(u => u._id === req.user._id);
+
+        if (userIndex !== -1) {
+            users[userIndex].settings = { ...users[userIndex].settings, ...settings };
+            storageSystem.writeFile('users.json', users);
+            res.json({ message: 'تم تحديث الإعدادات', settings: users[userIndex].settings });
+        } else {
+            res.status(404).json({ message: 'المستخدم غير موجود' });
+        }
+    } catch (error) {
+        res.status(500).json({ message: 'خطأ في تحديث الإعدادات' });
+    }
+});
+
+// البحث في المحادثات والرسائل
+app.get('/api/chat/search', auth, async (req, res) => {
+    try {
+        const { q, type = 'all' } = req.query;
+        if (!q || q.length < 2) {
+            return res.status(400).json({ message: 'أدخل مصطلح بحث مكون من حرفين على الأقل' });
+        }
+
+        const users = storageSystem.readFile('users.json');
+        const conversations = storageSystem.readFile('conversations.json');
+        const messages = storageSystem.readFile('messages.json');
+
+        const searchResults = {
+            conversations: [],
+            messages: [],
+            users: []
+        };
+
+        if (type === 'all' || type === 'conversations') {
+            searchResults.conversations = conversations.filter(conv => 
+                conv.participants.some(p => p.userId !== req.user._id) &&
+                conv.participants.some(p => {
+                    const user = users.find(u => u._id === p.userId);
+                    return user?.fullName?.includes(q);
+                })
+            ).slice(0, 10);
+        }
+
+        if (type === 'all' || type === 'messages') {
+            searchResults.messages = messages
+                .filter(msg => 
+                    msg.text?.includes(q) &&
+                    msg.conversationId && 
+                    conversations.find(c => c._id === msg.conversationId && 
+                    c.participants.some(p => p.userId === req.user._id))
+                )
+                .slice(0, 20);
+        }
+
+        if (type === 'all' || type === 'users') {
+            searchResults.users = users
+                .filter(user => 
+                    user.role === 'student' && 
+                    user.fullName?.includes(q) &&
+                    user._id !== req.user._id
+                )
+                .slice(0, 10);
+        }
+
+        res.json(searchResults);
+    } catch (error) {
+        res.status(500).json({ message: 'خطأ في البحث' });
     }
 });
 
 // خدمة الملفات
 app.use('/uploads', express.static('uploads'));
+app.use('/avatars', express.static('avatars'));
 
 // إنشاء مدير افتراضي
 const createAdmin = async () => {
@@ -384,13 +768,21 @@ const createAdmin = async () => {
             _id: 'admin-' + crypto.randomBytes(8).toString('hex'),
             fullName: 'مدير النظام',
             phone: '500000000',
-            university: 'الإدارة',
-            major: 'إدارة',
+            university: 'الإدارة العامة',
+            major: 'نظم المعلومات',
             batch: '2024',
             password: hashedPassword,
+            avatar: null,
             role: 'admin',
             isActive: true,
-            createdAt: new Date().toISOString()
+            isOnline: false,
+            lastSeen: new Date().toISOString(),
+            createdAt: new Date().toISOString(),
+            settings: {
+                notifications: true,
+                sound: true,
+                theme: 'light'
+            }
         });
         storageSystem.writeFile('users.json', users);
         console.log('✅ تم إنشاء حساب المدير: 500000000 / admin123');
@@ -399,7 +791,8 @@ const createAdmin = async () => {
 
 // بدء السيرفر
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, async () => {
+http.listen(PORT, async () => {
     await createAdmin();
     console.log(`🚀 السيرفر يعمل على http://localhost:${PORT}`);
+    console.log(`💬 نظام الدردشة جاهز للاستخدام`);
 });
