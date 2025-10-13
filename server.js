@@ -59,7 +59,7 @@ class Database {
                     _id: 'admin-' + crypto.randomBytes(8).toString('hex'),
                     username: 'admin',
                     phone: '500000000',
-                    password: '$2a$12$LQv3c1yqBWVHxkd0g8f7QuOMrS8UB.aRcZ6YJgSqDEDdQYz6X1WzK', // admin123
+                    password: 'admin123',
                     role: 'admin',
                     isActive: true,
                     createdAt: new Date().toISOString(),
