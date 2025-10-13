@@ -157,6 +157,144 @@
             to { opacity: 1; transform: translateY(0); }
         }
 
+        /* Connection Status */
+        .connection-status {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            background: var(--success);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 0.8rem;
+            z-index: 1001;
+            display: none;
+        }
+        
+        .connection-status.offline {
+            background: var(--danger);
+        }
+
+        /* Password Toggle */
+        .password-input-container {
+            position: relative;
+        }
+
+        .password-toggle {
+            position: absolute;
+            left: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: var(--gray);
+            cursor: pointer;
+            font-size: 1rem;
+            z-index: 2;
+        }
+
+        .password-input-container .form-control {
+            padding-left: 45px;
+        }
+
+        /* Dashboard Styles */
+        .dashboard {
+            padding: 1rem;
+        }
+
+        .welcome-section {
+            text-align: center;
+            margin-bottom: 2rem;
+            padding: 2rem;
+            background: white;
+            border-radius: 15px;
+            box-shadow: var(--shadow);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 15px;
+            text-align: center;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border);
+        }
+
+        .stat-icon {
+            width: 50px;
+            height: 50px;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.5rem;
+            margin: 0 auto 1rem;
+        }
+
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--primary);
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-label {
+            color: var(--gray);
+            font-size: 0.9rem;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .feature-card {
+            background: white;
+            padding: 2rem;
+            border-radius: 15px;
+            text-align: center;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border);
+            transition: transform 0.3s ease;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .feature-icon {
+            width: 70px;
+            height: 70px;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 2rem;
+            margin: 0 auto 1.5rem;
+        }
+
+        .feature-card h3 {
+            color: var(--primary);
+            margin-bottom: 1rem;
+        }
+
+        .feature-card p {
+            color: var(--gray);
+            line-height: 1.6;
+        }
+
         /* أنماط نظام الـ Stories */
         .stories-container {
             display: flex;
@@ -681,7 +819,7 @@
             transform: none;
         }
 
-        /* الأنماط الأساسية الأخرى تبقى كما هي */
+        /* الأنماط الأساسية الأخرى */
         .auth-container {
             max-width: 500px;
             margin: 2rem auto;
@@ -806,23 +944,6 @@
         .loading {
             opacity: 0.6;
             pointer-events: none;
-        }
-
-        .connection-status {
-            position: fixed;
-            top: 10px;
-            left: 10px;
-            background: var(--success);
-            color: white;
-            padding: 5px 10px;
-            border-radius: 15px;
-            font-size: 0.8rem;
-            z-index: 1001;
-            display: none;
-        }
-        
-        .connection-status.offline {
-            background: var(--danger);
         }
 
         /* Responsive Design */
@@ -981,7 +1102,7 @@
                             <button class="btn btn-primary btn-block" id="homeLoginBtn">
                                 <i class="fas fa-sign-in-alt"></i> تسجيل الدخول
                             </button>
-                            <button class="btn btn-outline btn-block mt-3" id="homeRegisterBtn">
+                            <button class="btn btn-primary btn-block mt-3" id="homeRegisterBtn">
                                 <i class="fas fa-user-plus"></i> إنشاء حساب جديد
                             </button>
                         </div>
@@ -1010,7 +1131,12 @@
                                 <label class="form-label" for="loginPassword">
                                     <i class="fas fa-lock"></i> كلمة المرور
                                 </label>
-                                <input type="password" class="form-control" id="loginPassword" required>
+                                <div class="password-input-container">
+                                    <input type="password" class="form-control" id="loginPassword" required>
+                                    <button type="button" class="password-toggle" id="loginPasswordToggle">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                </div>
                             </div>
                             <button type="submit" class="btn btn-primary btn-block">
                                 <i class="fas fa-sign-in-alt"></i> دخول
@@ -1088,13 +1214,23 @@
                                 <label class="form-label" for="password">
                                     <i class="fas fa-lock"></i> كلمة المرور
                                 </label>
-                                <input type="password" class="form-control" id="password" required>
+                                <div class="password-input-container">
+                                    <input type="password" class="form-control" id="password" required>
+                                    <button type="button" class="password-toggle" id="passwordToggle">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                </div>
                             </div>
                             <div class="form-group">
                                 <label class="form-label" for="confirmPassword">
                                     <i class="fas fa-lock"></i> تأكيد كلمة المرور
                                 </label>
-                                <input type="password" class="form-control" id="confirmPassword" required>
+                                <div class="password-input-container">
+                                    <input type="password" class="form-control" id="confirmPassword" required>
+                                    <button type="button" class="password-toggle" id="confirmPasswordToggle">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                </div>
                             </div>
                             <button type="submit" class="btn btn-primary btn-block">
                                 <i class="fas fa-user-plus"></i> إنشاء الحساب
@@ -1185,7 +1321,7 @@
                     <!-- الشريط الجانبي للمحادثات -->
                     <div class="chat-sidebar" id="chatSidebar">
                         <div class="chat-header">
-                            <div class="user-avatar">
+                            <div class="conversation-avatar">
                                 <i class="fas fa-user"></i>
                             </div>
                             <div>
@@ -1204,7 +1340,7 @@
                     <!-- منطقة الدردشة الرئيسية -->
                     <div class="chat-main">
                         <div class="chat-header">
-                            <div class="user-avatar">
+                            <div class="conversation-avatar">
                                 <i class="fas fa-user-tie"></i>
                             </div>
                             <div>
@@ -1217,8 +1353,8 @@
                         </div>
 
                         <div class="chat-messages" id="chatMessages">
-                            <div class="chat-placeholder">
-                                <i class="fas fa-comments"></i>
+                            <div class="text-center" style="padding: 2rem; color: var(--gray);">
+                                <i class="fas fa-comments" style="font-size: 3rem; margin-bottom: 1rem;"></i>
                                 <h3>مرحباً بك في نظام الدردشة المتطور</h3>
                                 <p>اختر محادثة من القائمة الجانبية لبدء المحادثة</p>
                             </div>
@@ -1273,8 +1409,31 @@
                 </div>
             </div>
 
-            <!-- باقي الصفحات (Images, Admin) تبقى كما هي -->
-            <!-- [يتم الحفاظ على الصفحات الأخرى من الإصدار السابق] -->
+            <!-- Images Page -->
+            <div class="page" id="imagesPage">
+                <div class="dashboard">
+                    <div class="welcome-section">
+                        <h1><i class="fas fa-images"></i> معرض الصور</h1>
+                        <p>الصور والملفات المرسلة لك من قبل إدارة المنصة</p>
+                    </div>
+                    <div id="imagesContainer" class="text-center">
+                        <p>جاري تحميل الصور...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Admin Page -->
+            <div class="page" id="adminPage">
+                <div class="dashboard">
+                    <div class="welcome-section">
+                        <h1><i class="fas fa-cogs"></i> لوحة الإدارة</h1>
+                        <p>إدارة النظام والمستخدمين والإحصائيات</p>
+                    </div>
+                    <div id="adminStats" class="stats-grid">
+                        <!-- الإحصائيات ستظهر هنا -->
+                    </div>
+                </div>
+            </div>
 
         </main>
     </div>
@@ -1298,14 +1457,14 @@
 
         function initializeApp() {
             setupEventListeners();
+            setupPasswordToggles();
             checkAuthStatus();
             setupChatUI();
             setupStories();
             
             // اختبار الاتصال
-            setTimeout(() => {
-                testConnection();
-            }, 1000);
+            testConnection();
+            setInterval(testConnection, 30000); // اختبار كل 30 ثانية
         }
 
         function setupEventListeners() {
@@ -1348,6 +1507,24 @@
             });
             document.getElementById('storyInput').addEventListener('change', handleStoryUpload);
             document.getElementById('storyClose').addEventListener('click', closeStoryViewer);
+        }
+
+        function setupPasswordToggles() {
+            // إعداد أزرار إظهار/إخفاء كلمة المرور
+            const togglePassword = (inputId, toggleId) => {
+                const passwordInput = document.getElementById(inputId);
+                const toggleButton = document.getElementById(toggleId);
+                
+                toggleButton.addEventListener('click', function() {
+                    const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+                    passwordInput.setAttribute('type', type);
+                    this.innerHTML = type === 'password' ? '<i class="fas fa-eye"></i>' : '<i class="fas fa-eye-slash"></i>';
+                });
+            };
+
+            togglePassword('loginPassword', 'loginPasswordToggle');
+            togglePassword('password', 'passwordToggle');
+            togglePassword('confirmPassword', 'confirmPasswordToggle');
         }
 
         function setupChatUI() {
@@ -1431,7 +1608,9 @@
 
             socket.on('connect', () => {
                 console.log('Connected to server');
-                socket.emit('authenticate', currentUser);
+                if (currentUser) {
+                    socket.emit('authenticate', currentUser);
+                }
             });
 
             socket.on('disconnect', () => {
@@ -1528,7 +1707,7 @@
 
         function displayNewMessage(message) {
             const messagesContainer = document.getElementById('chatMessages');
-            const placeholder = messagesContainer.querySelector('.chat-placeholder');
+            const placeholder = messagesContainer.querySelector('.text-center');
             
             if (placeholder) {
                 placeholder.remove();
@@ -1657,7 +1836,7 @@
             const progressContainer = document.getElementById('storyProgress');
 
             // تعيين البيانات
-            media.src = `${API_BASE}${story.mediaUrl}`;
+            media.src = `${window.location.origin}${story.mediaUrl}`;
             userAvatar.src = userStories.user.avatar || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZGRkIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzk5OSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPuWNleivleS4rTwvdGV4dD48L3N2Zz4=';
             userName.textContent = userStories.user.fullName;
             storyTime.textContent = new Date(story.createdAt).toLocaleTimeString('ar-SA');
@@ -1784,11 +1963,52 @@
 
         // دوال المساعدة
         function showAlert(containerId, message, type = 'info') {
-            // تنفيذ دالة showAlert كما في الإصدار السابق
+            const container = document.getElementById(containerId);
+            if (!container) return;
+
+            let alertDiv = container.querySelector('.alert');
+            if (!alertDiv) {
+                alertDiv = document.createElement('div');
+                alertDiv.className = `alert alert-${type}`;
+                container.insertBefore(alertDiv, container.firstChild);
+            }
+
+            const icon = type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle';
+            alertDiv.innerHTML = `<i class="fas fa-${icon}"></i> ${message}`;
+            alertDiv.className = `alert alert-${type}`;
+
+            setTimeout(() => {
+                alertDiv.remove();
+            }, 5000);
         }
 
         function updateNavigation(isLoggedIn, isAdmin = false) {
-            // تنفيذ دالة updateNavigation كما في الإصدار السابق
+            const publicLinks = ['homeLink', 'loginLink', 'registerLink'];
+            const privateLinks = ['dashboardLink', 'chatLink', 'storiesLink', 'imagesLink', 'logoutLink'];
+            const adminLinks = ['adminLink'];
+
+            publicLinks.forEach(link => {
+                document.getElementById(link).classList.toggle('hidden', isLoggedIn);
+            });
+
+            privateLinks.forEach(link => {
+                document.getElementById(link).classList.toggle('hidden', !isLoggedIn);
+            });
+
+            adminLinks.forEach(link => {
+                document.getElementById(link).classList.toggle('hidden', !isAdmin);
+            });
+
+            document.getElementById('userInfo').classList.toggle('hidden', !isLoggedIn);
+            
+            if (isLoggedIn && currentUser) {
+                document.getElementById('userName').textContent = currentUser.fullName;
+                document.getElementById('currentUserName').textContent = currentUser.fullName;
+                document.getElementById('dashboardUserName').textContent = currentUser.fullName;
+                document.getElementById('userUniversity').textContent = currentUser.university;
+                document.getElementById('userMajor').textContent = currentUser.major;
+                document.getElementById('userBatch').textContent = currentUser.batch;
+            }
         }
 
         function showPage(pageId) {
@@ -1883,6 +2103,7 @@
             conversations.forEach(conv => {
                 const convElement = document.createElement('div');
                 convElement.className = `conversation-item ${currentConversation === conv.userId ? 'active' : ''}`;
+                convElement.setAttribute('data-user-id', conv.userId);
                 
                 const lastMessageTime = new Date(conv.lastMessageTime).toLocaleTimeString('ar-SA', {
                     hour: '2-digit',
@@ -1891,239 +2112,372 @@
 
                 convElement.innerHTML = `
                     <div class="conversation-avatar">
-                        <img src="${conv.userAvatar || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZGRkIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzk5OSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPuWNleivleS4rTwvdGV4dD48L3N2Zz4='}" 
-                             alt="${conv.userName}">
-                        ${conv.isOnline ? '<div class="online-indicator"></div>' : ''}
-                    </div>
-                    <div class="conversation-info">
-                        <div class="conversation-name">
-                            ${conv.userName}
-                        </div>
-                        <div class="conversation-preview">${conv.lastMessage}</div>
-                    </div>
-                    <div class="conversation-meta">
-                        <div class="conversation-time">${lastMessageTime}</div>
-                        ${conv.unreadCount > 0 ? `<div class="unread-badge">${conv.unreadCount}</div>` : ''}
-                    </div>
-                `;
+                        <img src="${conv.userAvatar || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZGRkIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzk5OSIgdGV4dC1hbmNob3I9Im1pZ
+                                                        userPhone: user.phone,
+                    lastMessage: lastMessage?.text || 'لا توجد رسائل',
+                    lastMessageTime: lastMessage?.timestamp || new Date().toISOString(),
+                    unreadCount: unreadCount,
+                    isOnline: userSockets.has(user._id)
+                };
+            }
+        });
+        
+        res.json(Object.values(userConversations));
+    } catch (error) {
+        console.error('خطأ جلب المحادثات:', error);
+        res.status(500).json({ message: 'خطأ في الخادم' });
+    }
+});
 
-                convElement.addEventListener('click', () => {
-                    selectConversation(conv.userId, conv.userName);
-                });
+// الحصول على رسائل محادثة محددة
+app.get('/api/chat/conversation/:userId', authenticateToken, async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const messages = readLocalFile('local-messages.json');
+        
+        const conversationMessages = messages.filter(msg => 
+            !msg.channelId && // استبعاد رسائل القنوات
+            ((msg.senderId === req.user._id && msg.receiverId === userId) ||
+             (msg.senderId === userId && msg.receiverId === req.user._id))
+        ).sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+        
+        res.json(conversationMessages);
+    } catch (error) {
+        console.error('خطأ جلب رسائل المحادثة:', error);
+        res.status(500).json({ message: 'خطأ في الخادم' });
+    }
+});
 
-                container.appendChild(convElement);
+// المسارات الأساسية (التسجيل، الدخول، إلخ)
+app.post('/api/auth/register', async (req, res) => {
+    try {
+        const { fullName, phone, university, major, batch, password } = req.body;
+
+        if (!fullName || !phone || !university || !major || !batch || !password) {
+            return res.status(400).json({ message: 'جميع الحقول مطلوبة' });
+        }
+
+        if (password.length < 6) {
+            return res.status(400).json({ message: 'كلمة المرور يجب أن تكون 6 أحرف على الأقل' });
+        }
+
+        const saudiPhoneRegex = /^5\d{8}$/;
+        if (!saudiPhoneRegex.test(phone)) {
+            return res.status(400).json({ 
+                message: 'رقم الهاتف غير صحيح' 
             });
         }
 
-        function selectConversation(userId, userName) {
-            currentConversation = userId;
-            
-            // تحديث الواجهة
-            document.getElementById('chatWithName').textContent = userName;
-            document.getElementById('chatStatusText').textContent = 'متصل الآن';
-            document.getElementById('chatStatusIndicator').className = 'status-indicator';
-            
-            // تحميل الرسائل
-            loadConversationMessages(userId);
-            
-            // تحديث قائمة المحادثات
-            document.querySelectorAll('.conversation-item').forEach(item => {
-                item.classList.remove('active');
-            });
-            document.querySelector(`.conversation-item[data-user-id="${userId}"]`)?.classList.add('active');
+        const users = readLocalFile('local-users.json');
+        if (users.find(u => u.phone === phone)) {
+            return res.status(400).json({ message: 'رقم الهاتف مسجل مسبقاً' });
         }
 
-        async function loadConversationMessages(userId) {
-            try {
-                const response = await fetch(`${API_BASE}/chat/conversation/${userId}`, {
-                    headers: {
-                        'Authorization': `Bearer ${localStorage.getItem('token')}`
-                    }
-                });
+        const hashedPassword = await bcrypt.hash(password, 12);
+        const newUser = {
+            _id: uuidv4(),
+            fullName: fullName.trim(),
+            phone,
+            university,
+            major,
+            batch,
+            password: hashedPassword,
+            role: 'student',
+            isActive: true,
+            createdAt: new Date().toISOString(),
+            lastLogin: null,
+            avatar: null
+        };
 
-                if (response.ok) {
-                    const messages = await response.json();
-                    displayMessages(messages);
-                }
-            } catch (error) {
-                console.error('Error loading conversation messages:', error);
+        users.push(newUser);
+        writeLocalFile('local-users.json', users);
+
+        res.status(201).json({ 
+            message: 'تم إنشاء الحساب بنجاح',
+            user: {
+                _id: newUser._id,
+                fullName: newUser.fullName,
+                phone: newUser.phone,
+                university: newUser.university
             }
+        });
+    } catch (error) {
+        console.error('خطأ التسجيل:', error);
+        res.status(500).json({ message: 'خطأ في الخادم' });
+    }
+});
+
+app.post('/api/auth/login', async (req, res) => {
+    try {
+        const { phone, password } = req.body;
+
+        if (!phone || !password) {
+            return res.status(400).json({ message: 'رقم الهاتف وكلمة المرور مطلوبان' });
         }
 
-        function displayMessages(messages) {
-            const container = document.getElementById('chatMessages');
-            container.innerHTML = '';
+        const users = readLocalFile('local-users.json');
+        const user = users.find(u => u.phone === phone && u.isActive !== false);
 
-            messages.forEach(message => {
-                displayNewMessage(message);
-            });
+        if (!user) {
+            return res.status(400).json({ message: 'بيانات الدخول غير صحيحة' });
         }
 
-        function updateUserOnlineStatus(userId, isOnline) {
-            const conversationItem = document.querySelector(`.conversation-item[data-user-id="${userId}"]`);
-            if (conversationItem) {
-                const indicator = conversationItem.querySelector('.online-indicator');
-                if (indicator) {
-                    indicator.style.display = isOnline ? 'block' : 'none';
-                }
-            }
-
-            if (currentConversation === userId) {
-                document.getElementById('chatStatusText').textContent = isOnline ? 'متصل الآن' : 'غير متصل';
-                document.getElementById('chatStatusIndicator').className = `status-indicator ${isOnline ? '' : 'offline'}`;
-            }
+        const validPassword = await bcrypt.compare(password, user.password);
+        if (!validPassword) {
+            return res.status(400).json({ message: 'بيانات الدخول غير صحيحة' });
         }
 
-        // دوال التسجيل والدخول
-        async function handleLogin(e) {
-            e.preventDefault();
-            const phone = document.getElementById('loginPhone').value;
-            const password = document.getElementById('loginPassword').value;
+        // تحديث آخر دخول
+        user.lastLogin = new Date().toISOString();
+        writeLocalFile('local-users.json', users);
 
-            if (!phone || !password) {
-                showAlert('loginAlert', 'جميع الحقول مطلوبة', 'error');
-                return;
+        const token = jwt.sign(
+            { 
+                _id: user._id,
+                fullName: user.fullName,
+                phone: user.phone,
+                role: user.role 
+            },
+            JWT_SECRET,
+            { expiresIn: '7d' }
+        );
+
+        res.json({
+            token,
+            user: {
+                _id: user._id,
+                fullName: user.fullName,
+                phone: user.phone,
+                university: user.university,
+                major: user.major,
+                batch: user.batch,
+                role: user.role,
+                lastLogin: user.lastLogin,
+                avatar: user.avatar
             }
+        });
+    } catch (error) {
+        console.error('خطأ الدخول:', error);
+        res.status(500).json({ message: 'خطأ في الخادم' });
+    }
+});
 
-            const btn = e.target.querySelector('button[type="submit"]') || e.target;
-            btn.classList.add('loading');
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري الدخول...';
+// إدارة الصور
+app.post('/api/admin/send-image', authenticateToken, requireAdmin, upload.single('image'), async (req, res) => {
+    try {
+        const { receiverId, description } = req.body;
 
-            try {
-                const response = await fetch(`${API_BASE}/auth/login`, {
-                    method: 'POST',
-                    headers: { 
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ phone, password })
-                });
-
-                const data = await response.json();
-
-                if (response.ok) {
-                    localStorage.setItem('token', data.token);
-                    localStorage.setItem('user', JSON.stringify(data.user));
-                    currentUser = data.user;
-                    
-                    showAlert('loginAlert', 'تم تسجيل الدخول بنجاح', 'success');
-                    setTimeout(() => {
-                        if (currentUser.role === 'admin') {
-                            showAdminPanel();
-                        } else {
-                            showDashboard();
-                        }
-                    }, 1000);
-                } else {
-                    showAlert('loginAlert', data.message, 'error');
-                }
-            } catch (error) {
-                console.error('Login error:', error);
-                showAlert('loginAlert', 'خطأ في الاتصال بالخادم', 'error');
-            } finally {
-                btn.classList.remove('loading');
-                btn.innerHTML = '<i class="fas fa-sign-in-alt"></i> دخول';
-            }
+        if (!req.file) {
+            return res.status(400).json({ message: 'لم يتم رفع أي صورة' });
         }
 
-        async function handleRegister(e) {
-            e.preventDefault();
-            const formData = {
-                fullName: document.getElementById('fullName').value,
-                phone: document.getElementById('phone').value,
-                university: document.getElementById('university').value,
-                major: document.getElementById('major').value,
-                batch: document.getElementById('batch').value,
-                password: document.getElementById('password').value
+        if (!receiverId) {
+            return res.status(400).json({ message: 'معرف المستلم مطلوب' });
+        }
+
+        const users = readLocalFile('local-users.json');
+        const receiver = users.find(u => u._id === receiverId);
+        
+        if (!receiver) {
+            if (fs.existsSync(req.file.path)) {
+                fs.unlinkSync(req.file.path);
+            }
+            return res.status(404).json({ message: 'المستخدم غير موجود' });
+        }
+
+        const images = readLocalFile('local-images.json');
+        const newImage = {
+            _id: uuidv4(),
+            userId: receiverId,
+            userName: receiver.fullName,
+            userPhone: receiver.phone,
+            imageName: req.file.filename,
+            originalName: req.file.originalname,
+            url: `/uploads/${req.file.filename}`,
+            description: description || '',
+            sentBy: req.user._id,
+            sentAt: new Date().toISOString(),
+            fileSize: req.file.size,
+            mimeType: req.file.mimetype
+        };
+
+        images.push(newImage);
+        writeLocalFile('local-images.json', images);
+
+        res.json({ 
+            message: 'تم إرسال الصورة بنجاح',
+            image: {
+                id: newImage._id,
+                url: newImage.url,
+                userName: newImage.userName,
+                sentAt: newImage.sentAt
+            }
+        });
+    } catch (error) {
+        console.error('خطأ إرسال الصورة:', error);
+        if (req.file && fs.existsSync(req.file.path)) {
+            fs.unlinkSync(req.file.path);
+        }
+        res.status(500).json({ message: 'خطأ في الخادم' });
+    }
+});
+
+app.get('/api/images', authenticateToken, async (req, res) => {
+    try {
+        const images = readLocalFile('local-images.json')
+            .filter(img => img.userId === req.user._id)
+            .sort((a, b) => new Date(b.sentAt) - new Date(a.sentAt));
+        
+        res.json(images);
+    } catch (error) {
+        console.error('خطأ جلب الصور:', error);
+        res.status(500).json({ message: 'خطأ في الخادم' });
+    }
+});
+
+// إدارة المستخدمين للمدير
+app.get('/api/admin/users', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const users = readLocalFile('local-users.json')
+            .filter(user => user.role === 'student')
+            .map(user => ({
+                _id: user._id,
+                fullName: user.fullName,
+                phone: user.phone,
+                university: user.university,
+                major: user.major,
+                batch: user.batch,
+                isActive: user.isActive,
+                createdAt: user.createdAt,
+                lastLogin: user.lastLogin,
+                avatar: user.avatar
+            }));
+        
+        res.json(users);
+    } catch (error) {
+        console.error('خطأ جلب المستخدمين:', error);
+        res.status(500).json({ message: 'خطأ في الخادم' });
+    }
+});
+
+// إحصائيات النظام
+app.get('/api/admin/stats', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const users = readLocalFile('local-users.json');
+        const messages = readLocalFile('local-messages.json');
+        const images = readLocalFile('local-images.json');
+        const stories = readLocalFile('local-stories.json');
+
+        const stats = {
+            totalUsers: users.filter(u => u.role === 'student').length,
+            activeUsers: users.filter(u => u.isActive !== false && u.role === 'student').length,
+            totalMessages: messages.length,
+            unreadMessages: messages.filter(m => m.receiverId === 'admin' && !m.read).length,
+            totalImages: images.length,
+            activeStories: stories.filter(s => new Date(s.expiresAt) > new Date()).length,
+            onlineUsers: connectedUsers.size,
+            storageUsed: images.reduce((total, img) => total + (img.fileSize || 0), 0)
+        };
+
+        res.json(stats);
+    } catch (error) {
+        console.error('خطأ جلب الإحصائيات:', error);
+        res.status(500).json({ message: 'خطأ في الخادم' });
+    }
+});
+
+// خدمة الملفات الثابتة
+app.use('/uploads', express.static('uploads'));
+app.use('/stories', express.static('stories'));
+app.use('/avatars', express.static('avatars'));
+app.use('/channels', express.static('channels'));
+
+// إنشاء مدير افتراضي
+const createAdminUser = async () => {
+    try {
+        const users = readLocalFile('local-users.json');
+        const adminExists = users.find(u => u.role === 'admin');
+
+        if (!adminExists) {
+            const hashedPassword = await bcrypt.hash('Admin123!@#', 12);
+            const adminUser = {
+                _id: 'admin-' + crypto.randomBytes(8).toString('hex'),
+                fullName: 'مدير النظام',
+                phone: '500000000',
+                university: 'الإدارة العامة',
+                major: 'نظم المعلومات',
+                batch: '2024',
+                password: hashedPassword,
+                role: 'admin',
+                isActive: true,
+                createdAt: new Date().toISOString(),
+                lastLogin: null,
+                avatar: null
             };
 
-            // التحقق من البيانات
-            if (!formData.fullName || !formData.phone || !formData.university || !formData.major || !formData.batch || !formData.password) {
-                showAlert('registerAlert', 'جميع الحقول مطلوبة', 'error');
-                return;
-            }
-
-            if (formData.password !== document.getElementById('confirmPassword').value) {
-                showAlert('registerAlert', 'كلمتا المرور غير متطابقتين', 'error');
-                return;
-            }
-
-            if (formData.password.length < 6) {
-                showAlert('registerAlert', 'كلمة المرور يجب أن تكون 6 أحرف على الأقل', 'error');
-                return;
-            }
-
-            const btn = e.target.querySelector('button[type="submit"]') || e.target;
-            btn.classList.add('loading');
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري إنشاء الحساب...';
-
-            try {
-                const response = await fetch(`${API_BASE}/auth/register`, {
-                    method: 'POST',
-                    headers: { 
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(formData)
-                });
-
-                const data = await response.json();
-
-                if (response.ok) {
-                    showAlert('registerAlert', 'تم إنشاء الحساب بنجاح', 'success');
-                    setTimeout(() => showLogin(), 2000);
-                } else {
-                    showAlert('registerAlert', data.message, 'error');
-                }
-            } catch (error) {
-                console.error('Register error:', error);
-                showAlert('registerAlert', 'خطأ في الاتصال بالخادم', 'error');
-            } finally {
-                btn.classList.remove('loading');
-                btn.innerHTML = '<i class="fas fa-user-plus"></i> إنشاء الحساب';
-            }
+            users.push(adminUser);
+            writeLocalFile('local-users.json', users);
+            console.log('✅ تم إنشاء حساب المدير الافتراضي');
+            console.log('📱 رقم الهاتف: 500000000');
+            console.log('🔐 كلمة المرور: Admin123!@#');
         }
+    } catch (error) {
+        console.error('خطأ في إنشاء المدير:', error);
+    }
+};
 
-        // دوال إضافية للصور والإدارة
-        async function loadUserImages() {
-            try {
-                const response = await fetch(`${API_BASE}/images`, {
-                    headers: {
-                        'Authorization': `Bearer ${localStorage.getItem('token')}`
-                    }
-                });
+// Route الأساسي
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
+});
 
-                if (response.ok) {
-                    const images = await response.json();
-                    displayImages(images);
-                }
-            } catch (error) {
-                console.error('Error loading images:', error);
-            }
-        }
+// صفحة الإدارة
+app.get('/admin', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
+});
 
-        async function loadAdminStats() {
-            try {
-                const response = await fetch(`${API_BASE}/admin/stats`, {
-                    headers: {
-                        'Authorization': `Bearer ${localStorage.getItem('token')}`
-                    }
-                });
+// مسار الصحة
+app.get('/health', (req, res) => {
+    res.json({ 
+        status: '✅ النظام يعمل بشكل طبيعي',
+        timestamp: new Date().toISOString(),
+        version: '3.1.0',
+        environment: process.env.NODE_ENV || 'development',
+        onlineUsers: connectedUsers.size
+    });
+});
 
-                if (response.ok) {
-                    const stats = await response.json();
-                    displayAdminStats(stats);
-                }
-            } catch (error) {
-                console.error('Error loading admin stats:', error);
-            }
-        }
+// Middleware للأمان
+app.use((req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('X-XSS-Protection', '1; mode=block');
+    next();
+});
 
-        function displayAdminStats(stats) {
-            // تنفيذ عرض إحصائيات الإدارة
-        }
+// معالجة الأخطاء
+app.use((error, req, res, next) => {
+    console.error('خطأ غير متوقع:', error);
+    res.status(500).json({ 
+        message: 'حدث خطأ غير متوقع في النظام',
+        reference: crypto.randomBytes(4).toString('hex')
+    });
+});
 
-        function displayImages(images) {
-            // تنفيذ عرض الصور
-        }
-    </script>
-</body>
-</html>
+// 404 handler
+app.use((req, res) => {
+    res.status(404).json({ message: 'الصفحة غير موجودة' });
+});
+
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, '0.0.0.0', () => {
+    console.log(`🚀 المنصة الإلكترونية تعمل على البورت ${PORT}`);
+    console.log(`🌐 الرابط: http://localhost:${PORT}`);
+    console.log(`⚡ النسخة: 3.1.0 - نظام الدردشة المتطور`);
+    console.log(`🔒 نظام أمان متقدم مفعل`);
+    console.log(`💬 نظام الدردشة في الوقت الحقيقي مفعل`);
+    console.log(`📱 نظام الـ Stories مفعل`);
+    console.log(`🎯 نظام القنوات والمجموعات مفعل`);
+    
+    setTimeout(createAdminUser, 2000);
+});
