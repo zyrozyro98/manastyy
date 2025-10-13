@@ -1,0 +1,17 @@
+{
+  "_id": "admin-fixed",
+  "username": "admin",
+  "phone": "500000000", 
+  "password": "$2a$12$LQv3c1yqBWVHxkd0g8f7QuOMrS8UB.aRcZ6YJgSqDEDdQYz6X1WzK",
+  "role": "admin",
+  "isActive": true,
+  "createdAt": "2024-01-01T00:00:00.000Z",
+  "lastLogin": null,
+  "settings": {
+    "hideOnlineStatus": false,
+    "hideLastSeen": false,
+    "hideStoryViews": false,
+    "chatBackground": "default",
+    "theme": "light"
+  }
+}
