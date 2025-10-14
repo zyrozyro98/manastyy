@@ -2630,3 +2630,962 @@ input:checked + .slider:before {
             loadChatMessages(user._id);
         }
         
+        async function loadChatMessages(userId) {
+            try {
+                const response = await fetch(`${API_BASE}/messages/${userId}`, {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    }
+                });
+
+                if (response.ok) {
+                    const messages = await response.json();
+                    displayMessages(messages);
+                }
+            } catch (error) {
+                console.error('Error loading messages:', error);
+            }
+        }
+
+        function displayMessages(messages) {
+            const container = document.getElementById('chatMessages');
+            container.innerHTML = '';
+
+            if (messages.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center" style="color: var(--gray); margin-top: 2rem;">
+                        <i class="fas fa-comments" style="font-size: 3rem; margin-bottom: 1rem;"></i>
+                        <p>لا توجد رسائل بعد. ابدأ المحادثة الآن!</p>
+                    </div>
+                `;
+                return;
+            }
+
+            messages.forEach(message => {
+                displayNewMessage(message);
+            });
+
+            // التمرير إلى الأسفل
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function displayNewMessage(message) {
+            const container = document.getElementById('chatMessages');
+            const messageElement = document.createElement('div');
+            
+            const isSent = message.senderId === currentUser._id;
+            messageElement.className = `message ${isSent ? 'sent' : 'received'}`;
+            messageElement.dataset.messageId = message._id;
+
+            const time = new Date(message.timestamp).toLocaleTimeString('ar-SA', {
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+
+            messageElement.innerHTML = `
+                ${!isSent ? `
+                    <div class="message-header">
+                        <span class="message-sender">${message.senderUsername}</span>
+                        <span class="message-time">${time}</span>
+                    </div>
+                ` : `
+                    <div class="message-header">
+                        <span class="message-time">${time}</span>
+                    </div>
+                `}
+                <div class="message-text">${message.content}</div>
+                ${message.reactions && message.reactions.length > 0 ? `
+                    <div class="message-reactions">
+                        ${message.reactions.map(reaction => `
+                            <span class="reaction">${reaction.emoji} ${reaction.count}</span>
+                        `).join('')}
+                    </div>
+                ` : ''}
+            `;
+
+            container.appendChild(messageElement);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        async function sendMessage() {
+            const messageInput = document.getElementById('messageInput');
+            const content = messageInput.value.trim();
+            
+            if (!content && selectedFiles.length === 0) return;
+            if (!currentChat) return;
+
+            try {
+                const messageData = {
+                    receiverId: currentChat._id,
+                    content: content,
+                    timestamp: new Date().toISOString()
+                };
+
+                // إرسال الملفات إذا وجدت
+                if (selectedFiles.length > 0) {
+                    const formData = new FormData();
+                    selectedFiles.forEach(file => {
+                        formData.append('attachments', file);
+                    });
+                    formData.append('receiverId', currentChat._id);
+                    formData.append('content', content);
+
+                    const response = await fetch(`${API_BASE}/messages/send`, {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${localStorage.getItem('token')}`
+                        },
+                        body: formData
+                    });
+
+                    if (response.ok) {
+                        const message = await response.json();
+                        socket.emit('send_message', message);
+                        displayNewMessage(message);
+                    }
+                } else {
+                    // إرسال رسالة نصية فقط
+                    const response = await fetch(`${API_BASE}/messages/send`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${localStorage.getItem('token')}`
+                        },
+                        body: JSON.stringify(messageData)
+                    });
+
+                    if (response.ok) {
+                        const message = await response.json();
+                        socket.emit('send_message', message);
+                        displayNewMessage(message);
+                    }
+                }
+
+                // تنظيف الحقول
+                messageInput.value = '';
+                messageInput.style.height = 'auto';
+                selectedFiles = [];
+                document.getElementById('attachmentsPreview').innerHTML = '';
+                hideTypingIndicator();
+
+            } catch (error) {
+                console.error('Error sending message:', error);
+                showAlert('حدث خطأ في إرسال الرسالة', 'error');
+            }
+        }
+
+        function showTypingIndicator(username) {
+            const indicator = document.getElementById('typingIndicator');
+            const typingUser = document.getElementById('typingUser');
+            
+            typingUser.textContent = username;
+            indicator.classList.remove('hidden');
+        }
+
+        function hideTypingIndicator() {
+            const indicator = document.getElementById('typingIndicator');
+            indicator.classList.add('hidden');
+        }
+
+        // نظام الـ Stories
+        async function loadStories() {
+            try {
+                const response = await fetch(`${API_BASE}/stories`, {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    }
+                });
+
+                if (response.ok) {
+                    stories = await response.json();
+                    displayStories();
+                }
+            } catch (error) {
+                console.error('Error loading stories:', error);
+            }
+        }
+
+        function displayStories() {
+            const container = document.getElementById('storiesContainer');
+            const pageContainer = document.getElementById('storiesPageContainer');
+            
+            if (!container && !pageContainer) return;
+
+            const targetContainer = container || pageContainer;
+            targetContainer.innerHTML = '';
+
+            // زر إضافة Story
+            const addStoryBtn = document.createElement('div');
+            addStoryBtn.className = 'story-item';
+            addStoryBtn.innerHTML = `
+                <div class="story-add-btn" onclick="createStory()">
+                    <i class="fas fa-plus"></i>
+                </div>
+                <div class="story-username">إضافة</div>
+            `;
+            targetContainer.appendChild(addStoryBtn);
+
+            // عرض Stories المستخدمين
+            stories.forEach((userStories, index) => {
+                if (userStories.stories.length === 0) return;
+
+                const storyItem = document.createElement('div');
+                storyItem.className = 'story-item';
+                storyItem.addEventListener('click', () => openStoryViewer(index, 0));
+
+                storyItem.innerHTML = `
+                    <div class="story-avatar">
+                        <img src="${userStories.user.avatar || '/default-avatar.png'}" alt="${userStories.user.username}">
+                    </div>
+                    <div class="story-username">${userStories.user.username}</div>
+                `;
+
+                targetContainer.appendChild(storyItem);
+            });
+        }
+
+        function createStory() {
+            document.getElementById('storyInput').click();
+        }
+
+        async function handleStoryUpload(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            try {
+                const formData = new FormData();
+                formData.append('media', file);
+
+                const response = await fetch(`${API_BASE}/stories/upload`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    },
+                    body: formData
+                });
+
+                if (response.ok) {
+                    const story = await response.json();
+                    socket.emit('new_story', story);
+                    loadStories();
+                    showAlert('تم نشر الـ Story بنجاح', 'success');
+                }
+            } catch (error) {
+                console.error('Error uploading story:', error);
+                showAlert('حدث خطأ في رفع الـ Story', 'error');
+            }
+        }
+
+        function openStoryViewer(userIndex, storyIndex) {
+            const userStories = stories[userIndex];
+            if (!userStories || !userStories.stories[storyIndex]) return;
+
+            currentStoryUserIndex = userIndex;
+            currentStoryIndex = storyIndex;
+
+            const story = userStories.stories[storyIndex];
+            const viewer = document.getElementById('storyViewer');
+            const media = document.getElementById('storyMedia');
+            const userAvatar = document.getElementById('storyUserAvatar');
+            const userName = document.getElementById('storyUserName');
+            const storyTime = document.getElementById('storyTime');
+            const progressContainer = document.getElementById('storyProgress');
+
+            // تعيين بيانات الـ Story
+            media.src = story.mediaUrl;
+            userAvatar.src = userStories.user.avatar || '/default-avatar.png';
+            userName.textContent = userStories.user.username;
+            storyTime.textContent = new Date(story.timestamp).toLocaleTimeString('ar-SA');
+
+            // إنشاء أشرطة التقدم
+            progressContainer.innerHTML = '';
+            userStories.stories.forEach((s, index) => {
+                const progressBar = document.createElement('div');
+                progressBar.className = 'story-progress-bar';
+                
+                const progressFill = document.createElement('div');
+                progressFill.className = 'story-progress-fill';
+                if (index < storyIndex) {
+                    progressFill.style.width = '100%';
+                } else if (index === storyIndex) {
+                    progressFill.style.width = '0%';
+                }
+                
+                progressBar.appendChild(progressFill);
+                progressContainer.appendChild(progressBar);
+            });
+
+            // عرض النافذة
+            viewer.classList.add('active');
+            startStoryProgress();
+        }
+
+        function startStoryProgress() {
+            if (storyInterval) clearInterval(storyInterval);
+
+            storyInterval = setInterval(() => {
+                const userStories = stories[currentStoryUserIndex];
+                const progressBars = document.querySelectorAll('.story-progress-fill');
+                const currentProgressBar = progressBars[currentStoryIndex];
+                
+                let width = parseFloat(currentProgressBar.style.width) || 0;
+                width += 1;
+                
+                currentProgressBar.style.width = width + '%';
+                
+                if (width >= 100) {
+                    showNextStory();
+                }
+            }, 50);
+        }
+
+        function showNextStory() {
+            const userStories = stories[currentStoryUserIndex];
+            if (currentStoryIndex < userStories.stories.length - 1) {
+                currentStoryIndex++;
+                openStoryViewer(currentStoryUserIndex, currentStoryIndex);
+            } else {
+                closeStoryViewer();
+            }
+        }
+
+        function showPreviousStory() {
+            if (currentStoryIndex > 0) {
+                currentStoryIndex--;
+                openStoryViewer(currentStoryUserIndex, currentStoryIndex);
+            }
+        }
+
+        function closeStoryViewer() {
+            const viewer = document.getElementById('storyViewer');
+            viewer.classList.remove('active');
+            
+            if (storyInterval) {
+                clearInterval(storyInterval);
+                storyInterval = null;
+            }
+        }
+
+        async function saveCurrentStory() {
+            try {
+                const userStories = stories[currentStoryUserIndex];
+                const story = userStories.stories[currentStoryIndex];
+                
+                const response = await fetch(`${API_BASE}/stories/${story._id}/save`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    }
+                });
+
+                if (response.ok) {
+                    showAlert('تم حفظ الـ Story بنجاح', 'success');
+                }
+            } catch (error) {
+                console.error('Error saving story:', error);
+                showAlert('حدث خطأ في حفظ الـ Story', 'error');
+            }
+        }
+
+        // نظام الإعدادات
+        async function loadUserSettings() {
+            try {
+                const response = await fetch(`${API_BASE}/settings`, {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    }
+                });
+
+                if (response.ok) {
+                    const settings = await response.json();
+                    applyUserSettings(settings);
+                }
+            } catch (error) {
+                console.error('Error loading settings:', error);
+            }
+        }
+
+        function applyUserSettings(settings) {
+            document.getElementById('hideOnlineStatus').checked = settings.hideOnlineStatus || false;
+            document.getElementById('hideLastSeen').checked = settings.hideLastSeen || false;
+            document.getElementById('hideStoryViews').checked = settings.hideStoryViews || false;
+            
+            // تطبيق سمة المحادثة
+            const theme = settings.chatTheme || 'default';
+            document.getElementById('chatMain').dataset.theme = theme;
+            
+            document.querySelectorAll('.theme-option').forEach(option => {
+                option.classList.remove('active');
+                if (option.dataset.theme === theme) {
+                    option.classList.add('active');
+                }
+            });
+        }
+
+        async function saveUserSettings() {
+            try {
+                const settings = {
+                    hideOnlineStatus: document.getElementById('hideOnlineStatus').checked,
+                    hideLastSeen: document.getElementById('hideLastSeen').checked,
+                    hideStoryViews: document.getElementById('hideStoryViews').checked,
+                    chatTheme: document.getElementById('chatMain').dataset.theme
+                };
+
+                const response = await fetch(`${API_BASE}/settings`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    },
+                    body: JSON.stringify(settings)
+                });
+
+                if (response.ok) {
+                    showAlert('تم حفظ الإعدادات بنجاح', 'success');
+                }
+            } catch (error) {
+                console.error('Error saving settings:', error);
+                showAlert('حدث خطأ في حفظ الإعدادات', 'error');
+            }
+        }
+
+        // نظام الإدارة
+        async function loadAdminUsers() {
+            try {
+                const response = await fetch(`${API_BASE}/admin/users`, {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    }
+                });
+
+                if (response.ok) {
+                    const users = await response.json();
+                    displayAdminUsers(users);
+                }
+            } catch (error) {
+                console.error('Error loading admin users:', error);
+            }
+        }
+
+        function displayAdminUsers(users) {
+            const tbody = document.getElementById('usersTableBody');
+            tbody.innerHTML = '';
+
+            users.forEach(user => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${user.username}</td>
+                    <td>${user.phone}</td>
+                    <td>${user.role}</td>
+                    <td>${user.isOnline ? '<span style="color: var(--success);">متصل</span>' : '<span style="color: var(--gray);">غير متصل</span>'}</td>
+                    <td>${new Date(user.createdAt).toLocaleDateString('ar-SA')}</td>
+                    <td class="action-buttons">
+                        <button class="btn btn-danger btn-sm" onclick="deleteUser('${user._id}')">
+                            <i class="fas fa-trash"></i> حذف
+                        </button>
+                        ${user.role !== 'admin' ? `
+                            <button class="btn btn-warning btn-sm" onclick="makeAdmin('${user._id}')">
+                                <i class="fas fa-crown"></i> ترقية
+                            </button>
+                        ` : ''}
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        async function deleteUser(userId) {
+            if (!confirm('هل أنت متأكد من حذف هذا المستخدم؟')) return;
+
+            try {
+                const response = await fetch(`${API_BASE}/admin/users/${userId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    }
+                });
+
+                if (response.ok) {
+                    socket.emit('user_deleted', { userId });
+                    showAlert('تم حذف المستخدم بنجاح', 'success');
+                    loadAdminUsers();
+                }
+            } catch (error) {
+                console.error('Error deleting user:', error);
+                showAlert('حدث خطأ في حذف المستخدم', 'error');
+            }
+        }
+
+        async function makeAdmin(userId) {
+            try {
+                const response = await fetch(`${API_BASE}/admin/users/${userId}/make-admin`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    }
+                });
+
+                if (response.ok) {
+                    showAlert('تم ترقية المستخدم إلى مدير بنجاح', 'success');
+                    loadAdminUsers();
+                }
+            } catch (error) {
+                console.error('Error making user admin:', error);
+                showAlert('حدث خطأ في ترقية المستخدم', 'error');
+            }
+        }
+
+        async function deleteMessageAsAdmin() {
+            const messageId = document.getElementById('messageIdInput').value.trim();
+            if (!messageId) {
+                showAlert('يرجى إدخال معرف الرسالة', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/admin/messages/${messageId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    }
+                });
+
+                if (response.ok) {
+                    socket.emit('message_deleted', { messageId });
+                    showAlert('تم حذف الرسالة بنجاح', 'success');
+                    document.getElementById('messageIdInput').value = '';
+                }
+            } catch (error) {
+                console.error('Error deleting message:', error);
+                showAlert('حدث خطأ في حذف الرسالة', 'error');
+            }
+        }
+
+        async function deleteStoryAsAdmin() {
+            const storyId = document.getElementById('storyIdInput').value.trim();
+            if (!storyId) {
+                showAlert('يرجى إدخال معرف الـ Story', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/admin/stories/${storyId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    }
+                });
+
+                if (response.ok) {
+                    socket.emit('story_deleted', { storyId });
+                    showAlert('تم حذف الـ Story بنجاح', 'success');
+                    document.getElementById('storyIdInput').value = '';
+                }
+            } catch (error) {
+                console.error('Error deleting story:', error);
+                showAlert('حدث خطأ في حذف الـ Story', 'error');
+            }
+        }
+
+        async function createBackup() {
+            try {
+                const response = await fetch(`${API_BASE}/admin/backup`, {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    }
+                });
+
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `backup-${new Date().toISOString().split('T')[0]}.zip`;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+                    
+                    showAlert('تم إنشاء النسخ الاحتياطي بنجاح', 'success');
+                }
+            } catch (error) {
+                console.error('Error creating backup:', error);
+                showAlert('حدث خطأ في إنشاء النسخ الاحتياطي', 'error');
+            }
+        }
+
+        async function restoreBackup(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const formData = new FormData();
+            formData.append('backup', file);
+
+            try {
+                const response = await fetch(`${API_BASE}/admin/restore`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    },
+                    body: formData
+                });
+
+                if (response.ok) {
+                    showAlert('تم استعادة النسخ الاحتياطي بنجاح', 'success');
+                    e.target.value = '';
+                }
+            } catch (error) {
+                console.error('Error restoring backup:', error);
+                showAlert('حدث خطأ في استعادة النسخ الاحتياطي', 'error');
+            }
+        }
+
+        async function loadAdminStats() {
+            try {
+                const response = await fetch(`${API_BASE}/admin/stats`, {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    }
+                });
+
+                if (response.ok) {
+                    const stats = await response.json();
+                    document.getElementById('adminTotalUsers').textContent = stats.totalUsers;
+                    document.getElementById('adminTotalMessages').textContent = stats.totalMessages;
+                    document.getElementById('adminTotalStories').textContent = stats.totalStories;
+                    document.getElementById('adminStorageUsed').textContent = stats.storageUsed;
+                }
+            } catch (error) {
+                console.error('Error loading admin stats:', error);
+            }
+        }
+
+        // وظائف المساعدة
+        function showPage(pageId) {
+            // إخفاء جميع الصفحات
+            document.querySelectorAll('.page').forEach(page => {
+                page.classList.remove('active');
+            });
+            
+            // إظهار الصفحة المطلوبة
+            document.getElementById(pageId).classList.add('active');
+            
+            // تحميل البيانات الخاصة بالصفحة
+            if (pageId === 'dashboardPage') {
+                loadUserData();
+                loadStories();
+            } else if (pageId === 'chatPage') {
+                loadConversations();
+            } else if (pageId === 'storiesPage') {
+                loadStories();
+            } else if (pageId === 'adminPage') {
+                loadAdminUsers();
+                loadAdminStats();
+            }
+        }
+
+        function updateNavigation(isLoggedIn, isAdmin = false) {
+            const publicItems = ['homeLink', 'loginLink', 'registerLink'];
+            const privateItems = ['dashboardLink', 'chatLink', 'storiesLink', 'settingsLink', 'logoutLink'];
+            const adminItems = ['adminLink'];
+            
+            publicItems.forEach(item => {
+                document.getElementById(item).classList.toggle('hidden', isLoggedIn);
+            });
+            
+            privateItems.forEach(item => {
+                document.getElementById(item).classList.toggle('hidden', !isLoggedIn);
+            });
+            
+            adminItems.forEach(item => {
+                document.getElementById(item).classList.toggle('hidden', !isAdmin);
+            });
+            
+            document.getElementById('userInfo').classList.toggle('hidden', !isLoggedIn);
+            
+            if (isLoggedIn && currentUser) {
+                document.getElementById('userName').textContent = currentUser.username;
+                document.getElementById('dashboardWelcome').textContent = `مرحباً ${currentUser.username}!`;
+            }
+        }
+
+        async function loadUserData() {
+            if (!currentUser) return;
+            
+            try {
+                const response = await fetch(`${API_BASE}/user/stats`, {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    }
+                });
+
+                if (response.ok) {
+                    const stats = await response.json();
+                    document.getElementById('userMessages').textContent = stats.unreadMessages;
+                    document.getElementById('userMaterials').textContent = stats.newMaterials;
+                    document.getElementById('userTasks').textContent = stats.pendingTasks;
+                    document.getElementById('userEvents').textContent = stats.upcomingEvents;
+                }
+            } catch (error) {
+                console.error('Error loading user data:', error);
+            }
+        }
+
+        async function loadHomeStats() {
+            try {
+                const response = await fetch(`${API_BASE}/stats`);
+                if (response.ok) {
+                    const stats = await response.json();
+                    document.getElementById('totalUsers').textContent = stats.totalUsers;
+                    document.getElementById('totalMessages').textContent = stats.totalMessages;
+                    document.getElementById('activeStories').textContent = stats.activeStories;
+                    document.getElementById('onlineUsers').textContent = stats.onlineUsers;
+                }
+            } catch (error) {
+                console.error('Error loading home stats:', error);
+                // استخدام أرقام افتراضية للعرض
+                document.getElementById('totalUsers').textContent = '1,234';
+                document.getElementById('totalMessages').textContent = '45,678';
+                document.getElementById('activeStories').textContent = '23';
+                document.getElementById('onlineUsers').textContent = '89';
+            }
+        }
+
+        async function handleLogin(e) {
+            e.preventDefault();
+            
+            const phone = document.getElementById('loginPhone').value;
+            const password = document.getElementById('loginPassword').value;
+            
+            try {
+                const response = await fetch(`${API_BASE}/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ phone, password })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    localStorage.setItem('token', data.token);
+                    localStorage.setItem('user', JSON.stringify(data.user));
+                    currentUser = data.user;
+                    
+                    updateNavigation(true, data.user.role === 'admin');
+                    initializeSocket();
+                    showPage('dashboardPage');
+                    showAlert('تم تسجيل الدخول بنجاح!', 'success');
+                } else {
+                    showAlert(data.message || 'خطأ في تسجيل الدخول', 'error');
+                }
+            } catch (error) {
+                console.error('Login error:', error);
+                showAlert('حدث خطأ في الاتصال بالخادم', 'error');
+            }
+        }
+
+        async function handleRegister(e) {
+            e.preventDefault();
+            
+            const username = document.getElementById('registerUsername').value;
+            const phone = document.getElementById('registerPhone').value;
+            const password = document.getElementById('registerPassword').value;
+            const confirmPassword = document.getElementById('registerConfirmPassword').value;
+            
+            if (password !== confirmPassword) {
+                showAlert('كلمات المرور غير متطابقة', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/auth/register`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ username, phone, password })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showAlert('تم إنشاء الحساب بنجاح! يرجى تسجيل الدخول.', 'success');
+                    showPage('loginPage');
+                    document.getElementById('registerForm').reset();
+                } else {
+                    showAlert(data.message || 'خطأ في إنشاء الحساب', 'error');
+                }
+            } catch (error) {
+                console.error('Registration error:', error);
+                showAlert('حدث خطأ في الاتصال بالخادم', 'error');
+            }
+        }
+
+        function logout() {
+            if (socket) {
+                socket.disconnect();
+            }
+            
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            currentUser = null;
+            
+            updateNavigation(false);
+            showPage('homePage');
+            showAlert('تم تسجيل الخروج بنجاح', 'success');
+        }
+
+        function showAlert(message, type) {
+            // إنشاء عنصر التنبيه
+            const alert = document.createElement('div');
+            alert.className = `alert alert-${type}`;
+            alert.innerHTML = `
+                <i class="fas fa-${type === 'success' ? 'check' : 'exclamation'}-circle"></i>
+                ${message}
+            `;
+            
+            // إضافة التنبيه إلى الصفحة الحالية
+            const currentPage = document.querySelector('.page.active');
+            const existingAlert = currentPage.querySelector('.alert');
+            if (existingAlert) {
+                existingAlert.remove();
+            }
+            
+            currentPage.insertBefore(alert, currentPage.firstChild);
+            
+            // إزالة التنبيه بعد 5 ثواني
+            setTimeout(() => {
+                alert.remove();
+            }, 5000);
+        }
+
+        function simulateConnectionStatus() {
+            const statusElement = document.getElementById('connectionStatus');
+            
+            // محاكاة تغيير حالة الاتصال بشكل عشوائي
+            setInterval(() => {
+                if (Math.random() > 0.1) { // 90% اتصال
+                    statusElement.style.display = 'block';
+                    statusElement.classList.remove('offline');
+                    statusElement.innerHTML = '<i class="fas fa-wifi"></i> متصل';
+                } else {
+                    statusElement.style.display = 'block';
+                    statusElement.classList.add('offline');
+                    statusElement.innerHTML = '<i class="fas fa-wifi-slash"></i> غير متصل';
+                    
+                    // العودة للاتصال بعد 3 ثواني
+                    setTimeout(() => {
+                        statusElement.classList.remove('offline');
+                        statusElement.innerHTML = '<i class="fas fa-wifi"></i> متصل';
+                    }, 3000);
+                }
+            }, 10000);
+        }
+
+        // تحميل المحادثات
+        async function loadConversations() {
+            try {
+                const response = await fetch(`${API_BASE}/conversations`, {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    }
+                });
+
+                if (response.ok) {
+                    const conversations = await response.json();
+                    displayConversations(conversations);
+                }
+            } catch (error) {
+                console.error('Error loading conversations:', error);
+            }
+        }
+
+        function displayConversations(conversations) {
+            const container = document.getElementById('conversationsList');
+            container.innerHTML = '';
+
+            if (conversations.length === 0) {
+                container.innerHTML = `
+                    <div style="text-align: center; color: var(--gray); padding: 2rem;">
+                        <i class="fas fa-comments" style="font-size: 2rem; margin-bottom: 1rem;"></i>
+                        <p>لا توجد محادثات بعد</p>
+                    </div>
+                `;
+                return;
+            }
+
+            conversations.forEach(conversation => {
+                const conversationElement = document.createElement('div');
+                conversationElement.className = 'conversation-item';
+                conversationElement.addEventListener('click', () => startNewChat(conversation.user));
+                
+                conversationElement.innerHTML = `
+                    <div class="conversation-avatar">
+                        <i class="fas fa-user"></i>
+                        ${conversation.user.isOnline ? '<div class="online-indicator"></div>' : ''}
+                    </div>
+                    <div class="conversation-info">
+                        <div class="conversation-name">
+                            ${conversation.user.username}
+                            ${conversation.user.role === 'admin' ? '<i class="fas fa-crown" style="color: var(--warning);"></i>' : ''}
+                        </div>
+                        <div class="conversation-preview">
+                            ${conversation.lastMessage || 'لا توجد رسائل'}
+                        </div>
+                    </div>
+                    <div class="conversation-meta">
+                        <div class="conversation-time">${conversation.lastMessageTime || ''}</div>
+                        ${conversation.unreadCount > 0 ? `
+                            <div class="unread-badge">${conversation.unreadCount}</div>
+                        ` : ''}
+                    </div>
+                `;
+                
+                container.appendChild(conversationElement);
+            });
+        }
+
+        function loadConversationsTab(tab) {
+            // يمكن تطوير هذه الدالة لتحميل أنواع مختلفة من المحادثات
+            if (tab === 'conversations') {
+                loadConversations();
+            } else if (tab === 'groups') {
+                // تحميل المجموعات
+                document.getElementById('conversationsList').innerHTML = `
+                    <div style="text-align: center; color: var(--gray); padding: 2rem;">
+                        <i class="fas fa-users" style="font-size: 2rem; margin-bottom: 1rem;"></i>
+                        <p>لا توجد مجموعات بعد</p>
+                    </div>
+                `;
+            } else if (tab === 'channels') {
+                // تحميل القنوات
+                document.getElementById('conversationsList').innerHTML = `
+                    <div style="text-align: center; color: var(--gray); padding: 2rem;">
+                        <i class="fas fa-broadcast-tower" style="font-size: 2rem; margin-bottom: 1rem;"></i>
+                        <p>لا توجد قنوات بعد</p>
+                    </div>
+                `;
+            }
+        }
+
+        function updateUserOnlineStatus(userId, isOnline) {
+            // تحديث حالة المستخدم في قائمة المحادثات
+            const conversationItems = document.querySelectorAll('.conversation-item');
+            conversationItems.forEach(item => {
+                // يمكن تطوير هذه الدالة لتحديث حالة الاتصال للمستخدمين
+            });
+
+            // إذا كان المستخدم المتصل هو المستخدم الحالي في المحادثة
+            if (currentChat && currentChat._id === userId) {
+                document.getElementById('currentChatStatus').className = `status-indicator ${isOnline ? '' : 'offline'}`;
+                document.getElementById('currentChatStatusText').textContent = isOnline ? 'متصل الآن' : 'غير متصل';
+            }
+        }
+
+        // تهيئة التطبيق عند تحميل الصفحة
+        window.addEventListener('load', initializeApp);
+    </script>
+</body>
+</html>
