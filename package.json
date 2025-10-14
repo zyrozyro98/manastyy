@@ -1,71 +1,141 @@
 {
-  "name": "student-platform-pro",
-  "version": "4.0.0",
-  "description": "منصة طلاب إلكترونية احترافية - نظام إدارة متكامل مع صلاحيات غير محدودة للمدير",
-  "main": "server.js",
+  "name": "educational-platform",
+  "version": "1.0.0",
+  "description": "منصة تعليمية متكاملة بنظام دردشة متطور وStories تفاعلية",
+  "main": "src/server.js",
+  "type": "module",
   "scripts": {
-    "start": "node server.js",
-    "dev": "nodemon server.js",
-    "backup": "node backup.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
+    "dev:debug": "nodemon --inspect src/server.js",
+    "test": "NODE_ENV=test jest --verbose",
+    "test:watch": "NODE_ENV=test jest --watch",
+    "test:coverage": "NODE_ENV=test jest --coverage",
+    "lint": "eslint src/",
+    "lint:fix": "eslint src/ --fix",
+    "format": "prettier --write src/",
+    "clean": "rm -rf dist && rm -rf uploads",
+    "build": "npm run clean && npm run lint && npm test",
+    "setup": "npm install && node scripts/setup.js",
+    "seed": "node scripts/seedDatabase.js",
+    "backup": "node scripts/backup.js",
+    "migrate": "node scripts/migrate.js"
   },
+  "keywords": [
+    "education",
+    "learning",
+    "chat",
+    "stories",
+    "real-time",
+    "nodejs",
+    "express",
+    "mongodb",
+    "socket.io",
+    "arabic",
+    "platform"
+  ],
+  "author": {
+    "name": "Educational Platform",
+    "email": "support@edu-platform.com",
+    "url": "https://edu-platform.com"
+  },
+  "contributors": [
+    {
+      "name": "Developer Team",
+      "email": "dev@edu-platform.com"
+    }
+  ],
+  "license": "MIT",
   "dependencies": {
     "express": "^4.18.2",
+    "socket.io": "^4.7.2",
+    "mongoose": "^7.5.0",
     "bcryptjs": "^2.4.3",
     "jsonwebtoken": "^9.0.2",
     "multer": "^1.4.5-lts.1",
     "cors": "^2.8.5",
+    "helmet": "^7.0.0",
+    "compression": "^1.7.4",
     "dotenv": "^16.3.1",
-    "socket.io": "^4.7.4",
-    "sharp": "^0.32.6",
+    "express-rate-limit": "^6.10.0",
+    "express-validator": "^7.0.1",
+    "validator": "^13.11.0",
     "moment": "^2.29.4",
-    "uuid": "^9.0.1"
+    "uuid": "^9.0.0",
+    "sharp": "^0.32.5",
+    "archiver": "^5.3.1",
+    "unzipper": "^0.10.14",
+    "winston": "^3.10.0",
+    "morgan": "^1.10.0",
+    "node-cron": "^3.0.2",
+    "lodash": "^4.17.21",
+    "axios": "^1.5.0"
   },
   "devDependencies": {
-    "nodemon": "^3.0.1"
+    "nodemon": "^3.0.1",
+    "jest": "^29.6.2",
+    "supertest": "^6.3.3",
+    "@babel/core": "^7.22.9",
+    "@babel/preset-env": "^7.22.9",
+    "@babel/cli": "^7.22.9",
+    "babel-jest": "^29.6.2",
+    "eslint": "^8.46.0",
+    "eslint-config-prettier": "^8.9.0",
+    "eslint-plugin-prettier": "^4.2.1",
+    "prettier": "^3.0.0",
+    "webpack": "^5.88.2",
+    "webpack-cli": "^5.1.4",
+    "webpack-node-externals": "^3.0.0"
   },
-  "keywords": [
-    "education",
-    "students",
-    "platform",
-    "management",
-    "arabic",
-    "secure",
-    "chat",
-    "messaging",
-    "file-upload",
-    "authentication",
-    "realtime",
-    "stories",
-    "modern-chat",
-    "admin-panel",
-    "backup-system",
-    "privacy-settings"
-  ],
-  "author": {
-    "name": "Student Platform Team",
-    "email": "info@student-platform.com"
-  },
-  "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/student-platform/student-platform-pro.git"
-  },
-  "bugs": {
-    "url": "https://github.com/student-platform/student-platform-pro/issues"
-  },
-  "homepage": "https://github.com/student-platform/student-platform-pro#readme",
   "engines": {
-    "node": ">=16.0.0",
-    "npm": ">=8.0.0"
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
   },
   "os": [
     "linux",
-    "windows",
-    "macos"
+    "darwin",
+    "win32"
   ],
   "cpu": [
     "x64",
     "arm64"
-  ]
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/edu-platform/educational-platform.git"
+  },
+  "bugs": {
+    "url": "https://github.com/edu-platform/educational-platform/issues"
+  },
+  "homepage": "https://github.com/edu-platform/educational-platform#readme",
+  "funding": {
+    "type": "patreon",
+    "url": "https://patreon.com/eduplatform"
+  },
+  "private": true,
+  "config": {
+    "port": 3000,
+    "api_version": "v1",
+    "session_timeout": "24h"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "collectCoverageFrom": [
+      "src/**/*.js",
+      "!src/server.js"
+    ],
+    "coverageDirectory": "coverage",
+    "coverageReporters": [
+      "text",
+      "lcov",
+      "html"
+    ]
+  },
+  "prettier": {
+    "semi": true,
+    "singleQuote": true,
+    "printWidth": 80,
+    "tabWidth": 2,
+    "trailingComma": "es5"
+  }
 }
