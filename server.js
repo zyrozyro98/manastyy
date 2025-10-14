@@ -2320,3 +2320,1070 @@ function getReportTypeArabic(type) {
     };
     return types[type] || type;
 }
+// نظام النسخ الاحتياطي والاستعادة المتقدم
+app.post('/api/admin/backup', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const { name, description, includeMedia = true } = req.body;
+        
+        const backup = createBackup();
+        
+        if (backup) {
+            // تحديث معلومات النسخة الاحتياطية
+            const backups = readLocalFile('local-backups.json');
+            const backupIndex = backups.findIndex(b => b.id === backup.id);
+            
+            if (backupIndex !== -1) {
+                backups[backupIndex] = {
+                    ...backups[backupIndex],
+                    name: name || `نسخة احتياطية - ${new Date().toLocaleString('ar-EG')}`,
+                    description: description || '',
+                    includeMedia: includeMedia !== false,
+                    createdBy: req.user._id,
+                    size: JSON.stringify(backup).length
+                };
+                
+                writeLocalFile('local-backups.json', backups);
+                
+                // تحديث ملف النسخة الاحتياطية
+                const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+                const backupFilename = `backups/backup-${timestamp}.json`;
+                fs.writeFileSync(backupFilename, JSON.stringify(backups[backupIndex], null, 2));
+            }
+            
+            res.json({
+                success: true,
+                message: 'تم إنشاء النسخة الاحتياطية بنجاح',
+                backup: backups[backupIndex]
+            });
+        } else {
+            res.status(500).json({ 
+                success: false,
+                message: 'فشل إنشاء النسخة الاحتياطية' 
+            });
+        }
+    } catch (error) {
+        console.error('خطأ إنشاء نسخة احتياطية:', error);
+        res.status(500).json({ 
+            success: false,
+            message: 'خطأ في الخادم' 
+        });
+    }
+});
+
+app.get('/api/admin/backups', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const { page = 1, limit = 10 } = req.query;
+        
+        const backups = readLocalFile('local-backups.json');
+        
+        // الترتيب من الأحدث إلى الأقدم
+        backups.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+        
+        // التقسيم للصفحات
+        const startIndex = (page - 1) * limit;
+        const endIndex = startIndex + parseInt(limit);
+        const paginatedBackups = backups.slice(startIndex, endIndex);
+        
+        // إضافة معلومات الحجم المقروء
+        const backupsWithSize = paginatedBackups.map(backup => ({
+            ...backup,
+            sizeReadable: formatBytes(backup.size || 0),
+            canRestore: true
+        }));
+
+        res.json({
+            success: true,
+            backups: backupsWithSize,
+            pagination: {
+                page: parseInt(page),
+                limit: parseInt(limit),
+                total: backups.length,
+                pages: Math.ceil(backups.length / limit)
+            },
+            stats: {
+                total: backups.length,
+                totalSize: formatBytes(backups.reduce((sum, b) => sum + (b.size || 0), 0)),
+                lastBackup: backups.length > 0 ? backups[0].timestamp : null
+            }
+        });
+    } catch (error) {
+        console.error('خطأ جلب النسخ الاحتياطية:', error);
+        res.status(500).json({ 
+            success: false,
+            message: 'خطأ في الخادم' 
+        });
+    }
+});
+
+app.post('/api/admin/restore', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const { backupId, restoreOptions = {} } = req.body;
+
+        if (!backupId) {
+            return res.status(400).json({ 
+                success: false,
+                message: 'معرف النسخة الاحتياطية مطلوب' 
+            });
+        }
+
+        const backups = readLocalFile('local-backups.json');
+        const backup = backups.find(b => b.id === backupId);
+        
+        if (!backup) {
+            return res.status(404).json({ 
+                success: false,
+                message: 'النسخة الاحتياطية غير موجودة' 
+            });
+        }
+
+        const options = {
+            users: restoreOptions.users !== false,
+            messages: restoreOptions.messages !== false,
+            stories: restoreOptions.stories !== false,
+            channels: restoreOptions.channels !== false,
+            settings: restoreOptions.settings !== false,
+            notifications: restoreOptions.notifications !== false,
+            merge: restoreOptions.merge === true // دمج بدلاً من الاستبدال
+        };
+
+        // إنشاء نسخة احتياطية قبل الاستعادة
+        const preRestoreBackup = createBackup();
+
+        // تنفيذ الاستعادة حسب الخيارات
+        if (options.users && !options.merge) {
+            writeLocalFile('local-users.json', backup.users || []);
+        } else if (options.users && options.merge) {
+            const currentUsers = readLocalFile('local-users.json');
+            const mergedUsers = mergeData(currentUsers, backup.users || [], '_id');
+            writeLocalFile('local-users.json', mergedUsers);
+        }
+
+        if (options.messages && !options.merge) {
+            writeLocalFile('local-messages.json', backup.messages || []);
+        } else if (options.messages && options.merge) {
+            const currentMessages = readLocalFile('local-messages.json');
+            const mergedMessages = mergeData(currentMessages, backup.messages || [], '_id');
+            writeLocalFile('local-messages.json', mergedMessages);
+        }
+
+        if (options.stories && !options.merge) {
+            writeLocalFile('local-stories.json', backup.stories || []);
+        } else if (options.stories && options.merge) {
+            const currentStories = readLocalFile('local-stories.json');
+            const mergedStories = mergeData(currentStories, backup.stories || [], '_id');
+            writeLocalFile('local-stories.json', mergedStories);
+        }
+
+        if (options.channels && !options.merge) {
+            writeLocalFile('local-channels.json', backup.channels || []);
+        } else if (options.channels && options.merge) {
+            const currentChannels = readLocalFile('local-channels.json');
+            const mergedChannels = mergeData(currentChannels, backup.channels || [], '_id');
+            writeLocalFile('local-channels.json', mergedChannels);
+        }
+
+        if (options.settings && !options.merge) {
+            writeLocalFile('local-settings.json', backup.settings || []);
+        }
+
+        if (options.notifications && !options.merge) {
+            writeLocalFile('local-notifications.json', backup.notifications || []);
+        }
+
+        // إعادة تعيين نظام WebSocket
+        connectedUsers.clear();
+        userSockets.clear();
+        typingUsers.clear();
+        userPresence.clear();
+        activeCalls.clear();
+
+        // إرسال إشعار لإعادة التحميل لجميع المستخدمين المتصلين
+        io.emit('system_restored', { 
+            timestamp: new Date().toISOString(),
+            restoredBy: req.user.fullName,
+            backupId: backupId
+        });
+
+        // تسجيل عملية الاستعادة
+        const restoreLog = {
+            _id: uuidv4(),
+            backupId: backupId,
+            restoredBy: req.user._id,
+            timestamp: new Date().toISOString(),
+            options: options,
+            preRestoreBackupId: preRestoreBackup?.id
+        };
+
+        const restoreLogs = readLocalFile('local-restore-logs.json') || [];
+        restoreLogs.push(restoreLog);
+        writeLocalFile('local-restore-logs.json', restoreLogs);
+
+        res.json({
+            success: true,
+            message: 'تم استعادة البيانات بنجاح',
+            backup: backup,
+            restoreLog: restoreLog,
+            options: options
+        });
+    } catch (error) {
+        console.error('خطأ استعادة البيانات:', error);
+        res.status(500).json({ 
+            success: false,
+            message: 'خطأ في الخادم أثناء استعادة البيانات' 
+        });
+    }
+});
+
+// دالة مساعدة لدمج البيانات
+function mergeData(currentData, backupData, idField) {
+    const merged = [...currentData];
+    const currentIds = new Set(currentData.map(item => item[idField]));
+    
+    backupData.forEach(backupItem => {
+        if (!currentIds.has(backupItem[idField])) {
+            merged.push(backupItem);
+        } else {
+            // تحديث العناصر الموجودة
+            const existingIndex = merged.findIndex(item => item[idField] === backupItem[idField]);
+            if (existingIndex !== -1) {
+                merged[existingIndex] = {
+                    ...merged[existingIndex],
+                    ...backupItem,
+                    // الحفاظ على بعض الخصائص المهمة
+                    isOnline: merged[existingIndex].isOnline,
+                    lastSeen: merged[existingIndex].lastSeen
+                };
+            }
+        }
+    });
+    
+    return merged;
+}
+
+// دالة مساعدة لتنسيق الأحجام
+function formatBytes(bytes, decimals = 2) {
+    if (bytes === 0) return '0 Bytes';
+    
+    const k = 1024;
+    const dm = decimals < 0 ? 0 : decimals;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+    
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+}
+
+// نظام الإعدادات العامة
+app.get('/api/settings', authenticateToken, async (req, res) => {
+    try {
+        const settings = readLocalFile('local-settings.json');
+        const currentSettings = settings.length > 0 ? settings[0] : null;
+        
+        res.json({
+            success: true,
+            settings: currentSettings
+        });
+    } catch (error) {
+        console.error('خطأ جلب الإعدادات:', error);
+        res.status(500).json({ 
+            success: false,
+            message: 'خطأ في الخادم' 
+        });
+    }
+});
+
+app.put('/api/settings', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const updates = req.body;
+        
+        const settings = readLocalFile('local-settings.json');
+        let currentSettings = settings.length > 0 ? settings[0] : null;
+        
+        if (!currentSettings) {
+            currentSettings = {
+                _id: uuidv4(),
+                appName: "المنصة التعليمية",
+                theme: "light",
+                maxFileSize: 25,
+                storyDuration: 24,
+                backupInterval: 24,
+                allowRegistrations: true,
+                maintenanceMode: false,
+                createdAt: new Date().toISOString()
+            };
+        }
+        
+        // تحديث الإعدادات
+        const allowedUpdates = [
+            'appName', 'theme', 'maxFileSize', 'storyDuration', 'backupInterval',
+            'allowRegistrations', 'maintenanceMode', 'contactEmail', 'contactPhone',
+            'privacyPolicy', 'termsOfService', 'aboutUs', 'welcomeMessage',
+            'maxUsers', 'sessionTimeout', 'passwordPolicy'
+        ];
+        
+        allowedUpdates.forEach(field => {
+            if (updates[field] !== undefined) {
+                currentSettings[field] = updates[field];
+            }
+        });
+        
+        currentSettings.updatedAt = new Date().toISOString();
+        currentSettings.updatedBy = req.user._id;
+        
+        if (settings.length === 0) {
+            settings.push(currentSettings);
+        } else {
+            settings[0] = currentSettings;
+        }
+        
+        writeLocalFile('local-settings.json', settings);
+        
+        // إذا تم تفعيل وضع الصيانة، إرسال إشعار لجميع المستخدمين
+        if (updates.maintenanceMode !== undefined) {
+            if (updates.maintenanceMode) {
+                io.emit('maintenance_mode_enabled', {
+                    message: updates.maintenanceMessage || 'المنصة في وضع الصيانة. سنعود قريباً.',
+                    estimatedDuration: updates.maintenanceDuration
+                });
+            } else {
+                io.emit('maintenance_mode_disabled', {
+                    message: 'تم إكمال الصيانة. المنصة متاحة الآن.'
+                });
+            }
+        }
+        
+        res.json({
+            success: true,
+            message: 'تم تحديث الإعدادات بنجاح',
+            settings: currentSettings
+        });
+    } catch (error) {
+        console.error('خطأ تحديث الإعدادات:', error);
+        res.status(500).json({ 
+            success: false,
+            message: 'خطأ في الخادم' 
+        });
+    }
+});
+
+// إعدادات المستخدم الشخصية
+app.get('/api/user/settings', authenticateToken, async (req, res) => {
+    try {
+        const users = readLocalFile('local-users.json');
+        const user = users.find(u => u._id === req.user._id);
+        
+        if (!user) {
+            return res.status(404).json({ 
+                success: false,
+                message: 'المستخدم غير موجود' 
+            });
+        }
+        
+        res.json({
+            success: true,
+            settings: {
+                privacy: user.privacy || {},
+                chatSettings: user.chatSettings || {},
+                notificationSettings: user.notificationSettings || {},
+                appearance: user.appearance || {}
+            }
+        });
+    } catch (error) {
+        console.error('خطأ جلب إعدادات المستخدم:', error);
+        res.status(500).json({ 
+            success: false,
+            message: 'خطأ في الخادم' 
+        });
+    }
+});
+
+app.put('/api/user/settings', authenticateToken, async (req, res) => {
+    try {
+        const { privacy, chatSettings, notificationSettings, appearance } = req.body;
+        
+        const users = readLocalFile('local-users.json');
+        const userIndex = users.findIndex(u => u._id === req.user._id);
+        
+        if (userIndex === -1) {
+            return res.status(404).json({ 
+                success: false,
+                message: 'المستخدم غير موجود' 
+            });
+        }
+        
+        // تحديث إعدادات الخصوصية
+        if (privacy) {
+            users[userIndex].privacy = {
+                ...users[userIndex].privacy,
+                ...privacy,
+                updatedAt: new Date().toISOString()
+            };
+        }
+        
+        // تحديث إعدادات الدردشة
+        if (chatSettings) {
+            users[userIndex].chatSettings = {
+                ...users[userIndex].chatSettings,
+                ...chatSettings,
+                updatedAt: new Date().toISOString()
+            };
+        }
+        
+        // تحديث إعدادات الإشعارات
+        if (notificationSettings) {
+            users[userIndex].notificationSettings = {
+                ...users[userIndex].notificationSettings,
+                ...notificationSettings,
+                updatedAt: new Date().toISOString()
+            };
+        }
+        
+        // تحديث المظهر
+        if (appearance) {
+            users[userIndex].appearance = {
+                ...users[userIndex].appearance,
+                ...appearance,
+                updatedAt: new Date().toISOString()
+            };
+        }
+        
+        users[userIndex].updatedAt = new Date().toISOString();
+        writeLocalFile('local-users.json', users);
+        
+        // تحديث بيانات المستخدم المتصل
+        const userSocketId = userSockets.get(req.user._id);
+        if (userSocketId) {
+            const socketUser = connectedUsers.get(userSocketId);
+            if (socketUser) {
+                connectedUsers.set(userSocketId, {
+                    ...socketUser,
+                    privacy: users[userIndex].privacy,
+                    chatSettings: users[userIndex].chatSettings
+                });
+            }
+        }
+        
+        res.json({
+            success: true,
+            message: 'تم تحديث الإعدادات بنجاح',
+            settings: {
+                privacy: users[userIndex].privacy,
+                chatSettings: users[userIndex].chatSettings,
+                notificationSettings: users[userIndex].notificationSettings,
+                appearance: users[userIndex].appearance
+            }
+        });
+    } catch (error) {
+        console.error('خطأ تحديث إعدادات المستخدم:', error);
+        res.status(500).json({ 
+            success: false,
+            message: 'خطأ في الخادم' 
+        });
+    }
+});
+
+// نظام الإشعارات
+app.get('/api/notifications', authenticateToken, async (req, res) => {
+    try {
+        const { page = 1, limit = 20, unreadOnly = false } = req.query;
+        
+        const notifications = readLocalFile('local-notifications.json');
+        let userNotifications = notifications.filter(n => n.userId === req.user._id);
+        
+        // التصفية بالإشعارات غير المقروءة
+        if (unreadOnly) {
+            userNotifications = userNotifications.filter(n => !n.read);
+        }
+        
+        // الترتيب من الأحدث إلى الأقدم
+        userNotifications.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        
+        // التقسيم للصفحات
+        const startIndex = (page - 1) * limit;
+        const endIndex = startIndex + parseInt(limit);
+        const paginatedNotifications = userNotifications.slice(startIndex, endIndex);
+        
+        res.json({
+            success: true,
+            notifications: paginatedNotifications,
+            pagination: {
+                page: parseInt(page),
+                limit: parseInt(limit),
+                total: userNotifications.length,
+                pages: Math.ceil(userNotifications.length / limit)
+            },
+            stats: {
+                total: userNotifications.length,
+                unread: userNotifications.filter(n => !n.read).length
+            }
+        });
+    } catch (error) {
+        console.error('خطأ جلب الإشعارات:', error);
+        res.status(500).json({ 
+            success: false,
+            message: 'خطأ في الخادم' 
+        });
+    }
+});
+
+app.post('/api/notifications/:notificationId/read', authenticateToken, async (req, res) => {
+    try {
+        const { notificationId } = req.params;
+        
+        const notifications = readLocalFile('local-notifications.json');
+        const notificationIndex = notifications.findIndex(n => 
+            n._id === notificationId && n.userId === req.user._id
+        );
+        
+        if (notificationIndex === -1) {
+            return res.status(404).json({ 
+                success: false,
+                message: 'الإشعار غير موجود' 
+            });
+        }
+        
+        notifications[notificationIndex].read = true;
+        notifications[notificationIndex].readAt = new Date().toISOString();
+        
+        writeLocalFile('local-notifications.json', notifications);
+        
+        res.json({
+            success: true,
+            message: 'تم标记 الإشعار كمقروء'
+        });
+    } catch (error) {
+        console.error('خطأ标记 الإشعار:', error);
+        res.status(500).json({ 
+            success: false,
+            message: 'خطأ في الخادم' 
+        });
+    }
+});
+
+app.post('/api/notifications/read-all', authenticateToken, async (req, res) => {
+    try {
+        const notifications = readLocalFile('local-notifications.json');
+        let updatedCount = 0;
+        
+        notifications.forEach(notification => {
+            if (notification.userId === req.user._id && !notification.read) {
+                notification.read = true;
+                notification.readAt = new Date().toISOString();
+                updatedCount++;
+            }
+        });
+        
+        writeLocalFile('local-notifications.json', notifications);
+        
+        res.json({
+            success: true,
+            message: `تم标记 ${updatedCount} إشعار كمقروء`,
+            updatedCount: updatedCount
+        });
+    } catch (error) {
+        console.error('خطأ标记 جميع الإشعارات:', error);
+        res.status(500).json({ 
+            success: false,
+            message: 'خطأ في الخادم' 
+        });
+    }
+});
+
+// نظام البحث المتقدم
+app.get('/api/search', authenticateToken, async (req, res) => {
+    try {
+        const { q, type = 'all', page = 1, limit = 20 } = req.query;
+        
+        if (!q || q.length < 2) {
+            return res.status(400).json({ 
+                success: false,
+                message: 'استعلام البحث يجب أن يكون على الأقل حرفين' 
+            });
+        }
+        
+        const searchTerm = q.toLowerCase().trim();
+        const results = {
+            users: [],
+            messages: [],
+            channels: [],
+            stories: []
+        };
+        
+        // البحث في المستخدمين
+        if (type === 'all' || type === 'users') {
+            const users = readLocalFile('local-users.json')
+                .filter(user => 
+                    user.role !== 'admin' && // استبعاد المديرين من نتائج البحث
+                    user.isActive !== false &&
+                    (
+                        user.fullName.toLowerCase().includes(searchTerm) ||
+                        user.phone.includes(searchTerm) ||
+                        user.university.toLowerCase().includes(searchTerm) ||
+                        user.major.toLowerCase().includes(searchTerm)
+                    )
+                )
+                .map(user => ({
+                    _id: user._id,
+                    fullName: user.fullName,
+                    avatar: user.avatar,
+                    university: user.university,
+                    major: user.major,
+                    isOnline: userSockets.has(user._id),
+                    lastSeen: user.lastSeen
+                }));
+            
+            results.users = users.slice(0, limit);
+        }
+        
+        // البحث في الرسائل
+        if (type === 'all' || type === 'messages') {
+            const messages = readLocalFile('local-messages.json')
+                .filter(message => 
+                    message.text.toLowerCase().includes(searchTerm) &&
+                    (
+                        message.senderId === req.user._id ||
+                        message.receiverId === req.user._id ||
+                        (message.channelId && 
+                         readLocalFile('local-channels.json')
+                            .find(c => c._id === message.channelId)
+                            ?.members.includes(req.user._id))
+                    )
+                )
+                .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+                .slice(0, limit)
+                .map(message => ({
+                    ...message,
+                    conversationName: getConversationName(message, req.user._id)
+                }));
+            
+            results.messages = messages;
+        }
+        
+        // البحث في القنوات
+        if (type === 'all' || type === 'channels') {
+            const channels = readLocalFile('local-channels.json')
+                .filter(channel => 
+                    (channel.isPublic || channel.members.includes(req.user._id)) &&
+                    (
+                        channel.name.toLowerCase().includes(searchTerm) ||
+                        channel.description.toLowerCase().includes(searchTerm)
+                    )
+                )
+                .map(channel => ({
+                    ...channel,
+                    isMember: channel.members.includes(req.user._id),
+                    onlineCount: channel.members.filter(memberId => 
+                        userSockets.has(memberId)
+                    ).length
+                }));
+            
+            results.channels = channels.slice(0, limit);
+        }
+        
+        // البحث في الـ Stories
+        if (type === 'all' || type === 'stories') {
+            const stories = readLocalFile('local-stories.json')
+                .filter(story => 
+                    new Date(story.expiresAt) > new Date() &&
+                    (
+                        story.caption.toLowerCase().includes(searchTerm) ||
+                        story.userName.toLowerCase().includes(searchTerm)
+                    )
+                )
+                .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+                .slice(0, limit);
+            
+            results.stories = stories;
+        }
+        
+        res.json({
+            success: true,
+            query: q,
+            type: type,
+            results: results,
+            stats: {
+                users: results.users.length,
+                messages: results.messages.length,
+                channels: results.channels.length,
+                stories: results.stories.length
+            }
+        });
+    } catch (error) {
+        console.error('خطأ البحث:', error);
+        res.status(500).json({ 
+            success: false,
+            message: 'خطأ في الخادم' 
+        });
+    }
+});
+
+// دالة مساعدة للحصول على اسم المحادثة
+function getConversationName(message, currentUserId) {
+    if (message.channelId) {
+        const channel = readLocalFile('local-channels.json')
+            .find(c => c._id === message.channelId);
+        return channel?.name || 'قناة';
+    } else {
+        return message.senderId === currentUserId ? 
+            message.receiverId : message.senderId;
+    }
+}
+
+// نظام الإحصائيات الشخصية
+app.get('/api/user/stats', authenticateToken, async (req, res) => {
+    try {
+        const users = readLocalFile('local-users.json');
+        const messages = readLocalFile('local-messages.json');
+        const stories = readLocalFile('local-stories.json');
+        const channels = readLocalFile('local-channels.json');
+        
+        const user = users.find(u => u._id === req.user._id);
+        if (!user) {
+            return res.status(404).json({ 
+                success: false,
+                message: 'المستخدم غير موجود' 
+            });
+        }
+        
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        
+        // إحصائيات الرسائل
+        const userMessages = messages.filter(m => 
+            m.senderId === req.user._id && m.type !== 'system'
+        );
+        
+        const messageStats = {
+            total: userMessages.length,
+            today: userMessages.filter(m => new Date(m.timestamp) >= today).length,
+            thisWeek: userMessages.filter(m => new Date(m.timestamp) >= weekAgo).length,
+            thisMonth: userMessages.filter(m => new Date(m.timestamp) >= monthAgo).length,
+            averagePerDay: userMessages.length > 0 ? 
+                Math.round(userMessages.length / Math.max(1, Math.ceil((now - new Date(user.createdAt)) / (24 * 60 * 60 * 1000)))) : 0
+        };
+        
+        // إحصائيات الـ Stories
+        const userStories = stories.filter(s => s.userId === req.user._id);
+        const activeStories = userStories.filter(s => new Date(s.expiresAt) > now);
+        
+        const storyStats = {
+            total: userStories.length,
+            active: activeStories.length,
+            totalViews: userStories.reduce((sum, story) => sum + story.views.length, 0),
+            averageViews: userStories.length > 0 ? 
+                Math.round(userStories.reduce((sum, story) => sum + story.views.length, 0) / userStories.length) : 0
+        };
+        
+        // إحصائيات النشاط
+        const activityStats = {
+            joinedChannels: channels.filter(c => c.members.includes(req.user._id)).length,
+            createdChannels: channels.filter(c => c.createdBy === req.user._id).length,
+            adminChannels: channels.filter(c => c.admins.includes(req.user._id)).length,
+            lastActive: user.lastSeen || user.lastLogin,
+            accountAge: Math.ceil((now - new Date(user.createdAt)) / (24 * 60 * 60 * 1000))
+        };
+        
+        res.json({
+            success: true,
+            stats: {
+                user: {
+                    fullName: user.fullName,
+                    joinDate: user.createdAt,
+                    lastLogin: user.lastLogin
+                },
+                messages: messageStats,
+                stories: storyStats,
+                activity: activityStats,
+                overall: {
+                    level: calculateUserLevel(userMessages.length, userStories.length, activityStats.joinedChannels),
+                    rank: calculateUserRank(req.user._id, users, messages)
+                }
+            }
+        });
+    } catch (error) {
+        console.error('خطأ جلب الإحصائيات الشخصية:', error);
+        res.status(500).json({ 
+            success: false,
+            message: 'خطأ في الخادم' 
+        });
+    }
+});
+
+// دوال مساعدة لتصنيف المستخدمين
+function calculateUserLevel(messageCount, storyCount, channelCount) {
+    const score = (messageCount * 1) + (storyCount * 3) + (channelCount * 5);
+    
+    if (score >= 1000) return 10;
+    if (score >= 500) return 9;
+    if (score >= 250) return 8;
+    if (score >= 100) return 7;
+    if (score >= 50) return 6;
+    if (score >= 25) return 5;
+    if (score >= 10) return 4;
+    if (score >= 5) return 3;
+    if (score >= 2) return 2;
+    return 1;
+}
+
+function calculateUserRank(userId, users, messages) {
+    const userMessagesCount = messages.filter(m => m.senderId === userId).length;
+    const sortedUsers = users
+        .filter(u => u.role === 'student')
+        .map(user => ({
+            userId: user._id,
+            messageCount: messages.filter(m => m.senderId === user._id).length,
+            storyCount: readLocalFile('local-stories.json').filter(s => s.userId === user._id).length
+        }))
+        .sort((a, b) => (b.messageCount + b.storyCount) - (a.messageCount + a.storyCount));
+    
+    const userIndex = sortedUsers.findIndex(u => u.userId === userId);
+    return userIndex !== -1 ? userIndex + 1 : sortedUsers.length + 1;
+}
+
+// Middleware للأمان المتقدم
+app.use((req, res, next) => {
+    // رأسيات الأمان
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('X-XSS-Protection', '1; mode=block');
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+    res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; font-src 'self' https://cdnjs.cloudflare.com;");
+    
+    next();
+});
+
+// معدل للمعدل (Rate Limiting)
+const rateLimitStore = new Map();
+
+const rateLimit = (windowMs = 60000, maxRequests = 100) => {
+    return (req, res, next) => {
+        const key = req.ip + req.path;
+        const now = Date.now();
+        const windowStart = now - windowMs;
+        
+        if (!rateLimitStore.has(key)) {
+            rateLimitStore.set(key, []);
+        }
+        
+        const requests = rateLimitStore.get(key).filter(time => time > windowStart);
+        requests.push(now);
+        rateLimitStore.set(key, requests);
+        
+        if (requests.length > maxRequests) {
+            return res.status(429).json({
+                success: false,
+                message: 'تم تجاوز الحد المسموح من الطلبات. يرجى المحاولة لاحقاً.'
+            });
+        }
+        
+        next();
+    };
+};
+
+// تطبيق معدل المعدل على المسارات المهمة
+app.use('/api/auth/', rateLimit(900000, 5)); // 5 محاولات كل 15 دقيقة للتسجيل/الدخول
+app.use('/api/chat/', rateLimit(60000, 60)); // 60 رسالة في الدقيقة
+app.use('/api/stories/', rateLimit(60000, 10)); // 10 ستوريات في الدقيقة
+
+// مسار الصحة المتقدم
+app.get('/health', (req, res) => {
+    const health = {
+        status: '✅ النظام يعمل بشكل طبيعي',
+        timestamp: new Date().toISOString(),
+        version: '4.0.0',
+        environment: process.env.NODE_ENV || 'development',
+        system: {
+            uptime: process.uptime(),
+            memory: process.memoryUsage(),
+            cpu: process.cpuUsage()
+        },
+        connections: {
+            total: connectedUsers.size,
+            active: Array.from(connectedUsers.values()).filter(u => u.isOnline).length
+        },
+        database: {
+            users: readLocalFile('local-users.json').length,
+            messages: readLocalFile('local-messages.json').length,
+            stories: readLocalFile('local-stories.json').length,
+            channels: readLocalFile('local-channels.json').length
+        }
+    };
+    
+    res.json(health);
+});
+
+// Route الأساسي
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
+});
+
+app.get('/admin', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
+});
+
+// معالجة الأخطاء العالمية
+app.use((error, req, res, next) => {
+    console.error('🔴 خطأ غير متوقع:', error);
+    
+    // تسجيل الخطأ
+    const errorLog = {
+        _id: uuidv4(),
+        timestamp: new Date().toISOString(),
+        method: req.method,
+        url: req.url,
+        ip: req.ip,
+        userAgent: req.get('User-Agent'),
+        error: {
+            message: error.message,
+            stack: error.stack,
+            code: error.code
+        }
+    };
+    
+    const errorLogs = readLocalFile('local-error-logs.json') || [];
+    errorLogs.push(errorLog);
+    writeLocalFile('local-error-logs.json', errorLogs);
+    
+    res.status(500).json({ 
+        success: false,
+        message: 'حدث خطأ غير متوقع في النظام',
+        reference: errorLog._id,
+        timestamp: errorLog.timestamp
+    });
+});
+
+// 404 handler
+app.use((req, res) => {
+    res.status(404).json({ 
+        success: false,
+        message: 'الصفحة غير موجودة',
+        path: req.path,
+        method: req.method
+    });
+});
+
+// إنشاء مدير افتراضي عند التشغيل
+const createAdminUser = async () => {
+    try {
+        const users = readLocalFile('local-users.json');
+        const adminExists = users.find(u => u.role === 'admin' && u.phone === '500000000');
+
+        if (!adminExists) {
+            const hashedPassword = await bcrypt.hash('Admin123!@#', 12);
+            const adminUser = {
+                _id: 'admin-' + crypto.randomBytes(8).toString('hex'),
+                fullName: 'مدير النظام',
+                phone: '500000000',
+                university: 'الإدارة العامة',
+                major: 'نظم المعلومات',
+                batch: '2024',
+                password: hashedPassword,
+                role: 'admin',
+                isActive: true,
+                createdAt: new Date().toISOString(),
+                lastLogin: null,
+                lastSeen: null,
+                isOnline: false,
+                avatar: null,
+                privacy: {
+                    hideOnlineStatus: true,
+                    hideLastSeen: true,
+                    hideStoryViews: true,
+                    profileVisibility: 'private'
+                },
+                chatSettings: {
+                    theme: 'default',
+                    background: null,
+                    fontSize: 'medium'
+                },
+                notificationSettings: {
+                    messages: true,
+                    stories: true,
+                    channels: true,
+                    system: true
+                },
+                appearance: {
+                    language: 'ar',
+                    theme: 'auto'
+                }
+            };
+
+            users.push(adminUser);
+            writeLocalFile('local-users.json', users);
+            console.log('✅ تم إنشاء حساب المدير الافتراضي');
+            console.log('📱 رقم الهاتف: 500000000');
+            console.log('🔐 كلمة المرور: Admin123!@#');
+            console.log('⚠️  يرجى تغيير كلمة المرور بعد أول دخول!');
+        } else {
+            console.log('✅ حساب المدير موجود بالفعل');
+        }
+    } catch (error) {
+        console.error('🔴 خطأ في إنشاء المدير:', error);
+    }
+};
+
+// تشغيل الخادم
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, '0.0.0.0', () => {
+    console.log('\n' + '='.repeat(60));
+    console.log('🚀 المنصة التعليمية المتطورة - نظام الإدارة المتكامل');
+    console.log('='.repeat(60));
+    console.log(`🌐 الخادم يعمل على: http://localhost:${PORT}`);
+    console.log(`⚡ النسخة: 4.0.0`);
+    console.log(`🔒 البيئة: ${process.env.NODE_ENV || 'development'}`);
+    console.log('='.repeat(60));
+    console.log('✅ الميزات المفعلة:');
+    console.log('   💬 نظام الدردشة المتطور في الوقت الحقيقي');
+    console.log('   📱 نظام الـ Stories المتكامل');
+    console.log('   🎯 نظام القنوات والمجموعات المتقدم');
+    console.log('   👑 نظام إدارة متكامل مع صلاحيات غير محدودة');
+    console.log('   💾 نظام النسخ الاحتياطي والاستعادة التلقائي');
+    console.log('   🔒 نظام أمان متقدم وحماية من الهجمات');
+    console.log('   📊 إحصائيات وتحليلات شاملة');
+    console.log('   🔔 نظام إشعارات ذكي');
+    console.log('='.repeat(60));
+    
+    // إنشاء المدير الافتراضي بعد تشغيل الخادم
+    setTimeout(createAdminUser, 2000);
+    
+    // نسخة احتياطية أولية
+    setTimeout(() => {
+        const backup = createBackup();
+        if (backup) {
+            console.log('✅ تم إنشاء النسخة الاحتياطية الأولية بنجاح');
+        }
+    }, 5000);
+});
+
+// معالجة إغلاق الخادم بشكل أنيق
+process.on('SIGINT', () => {
+    console.log('\n🛑 إيقاف الخادم...');
+    
+    // إنشاء نسخة احتياطية نهائية
+    const backup = createBackup();
+    if (backup) {
+        console.log('✅ تم إنشاء نسخة احتياطية قبل الإغلاق');
+    }
+    
+    // فصل جميع المستخدمين
+    io.emit('server_shutdown', {
+        message: 'الخادم متوقف للصيانة. سنعود قريباً.',
+        timestamp: new Date().toISOString()
+    });
+    
+    setTimeout(() => {
+        process.exit(0);
+    }, 1000);
+});
+
+process.on('uncaughtException', (error) => {
+    console.error('🔴 خطأ غير معالج:', error);
+    // إنشاء نسخة احتياطية طارئة
+    createBackup();
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('🔴 وعد مرفوض غير معالج:', reason);
+});
