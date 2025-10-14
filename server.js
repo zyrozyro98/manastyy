@@ -14,6 +14,7 @@ import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import compression from 'compression';
 import morgan from 'morgan';
+import googleSheetsService from './google-sheets.js';
 
 // حل مشكلة __dirname في ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -34,6 +35,7 @@ const PORT = process.env.PORT || 3000;
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/educational_platform';
 const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key-2024';
 const NODE_ENV = process.env.NODE_ENV || 'development';
+const SPREADSHEET_ID = process.env.SPREADSHEET_ID || '1fW18ZxsUqntEfRxIv0-srLnzg7izBgmQpqZpfqyq3UA';
 
 // وسائط الأمان والتحسين
 app.use(helmet({
@@ -383,6 +385,99 @@ const Channel = mongoose.model('Channel', channelSchema);
 const Notification = mongoose.model('Notification', notificationSchema);
 const Report = mongoose.model('Report', reportSchema);
 
+// دوال التخزين في Google Sheets
+const saveUserToSheets = async (user) => {
+    try {
+        const values = [
+            [
+                user._id.toString(),
+                user.fullName,
+                user.phone,
+                user.university,
+                user.major,
+                user.batch,
+                user.role,
+                user.isOnline ? 'نعم' : 'لا',
+                user.isActive ? 'نشط' : 'موقوف',
+                new Date(user.createdAt).toLocaleDateString('ar-EG'),
+                new Date().toLocaleString('ar-EG')
+            ]
+        ];
+
+        await googleSheetsService.appendData(SPREADSHEET_ID, 'المستخدمين!A:K', values);
+        console.log('✅ تم حفظ المستخدم في Google Sheets');
+    } catch (error) {
+        console.error('❌ خطأ في حفظ المستخدم في Sheets:', error);
+    }
+};
+
+const saveMessageToSheets = async (message) => {
+    try {
+        const values = [
+            [
+                message._id.toString(),
+                message.conversationId.toString(),
+                message.senderId.toString(),
+                message.content.substring(0, 100), // أول 100 حرف فقط
+                message.messageType,
+                new Date(message.createdAt).toLocaleString('ar-EG'),
+                message.readBy.length,
+                'نشط'
+            ]
+        ];
+
+        await googleSheetsService.appendData(SPREADSHEET_ID, 'الرسائل!A:H', values);
+        console.log('✅ تم حفظ الرسالة في Google Sheets');
+    } catch (error) {
+        console.error('❌ خطأ في حفظ الرسالة في Sheets:', error);
+    }
+};
+
+const saveStoryToSheets = async (story) => {
+    try {
+        const values = [
+            [
+                story._id.toString(),
+                story.userId.toString(),
+                story.mediaType,
+                story.caption || 'بدون وصف',
+                new Date(story.createdAt).toLocaleString('ar-EG'),
+                new Date(story.expiresAt).toLocaleString('ar-EG'),
+                story.views.length,
+                story.reactions.length,
+                'نشط'
+            ]
+        ];
+
+        await googleSheetsService.appendData(SPREADSHEET_ID, 'الستوريات!A:I', values);
+        console.log('✅ تم حفظ الستوري في Google Sheets');
+    } catch (error) {
+        console.error('❌ خطأ في حفظ الستوري في Sheets:', error);
+    }
+};
+
+const saveChannelToSheets = async (channel) => {
+    try {
+        const values = [
+            [
+                channel._id.toString(),
+                channel.name,
+                channel.type,
+                channel.creatorId.toString(),
+                channel.members.length,
+                channel.isPublic ? 'عام' : 'خاص',
+                new Date(channel.createdAt).toLocaleString('ar-EG'),
+                'نشط'
+            ]
+        ];
+
+        await googleSheetsService.appendData(SPREADSHEET_ID, 'القنوات!A:H', values);
+        console.log('✅ تم حفظ القناة في Google Sheets');
+    } catch (error) {
+        console.error('❌ خطأ في حفظ القناة في Sheets:', error);
+    }
+};
+
 // middleware المصادقة المتقدم
 const authenticateToken = async (req, res, next) => {
     try {
@@ -544,7 +639,6 @@ const sendNotification = async (userId, type, title, message, data = null, actio
 
 const auditLog = async (action, userId, targetType, targetId, details = {}) => {
     try {
-        // يمكن إضافة سجل التدقيق هنا
         console.log(`📋 Audit Log: ${action} by ${userId} on ${targetType} ${targetId}`, details);
     } catch (error) {
         console.error('خطأ في تسجيل التدقيق:', error);
@@ -583,6 +677,10 @@ async function createDefaultAdmin() {
                 email: 'admin@eduplatform.com'
             });
             await admin.save();
+            
+            // حفظ المدير في Google Sheets
+            await saveUserToSheets(admin);
+            
             console.log('👑 تم إنشاء حساب المدير الافتراضي');
         }
     } catch (error) {
@@ -686,11 +784,6 @@ io.on('connection', (socket) => {
                 return;
             }
 
-            // التحقق من وضع البطء
-            if (conversation.settings.slowMode && conversation.settings.slowModeDelay > 0) {
-                // يمكن إضافة منطق التحقق من البطء هنا
-            }
-
             // إنشاء الرسالة
             const message = new Message({
                 conversationId,
@@ -702,6 +795,9 @@ io.on('connection', (socket) => {
             });
 
             await message.save();
+
+            // حفظ في Google Sheets
+            await saveMessageToSheets(message);
 
             // تحديث المحادثة
             conversation.lastMessage = message._id;
@@ -901,7 +997,7 @@ app.get('/', (req, res) => {
     res.json({ 
         success: true, 
         message: 'مرحباً بك في المنصة التعليمية المتطورة',
-        version: '4.1.0',
+        version: '4.2.0',
         environment: NODE_ENV,
         timestamp: new Date().toISOString(),
         features: [
@@ -910,7 +1006,8 @@ app.get('/', (req, res) => {
             'قنوات متخصصة',
             'إدارة متقدمة',
             'نظام إشعارات',
-            'تحليلات متقدمة'
+            'تحليلات متقدمة',
+            'تخزين في Google Sheets'
         ]
     });
 });
@@ -984,6 +1081,9 @@ app.post('/api/auth/register', async (req, res) => {
         });
 
         await user.save();
+
+        // حفظ في Google Sheets
+        await saveUserToSheets(user);
 
         // إنشاء tokens
         const token = generateToken(user._id);
@@ -1152,6 +1252,83 @@ app.post('/api/auth/refresh', async (req, res) => {
             success: false, 
             message: 'Refresh token غير صالح',
             code: 'INVALID_REFRESH_TOKEN'
+        });
+    }
+});
+
+// مسارات Google Sheets
+app.get('/api/sheets/stats', authenticateToken, async (req, res) => {
+    try {
+        const [usersData, messagesData, storiesData] = await Promise.all([
+            googleSheetsService.readData(SPREADSHEET_ID, 'المستخدمين!A:K'),
+            googleSheetsService.readData(SPREADSHEET_ID, 'الرسائل!A:H'),
+            googleSheetsService.readData(SPREADSHEET_ID, 'الستوريات!A:I')
+        ]);
+
+        // إزالة العناوين
+        const usersCount = Math.max(0, (usersData?.length || 1) - 1);
+        const messagesCount = Math.max(0, (messagesData?.length || 1) - 1);
+        const storiesCount = Math.max(0, (storiesData?.length || 1) - 1);
+
+        res.json({
+            success: true,
+            stats: {
+                totalUsers: usersCount,
+                totalMessages: messagesCount,
+                totalStories: storiesCount,
+                lastUpdate: new Date().toLocaleString('ar-EG')
+            }
+        });
+
+    } catch (error) {
+        console.error('خطأ في جلب إحصائيات الـ Sheets:', error);
+        res.status(500).json({
+            success: false,
+            message: 'حدث خطأ في جلب الإحصائيات'
+        });
+    }
+});
+
+app.post('/api/export/all-data', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const users = await User.find().select('-password -security');
+        const messages = await Message.find().limit(1000).populate('senderId', 'fullName');
+        const stories = await Story.find().limit(1000).populate('userId', 'fullName');
+        const channels = await Channel.find().limit(500).populate('creatorId', 'fullName');
+
+        // تصدير المستخدمين
+        const userValues = users.map(user => [
+            user._id.toString(),
+            user.fullName,
+            user.phone,
+            user.university,
+            user.major,
+            user.batch,
+            user.role,
+            user.isOnline ? 'نعم' : 'لا',
+            user.isActive ? 'نشط' : 'موقوف',
+            new Date(user.createdAt).toLocaleDateString('ar-EG')
+        ]);
+
+        // إضافة عناوين الأعمدة
+        userValues.unshift([
+            'ID', 'الاسم', 'الهاتف', 'الجامعة', 'التخصص', 'الدفعة', 
+            'الدور', 'متصل', 'الحالة', 'تاريخ التسجيل'
+        ]);
+
+        await googleSheetsService.updateData(SPREADSHEET_ID, 'تصدير_المستخدمين!A:J', userValues);
+
+        res.json({
+            success: true,
+            message: 'تم تصدير جميع البيانات بنجاح',
+            sheetUrl: `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/edit`
+        });
+
+    } catch (error) {
+        console.error('خطأ في تصدير البيانات:', error);
+        res.status(500).json({
+            success: false,
+            message: 'حدث خطأ أثناء التصدير'
         });
     }
 });
@@ -1518,6 +1695,9 @@ app.post('/api/stories', authenticateToken, upload.single('story'), async (req, 
 
         await story.save();
 
+        // حفظ في Google Sheets
+        await saveStoryToSheets(story);
+
         // تحديث إحصائيات المستخدم
         await User.findByIdAndUpdate(req.user._id, {
             $inc: { 'stats.storiesPosted': 1 }
@@ -1548,6 +1728,99 @@ app.post('/api/stories', authenticateToken, upload.single('story'), async (req, 
             success: false, 
             message: 'حدث خطأ في الخادم',
             code: 'STORY_CREATION_ERROR'
+        });
+    }
+});
+
+// مسارات القنوات
+app.post('/api/channels', authenticateToken, upload.single('channelAvatar'), async (req, res) => {
+    try {
+        const { name, description, type, isPublic = true, topics = [] } = req.body;
+
+        if (!name || !type) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'الاسم والنوع مطلوبان',
+                code: 'MISSING_FIELDS'
+            });
+        }
+
+        const channel = new Channel({
+            name,
+            description,
+            type,
+            isPublic: isPublic === 'true',
+            creatorId: req.user._id,
+            members: [req.user._id],
+            admins: [req.user._id],
+            topics: Array.isArray(topics) ? topics : topics.split(',').map(topic => topic.trim())
+        });
+
+        if (req.file) {
+            channel.avatar = `/uploads/channels/${req.file.filename}`;
+        }
+
+        await channel.save();
+
+        // حفظ في Google Sheets
+        await saveChannelToSheets(channel);
+
+        // تسجيل التدقيق
+        await auditLog('CHANNEL_CREATED', req.user._id, 'channel', channel._id, {
+            type,
+            isPublic: channel.isPublic
+        });
+
+        res.status(201).json({
+            success: true,
+            message: 'تم إنشاء القناة بنجاح',
+            channel
+        });
+
+    } catch (error) {
+        console.error('خطأ في إنشاء القناة:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'حدث خطأ في الخادم',
+            code: 'CHANNEL_CREATION_ERROR'
+        });
+    }
+});
+
+app.get('/api/channels', authenticateToken, async (req, res) => {
+    try {
+        const { limit = 20, type, search = '' } = req.query;
+
+        const query = { isActive: true };
+        
+        if (type) {
+            query.type = type;
+        }
+
+        if (search) {
+            query.$or = [
+                { name: { $regex: search, $options: 'i' } },
+                { description: { $regex: search, $options: 'i' } }
+            ];
+        }
+
+        const channels = await Channel.find(query)
+            .populate('creatorId', 'fullName avatar')
+            .limit(parseInt(limit))
+            .sort({ createdAt: -1 });
+
+        res.json({
+            success: true,
+            channels,
+            total: channels.length
+        });
+
+    } catch (error) {
+        console.error('خطأ في جلب القنوات:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'حدث خطأ في الخادم',
+            code: 'CHANNELS_FETCH_ERROR'
         });
     }
 });
@@ -1690,6 +1963,7 @@ server.listen(PORT, () => {
     console.log(`📧 بيئة: ${NODE_ENV}`);
     console.log(`🔗 الرابط: http://localhost:${PORT}`);
     console.log(`👥 مستخدمين متصلين: ${connectedUsers.size}`);
+    console.log(`📊 Google Sheets ID: ${SPREADSHEET_ID}`);
 });
 
 // تنظيف القصص المنتهية كل ساعة
