@@ -44,7 +44,7 @@ const io = new Server(server, {
 
 // الثوابت والإعدادات المتقدمة
 const PORT = process.env.PORT || 3000;
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/educational_platform';
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://zyrozyro98:770088254@cluster0.ighdvba.mongodb.net/';
 const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secure-jwt-secret-key-2024';
 const NODE_ENV = process.env.NODE_ENV || 'development';
 const UPLOADS_DIR = path.join(__dirname, 'uploads');
