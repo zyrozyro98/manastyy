@@ -1,649 +1,1182 @@
-import express from 'express';
-import http from 'http';
-import { Server } from 'socket.io';
-import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
-import multer from 'multer';
-import path from 'path';
-import fs from 'fs';
-import cors from 'cors';
-import { v4 as uuidv4 } from 'uuid';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const express = require('express');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const multer = require('multer');
+const cors = require('cors');
+const path = require('path');
+const fs = require('fs');
+const crypto = require('crypto');
+const http = require('http');
+const socketIo = require('socket.io');
+const sharp = require('sharp');
+const { v4: uuidv4 } = require('uuid');
+require('dotenv').config();
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, {
+const io = socketIo(server, {
   cors: {
-    origin: "*",
-    methods: ["GET", "POST"]
+    origin: process.env.ALLOWED_ORIGINS || "*",
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    credentials: true
   }
-});
-
-// الإعدادات
-const PORT = process.env.PORT || 3000;
-const JWT_SECRET = process.env.JWT_SECRET || 'educational-platform-secret-2024';
-const DATA_FILE = path.join(__dirname, 'data.json');
-const UPLOADS_DIR = path.join(__dirname, 'uploads');
-
-// إنشاء المجلدات والملفات اللازمة
-if (!fs.existsSync(UPLOADS_DIR)) {
-  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
-  fs.mkdirSync(path.join(UPLOADS_DIR, 'stories'), { recursive: true });
-  fs.mkdirSync(path.join(UPLOADS_DIR, 'attachments'), { recursive: true });
-  fs.mkdirSync(path.join(UPLOADS_DIR, 'avatars'), { recursive: true });
-}
-
-// نظام التخزين المبسط
-class SimpleDB {
-  constructor() {
-    this.data = this.loadData();
-    this.ensureDefaultData();
-  }
-
-  loadData() {
-    try {
-      if (fs.existsSync(DATA_FILE)) {
-        return JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
-      }
-    } catch (error) {
-      console.log('⚠️  إنشاء ملف بيانات جديد');
-    }
-    return { users: [], messages: [], stories: [] };
-  }
-
-  saveData() {
-    try {
-      fs.writeFileSync(DATA_FILE, JSON.stringify(this.data, null, 2));
-    } catch (error) {
-      console.error('❌ خطأ في حفظ البيانات:', error);
-    }
-  }
-
-  ensureDefaultData() {
-    if (this.data.users.length === 0) {
-      // إنشاء مستخدم مسؤول افتراضي
-      const adminPassword = bcrypt.hashSync('admin123', 12);
-      this.data.users.push({
-        _id: '1',
-        username: 'admin',
-        phone: '0512345678',
-        password: adminPassword,
-        role: 'admin',
-        avatar: '',
-        isOnline: false,
-        createdAt: new Date().toISOString()
-      });
-      this.saveData();
-      console.log('👤 تم إنشاء المستخدم الافتراضي: admin / admin123');
-    }
-  }
-
-  // عمليات المستخدمين
-  createUser(userData) {
-    const user = {
-      _id: uuidv4(),
-      ...userData,
-      createdAt: new Date().toISOString()
-    };
-    this.data.users.push(user);
-    this.saveData();
-    return user;
-  }
-
-  findUserByPhone(phone) {
-    return this.data.users.find(user => user.phone === phone);
-  }
-
-  findUserById(id) {
-    return this.data.users.find(user => user._id === id);
-  }
-
-  updateUser(id, updates) {
-    const userIndex = this.data.users.findIndex(user => user._id === id);
-    if (userIndex !== -1) {
-      this.data.users[userIndex] = { ...this.data.users[userIndex], ...updates };
-      this.saveData();
-      return this.data.users[userIndex];
-    }
-    return null;
-  }
-
-  // عمليات الرسائل
-  createMessage(messageData) {
-    const message = {
-      _id: uuidv4(),
-      ...messageData,
-      timestamp: new Date().toISOString(),
-      isRead: false
-    };
-    this.data.messages.push(message);
-    this.saveData();
-    return message;
-  }
-
-  findMessagesBetweenUsers(user1Id, user2Id) {
-    return this.data.messages.filter(message =>
-      (message.senderId === user1Id && message.receiverId === user2Id) ||
-      (message.senderId === user2Id && message.receiverId === user1Id)
-    ).sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-  }
-
-  // عمليات الـ Stories
-  createStory(storyData) {
-    const story = {
-      _id: uuidv4(),
-      ...storyData,
-      timestamp: new Date().toISOString(),
-      views: [],
-      saves: []
-    };
-    this.data.stories.push(story);
-    this.saveData();
-    return story;
-  }
-
-  findActiveStories() {
-    const now = new Date();
-    return this.data.stories.filter(story => 
-      new Date(story.expiresAt) > now
-    ).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-  }
-
-  // الإحصائيات
-  getStats() {
-    const now = new Date();
-    return {
-      totalUsers: this.data.users.length,
-      totalMessages: this.data.messages.length,
-      activeStories: this.data.stories.filter(story => 
-        new Date(story.expiresAt) > now
-      ).length,
-      onlineUsers: this.data.users.filter(user => user.isOnline).length
-    };
-  }
-
-  // تنظيف البيانات القديمة
-  cleanup() {
-    const now = new Date();
-    const dayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-    
-    // تنظيف الـ Stories المنتهية
-    this.data.stories = this.data.stories.filter(story => 
-      new Date(story.expiresAt) > dayAgo
-    );
-    
-    // تنظيف الرسائل القديمة (احتفظ بآخر 1000 رسالة)
-    if (this.data.messages.length > 1000) {
-      this.data.messages = this.data.messages.slice(-1000);
-    }
-    
-    this.saveData();
-  }
-}
-
-// إنشاء قاعدة البيانات
-const db = new SimpleDB();
-
-// تنظيف البيانات كل ساعة
-setInterval(() => db.cleanup(), 60 * 60 * 1000);
-
-// إعدادات Multer
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const type = file.fieldname === 'storyMedia' ? 'stories' : 'attachments';
-    const dir = path.join(UPLOADS_DIR, type);
-    cb(null, dir);
-  },
-  filename: (req, file, cb) => {
-    const uniqueName = `${Date.now()}-${Math.round(Math.random() * 1E9)}${path.extname(file.originalname)}`;
-    cb(null, uniqueName);
-  }
-});
-
-const upload = multer({
-  storage: storage,
-  limits: { fileSize: 50 * 1024 * 1024 }
 });
 
 // Middleware
-app.use(cors());
-app.use(express.json());
-app.use('/uploads', express.static(UPLOADS_DIR));
-app.use(express.static('public'));
+app.use(cors({
+    origin: process.env.ALLOWED_ORIGINS || "*",
+    credentials: true
+}));
+app.use(express.json({ limit: '100mb' }));
+app.use(express.urlencoded({ extended: true, limit: '100mb' }));
+app.use(express.static(__dirname));
 
-// Middleware المصادقة
-const authenticateToken = (req, res, next) => {
-  try {
-    const token = req.headers.authorization?.split(' ')[1];
-    if (!token) {
-      return res.status(401).json({ message: 'رمز الوصول مطلوب' });
-    }
+// معدلات الأمان
+app.disable('x-powered-by');
 
-    const decoded = jwt.verify(token, JWT_SECRET);
-    const user = db.findUserById(decoded.userId);
+// تهيئة الملفات والمجلدات
+function initializeApp() {
+    const files = [
+        'local-users.json', 
+        'local-messages.json', 
+        'local-stories.json', 
+        'local-channels.json', 
+        'local-backups.json', 
+        'local-settings.json',
+        'local-notifications.json'
+    ];
     
-    if (!user) {
-      return res.status(401).json({ message: 'مستخدم غير موجود' });
-    }
-
-    req.user = user;
-    next();
-  } catch (error) {
-    return res.status(403).json({ message: 'رمز وصول غير صالح' });
-  }
-};
-
-// وظائف مساعدة
-const formatUser = (user) => {
-  const { password, ...userWithoutPassword } = user;
-  return userWithoutPassword;
-};
-
-// ========== المسارات ==========
-
-// 📍 المسار الأساسي
-app.get('/', (req, res) => {
-  res.json({
-    message: '🚀 منصة التعليمية تعمل بنجاح!',
-    version: '2.0.0',
-    storage: 'ملف بيانات محلي',
-    endpoints: {
-      'POST /api/auth/register': 'تسجيل مستخدم جديد',
-      'POST /api/auth/login': 'تسجيل الدخول',
-      'GET /api/user/profile': 'الملف الشخصي (يتطلب مصادقة)',
-      'GET /api/messages/:userId': 'جلب الرسائل (يتطلب مصادقة)',
-      'POST /api/messages/send': 'إرسال رسالة (يتطلب مصادقة)',
-      'GET /api/stories': 'جلب الـ Stories (يتطلب مصادقة)',
-      'POST /api/stories/upload': 'رفع Story (يتطلب مصادقة)',
-      'GET /api/stats': 'إحصائيات المنصة'
-    }
-  });
-});
-
-// 🔐 مسارات المصادقة
-app.post('/api/auth/register', async (req, res) => {
-  try {
-    const { username, phone, password } = req.body;
-
-    if (!username || !phone || !password) {
-      return res.status(400).json({ message: 'جميع الحقول مطلوبة' });
-    }
-
-    if (password.length < 6) {
-      return res.status(400).json({ message: 'كلمة المرور يجب أن تكون 6 أحرف على الأقل' });
-    }
-
-    const existingUser = db.findUserByPhone(phone);
-    if (existingUser) {
-      return res.status(400).json({ message: 'رقم الهاتف موجود مسبقاً' });
-    }
-
-    const hashedPassword = await bcrypt.hash(password, 12);
-
-    const user = db.createUser({
-      username,
-      phone,
-      password: hashedPassword,
-      role: 'student',
-      avatar: '',
-      isOnline: false
-    });
-
-    const token = jwt.sign(
-      { userId: user._id, username: user.username },
-      JWT_SECRET,
-      { expiresIn: '30d' }
-    );
-
-    res.status(201).json({
-      success: true,
-      message: 'تم إنشاء الحساب بنجاح 🎉',
-      token,
-      user: formatUser(user)
-    });
-
-  } catch (error) {
-    console.error('❌ خطأ في التسجيل:', error);
-    res.status(500).json({ 
-      success: false,
-      message: 'خطأ في الخادم' 
-    });
-  }
-});
-
-app.post('/api/auth/login', async (req, res) => {
-  try {
-    const { phone, password } = req.body;
-
-    if (!phone || !password) {
-      return res.status(400).json({ message: 'رقم الهاتف وكلمة المرور مطلوبان' });
-    }
-
-    const user = db.findUserByPhone(phone);
-    if (!user) {
-      return res.status(400).json({ message: 'رقم الهاتف أو كلمة المرور غير صحيحة' });
-    }
-
-    const isValidPassword = await bcrypt.compare(password, user.password);
-    if (!isValidPassword) {
-      return res.status(400).json({ message: 'رقم الهاتف أو كلمة المرور غير صحيحة' });
-    }
-
-    // تحديث حالة المستخدم
-    db.updateUser(user._id, {
-      isOnline: true,
-      lastSeen: new Date().toISOString()
-    });
-
-    const token = jwt.sign(
-      { userId: user._id, username: user.username },
-      JWT_SECRET,
-      { expiresIn: '30d' }
-    );
-
-    res.json({
-      success: true,
-      message: `مرحباً بعودتك ${user.username}! 👋`,
-      token,
-      user: formatUser(user)
-    });
-
-  } catch (error) {
-    console.error('❌ خطأ في تسجيل الدخول:', error);
-    res.status(500).json({ 
-      success: false,
-      message: 'خطأ في الخادم' 
-    });
-  }
-});
-
-// 👤 مسارات المستخدم
-app.get('/api/user/profile', authenticateToken, (req, res) => {
-  res.json({
-    success: true,
-    user: formatUser(req.user)
-  });
-});
-
-app.get('/api/user/stats', authenticateToken, (req, res) => {
-  const userMessages = db.data.messages.filter(
-    msg => msg.receiverId === req.user._id && !msg.isRead
-  ).length;
-
-  res.json({
-    success: true,
-    stats: {
-      unreadMessages: userMessages,
-      newMaterials: Math.floor(Math.random() * 5),
-      pendingTasks: Math.floor(Math.random() * 3),
-      upcomingEvents: Math.floor(Math.random() * 2)
-    }
-  });
-});
-
-// 💬 مسارات الرسائل
-app.get('/api/messages/:userId', authenticateToken, (req, res) => {
-  try {
-    const messages = db.findMessagesBetweenUsers(req.user._id, req.params.userId);
-
-    // إضافة معلومات المرسل والمستقبل
-    const formattedMessages = messages.map(message => {
-      const sender = db.findUserById(message.senderId);
-      const receiver = db.findUserById(message.receiverId);
-      
-      return {
-        ...message,
-        senderUsername: sender?.username || 'مستخدم',
-        receiverUsername: receiver?.username || 'مستخدم',
-        senderAvatar: sender?.avatar || ''
-      };
-    });
-
-    res.json({
-      success: true,
-      messages: formattedMessages
-    });
-
-  } catch (error) {
-    console.error('❌ خطأ في جلب الرسائل:', error);
-    res.status(500).json({ 
-      success: false,
-      message: 'خطأ في الخادم' 
-    });
-  }
-});
-
-app.post('/api/messages/send', authenticateToken, upload.array('attachments', 5), (req, res) => {
-  try {
-    const { receiverId, content } = req.body;
+    const folders = [
+        'uploads', 'stories', 'channels', 'avatars', 
+        'backups', 'chat-backgrounds', 'temp',
+        'group-avatars', 'story-highlights'
+    ];
     
-    if (!receiverId) {
-      return res.status(400).json({ message: 'المستلم مطلوب' });
-    }
-
-    const receiver = db.findUserById(receiverId);
-    if (!receiver) {
-      return res.status(400).json({ message: 'المستخدم المستقبل غير موجود' });
-    }
-
-    const attachments = [];
-    if (req.files && req.files.length > 0) {
-      req.files.forEach(file => {
-        attachments.push({
-          filename: file.filename,
-          originalName: file.originalname,
-          mimetype: file.mimetype,
-          size: file.size,
-          url: `/uploads/attachments/${file.filename}`
-        });
-      });
-    }
-
-    const message = db.createMessage({
-      senderId: req.user._id,
-      receiverId,
-      content: content || '',
-      attachments,
-      messageType: attachments.length > 0 ? 'file' : 'text'
-    });
-
-    // إرسال عبر السوكيت
-    io.to(receiverId).emit('new_message', {
-      ...message,
-      senderUsername: req.user.username,
-      senderAvatar: req.user.avatar
-    });
-
-    res.status(201).json({
-      success: true,
-      message: 'تم إرسال الرسالة بنجاح 📨',
-      data: message
-    });
-
-  } catch (error) {
-    console.error('❌ خطأ في إرسال الرسالة:', error);
-    res.status(500).json({ 
-      success: false,
-      message: 'خطأ في الخادم' 
-    });
-  }
-});
-
-// 📸 مسارات الـ Stories
-app.get('/api/stories', authenticateToken, (req, res) => {
-  try {
-    const stories = db.findActiveStories();
-
-    // تجميع الـ Stories بالمستخدم
-    const storiesByUser = {};
-    stories.forEach(story => {
-      const user = db.findUserById(story.userId);
-      if (user) {
-        const userId = user._id;
-        if (!storiesByUser[userId]) {
-          storiesByUser[userId] = {
-            user: formatUser(user),
-            stories: []
-          };
+    files.forEach(file => {
+        if (!fs.existsSync(file)) {
+            fs.writeFileSync(file, '[]');
+            console.log(`✅ تم إنشاء ${file}`);
         }
-        
-        // إضافة معلومات المشاهدات والحفظ
-        const storyWithDetails = {
-          ...story,
-          viewCount: story.views.length,
-          saveCount: story.saves.length,
-          hasViewed: story.views.some(view => view.userId === req.user._id),
-          hasSaved: story.saves.some(save => save.userId === req.user._id)
+    });
+    
+    folders.forEach(folder => {
+        if (!fs.existsSync(folder)) {
+            fs.mkdirSync(folder, { recursive: true });
+            console.log(`✅ تم إنشاء مجلد ${folder}`);
+        }
+    });
+
+    // إنشاء الإعدادات الافتراضية
+    const settings = readLocalFile('local-settings.json');
+    if (settings.length === 0) {
+        const defaultSettings = {
+            _id: uuidv4(),
+            appName: "المنصة التعليمية المتطورة",
+            theme: "light",
+            maxFileSize: 50,
+            storyDuration: 24,
+            backupInterval: 24,
+            maxUsers: 1000,
+            allowRegistrations: true,
+            maintenanceMode: false,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+        };
+        writeLocalFile('local-settings.json', [defaultSettings]);
+    }
+}
+
+initializeApp();
+
+// مفتاح JWT آمن
+const JWT_SECRET = process.env.JWT_SECRET || crypto.randomBytes(64).toString('hex');
+
+// دوال مساعدة للتخزين المحلي
+function readLocalFile(filename) {
+    try {
+        const data = fs.readFileSync(filename, 'utf8');
+        return JSON.parse(data);
+    } catch (error) {
+        console.error(`Error reading ${filename}:`, error);
+        return [];
+    }
+}
+
+function writeLocalFile(filename, data) {
+    try {
+        fs.writeFileSync(filename, JSON.stringify(data, null, 2));
+        return true;
+    } catch (error) {
+        console.error('خطأ في الكتابة:', error);
+        return false;
+    }
+}
+
+// نظام النسخ الاحتياطي المتقدم
+function createBackup() {
+    try {
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const backupData = {
+            id: uuidv4(),
+            timestamp: new Date().toISOString(),
+            users: readLocalFile('local-users.json'),
+            messages: readLocalFile('local-messages.json'),
+            stories: readLocalFile('local-stories.json'),
+            channels: readLocalFile('local-channels.json'),
+            settings: readLocalFile('local-settings.json'),
+            notifications: readLocalFile('local-notifications.json'),
+            size: 0
         };
 
-        storiesByUser[userId].stories.push(storyWithDetails);
-      }
-    });
+        // حساب الحجم
+        backupData.size = JSON.stringify(backupData).length;
 
-    res.json({
-      success: true,
-      stories: Object.values(storiesByUser)
-    });
+        const backups = readLocalFile('local-backups.json');
+        backups.push(backupData);
+        
+        // حفظ فقط آخر 20 نسخة احتياطية
+        if (backups.length > 20) {
+            const oldBackups = backups.splice(0, backups.length - 20);
+            // حذف الملفات القديمة
+            oldBackups.forEach(backup => {
+                try {
+                    const oldFile = `backups/backup-${backup.timestamp.replace(/[:.]/g, '-')}.json`;
+                    if (fs.existsSync(oldFile)) {
+                        fs.unlinkSync(oldFile);
+                    }
+                } catch (error) {
+                    console.error('خطأ في حذف النسخة القديمة:', error);
+                }
+            });
+        }
+        
+        writeLocalFile('local-backups.json', backups);
+        
+        // حفظ نسخة في ملف منفصل
+        const backupFilename = `backups/backup-${timestamp}.json`;
+        fs.writeFileSync(backupFilename, JSON.stringify(backupData, null, 2));
+        
+        console.log(`✅ تم إنشاء نسخة احتياطية: ${backupFilename}`);
+        
+        // إرسال إشعار للمدير
+        const adminUsers = readLocalFile('local-users.json').filter(u => u.role === 'admin');
+        adminUsers.forEach(admin => {
+            const adminSocket = userSockets.get(admin._id);
+            if (adminSocket) {
+                io.to(adminSocket).emit('backup_created', {
+                    backupId: backupData.id,
+                    timestamp: backupData.timestamp,
+                    size: backupData.size
+                });
+            }
+        });
+        
+        return backupData;
+    } catch (error) {
+        console.error('خطأ في النسخ الاحتياطي:', error);
+        return null;
+    }
+}
 
-  } catch (error) {
-    console.error('❌ خطأ في جلب الـ Stories:', error);
-    res.status(500).json({ 
-      success: false,
-      message: 'خطأ في الخادم' 
-    });
-  }
+// جدولة النسخ الاحتياطي التلقائي
+setInterval(() => {
+    createBackup();
+}, 24 * 60 * 60 * 1000);
+
+// نظام التخزين المتقدم مع تحسين الأداء
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        let folder = 'uploads/';
+        if (file.fieldname === 'story') folder = 'stories/';
+        if (file.fieldname === 'avatar') folder = 'avatars/';
+        if (file.fieldname === 'channel') folder = 'channels/';
+        if (file.fieldname === 'background') folder = 'chat-backgrounds/';
+        if (file.fieldname === 'group_avatar') folder = 'group-avatars/';
+        if (file.fieldname === 'highlight') folder = 'story-highlights/';
+        cb(null, folder);
+    },
+    filename: (req, file, cb) => {
+        const uniqueSuffix = crypto.randomBytes(16).toString('hex');
+        const extension = path.extname(file.originalname);
+        const nameWithoutExt = path.basename(file.originalname, extension);
+        const cleanName = nameWithoutExt.replace(/[^a-zA-Z0-9-\u0600-\u06FF]/g, '-');
+        cb(null, `${uniqueSuffix}-${cleanName}${extension}`);
+    }
 });
 
-app.post('/api/stories/upload', authenticateToken, upload.single('media'), (req, res) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({ message: 'الملف مطلوب' });
+const upload = multer({
+    storage: storage,
+    limits: {
+        fileSize: 50 * 1024 * 1024, // 50MB
+        files: 10,
+        fields: 50
+    },
+    fileFilter: (req, file, cb) => {
+        const allowedMimes = [
+            'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp',
+            'video/mp4', 'video/mpeg', 'video/ogg', 'video/webm', 'video/quicktime'
+        ];
+        
+        if (allowedMimes.includes(file.mimetype)) {
+            cb(null, true);
+        } else {
+            cb(new Error('نوع الملف غير مدعوم. يسمح بالصور والفيديوهات فقط.'), false);
+        }
+    }
+});
+
+// Middleware الأمان المتقدم
+const authenticateToken = (req, res, next) => {
+    const authHeader = req.headers.authorization;
+    const token = authHeader && authHeader.split(' ')[1];
+    
+    if (!token) {
+        return res.status(401).json({ 
+            success: false,
+            message: 'الوصول غير مصرح. يلزم توفر رمز الدخول.' 
+        });
     }
 
-    const mediaType = req.file.mimetype.startsWith('image/') ? 'image' : 'video';
-    const mediaUrl = `/uploads/stories/${req.file.filename}`;
-
-    const story = db.createStory({
-      userId: req.user._id,
-      mediaUrl,
-      mediaType,
-      caption: req.body.caption || '',
-      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // 24 ساعة
+    jwt.verify(token, JWT_SECRET, (err, user) => {
+        if (err) {
+            return res.status(403).json({ 
+                success: false,
+                message: 'رمز الدخول غير صالح أو منتهي الصلاحية.' 
+            });
+        }
+        
+        // التحقق من أن المستخدم لا يزال نشطاً
+        const users = readLocalFile('local-users.json');
+        const currentUser = users.find(u => u._id === user._id && u.isActive !== false);
+        
+        if (!currentUser) {
+            return res.status(403).json({ 
+                success: false,
+                message: 'الحساب غير نشط أو غير موجود.' 
+            });
+        }
+        
+        req.user = { ...user, ...currentUser };
+        next();
     });
+};
 
-    // إرسال الإشعار عبر السوكيت
-    io.emit('new_story', {
-      ...story,
-      user: formatUser(req.user)
-    });
+const requireAdmin = (req, res, next) => {
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({ 
+            success: false,
+            message: 'صلاحيات غير كافية. هذه الوظيفة للمديرين فقط.' 
+        });
+    }
+    next();
+};
 
-    res.status(201).json({
-      success: true,
-      message: 'تم نشر الـ Story بنجاح 🎊',
-      story: {
-        ...story,
-        user: formatUser(req.user)
-      }
-    });
+const requireModerator = (req, res, next) => {
+    if (req.user.role !== 'admin' && req.user.role !== 'moderator') {
+        return res.status(403).json({ 
+            success: false,
+            message: 'صلاحيات غير كافية.' 
+        });
+    }
+    next();
+};
 
-  } catch (error) {
-    console.error('❌ خطأ في رفع الـ Story:', error);
-    res.status(500).json({ 
-      success: false,
-      message: 'خطأ في الخادم' 
-    });
-  }
-});
+// نظام WebSocket المتقدم للدردشة في الوقت الحقيقي
+const connectedUsers = new Map();
+const userSockets = new Map();
+const typingUsers = new Map();
+const userPresence = new Map();
+const activeCalls = new Map();
 
-// 📊 مسارات الإحصائيات
-app.get('/api/stats', (req, res) => {
-  try {
-    const stats = db.getStats();
-    res.json({
-      success: true,
-      ...stats,
-      message: 'إحصائيات المنصة 📈'
-    });
-  } catch (error) {
-    res.json({
-      success: true,
-      totalUsers: 1,
-      totalMessages: 0,
-      activeStories: 0,
-      onlineUsers: 0,
-      message: 'إحصائيات أولية'
-    });
-  }
-});
-
-// 🔌 نظام السوكيت
 io.on('connection', (socket) => {
-  console.log('🔌 مستخدم متصل:', socket.id);
+    console.log('👤 مستخدم متصل:', socket.id);
 
-  socket.on('authenticate', (userData) => {
-    const user = db.findUserById(userData._id);
-    if (user) {
-      socket.userId = user._id;
-      socket.join(socket.userId);
-      
-      db.updateUser(user._id, {
-        isOnline: true,
-        lastSeen: new Date().toISOString()
-      });
-      
-      io.emit('user_online', { 
-        userId: user._id,
-        username: user.username 
-      });
-      
-      console.log(`✅ ${user.username} قام بالمصادقة`);
-    }
-  });
+    socket.on('authenticate', (userData) => {
+        if (!userData || !userData._id) {
+            socket.emit('authentication_failed', { message: 'بيانات المستخدم غير صالحة' });
+            return;
+        }
 
-  socket.on('typing_start', (data) => {
-    socket.to(data.receiverId).emit('user_typing', {
-      userId: socket.userId,
-      username: data.username
-    });
-  });
-
-  socket.on('typing_stop', (data) => {
-    socket.to(data.receiverId).emit('user_stop_typing', {
-      userId: socket.userId
-    });
-  });
-
-  socket.on('disconnect', () => {
-    if (socket.userId) {
-      const user = db.findUserById(socket.userId);
-      if (user) {
-        db.updateUser(user._id, {
-          isOnline: false,
-          lastSeen: new Date().toISOString()
+        connectedUsers.set(socket.id, userData);
+        userSockets.set(userData._id, socket.id);
+        userPresence.set(userData._id, {
+            status: 'online',
+            lastSeen: new Date().toISOString(),
+            device: userData.device || 'web'
         });
         
-        io.emit('user_offline', { 
-          userId: user._id,
-          username: user.username 
+        updateUserOnlineStatus(userData._id, true);
+        
+        // إعلام الآخرين بتواجد المستخدم
+        socket.broadcast.emit('user_online', {
+            userId: userData._id,
+            fullName: userData.fullName,
+            status: 'online'
         });
         
-        console.log(`❌ ${user.username} انقطع`);
-      }
-    }
-  });
+        console.log(`✅ المستخدم ${userData.fullName} تم توثيقه`);
+        
+        // إرسال الإشعارات غير المقروءة
+        sendUnreadNotifications(userData._id, socket);
+    });
+
+    // إرسال رسالة فورية
+    socket.on('send_message', async (data) => {
+        try {
+            const user = connectedUsers.get(socket.id);
+            if (!user) {
+                socket.emit('message_error', { 
+                    success: false,
+                    error: 'المستخدم غير معتمد' 
+                });
+                return;
+            }
+
+            // التحقق من البيانات
+            if (!data.receiverId && !data.channelId) {
+                socket.emit('message_error', { 
+                    success: false,
+                    error: 'يجب تحديد مستلم أو قناة' 
+                });
+                return;
+            }
+
+            const messages = readLocalFile('local-messages.json');
+            const newMessage = {
+                _id: uuidv4(),
+                senderId: user._id,
+                senderName: user.fullName,
+                senderAvatar: user.avatar,
+                receiverId: data.receiverId,
+                channelId: data.channelId,
+                text: data.text || '',
+                timestamp: new Date().toISOString(),
+                read: false,
+                type: data.type || 'text',
+                reactions: [],
+                attachments: data.attachments || [],
+                replyTo: data.replyTo,
+                edited: false,
+                deleted: false,
+                forwarded: data.forwarded || false,
+                messageType: data.messageType || 'normal' // normal, system, announcement
+            };
+
+            messages.push(newMessage);
+            writeLocalFile('local-messages.json', messages);
+
+            // إرسال للمستلم إذا كان متصل
+            if (data.channelId) {
+                // رسالة قناة
+                io.emit('channel_message', newMessage);
+                
+                // تسجيل إشعار لأعضاء القناة
+                const channel = readLocalFile('local-channels.json')
+                    .find(c => c._id === data.channelId);
+                
+                if (channel) {
+                    channel.members.forEach(memberId => {
+                        if (memberId !== user._id) {
+                            createNotification({
+                                userId: memberId,
+                                type: 'channel_message',
+                                title: `رسالة جديدة في ${channel.name}`,
+                                message: data.text?.substring(0, 100) || 'مرفق',
+                                data: { channelId: data.channelId, messageId: newMessage._id },
+                                senderId: user._id
+                            });
+                        }
+                    });
+                }
+            } else {
+                // رسالة مباشرة
+                const receiverSocketId = userSockets.get(data.receiverId);
+                if (receiverSocketId) {
+                    io.to(receiverSocketId).emit('new_message', newMessage);
+                }
+
+                // إنشاء إشعار للمستلم
+                createNotification({
+                    userId: data.receiverId,
+                    type: 'direct_message',
+                    title: `رسالة جديدة من ${user.fullName}`,
+                    message: data.text?.substring(0, 100) || 'مرفق',
+                    data: { senderId: user._id, messageId: newMessage._id },
+                    senderId: user._id
+                });
+            }
+
+            socket.emit('message_sent', { 
+                success: true,
+                message: newMessage 
+            });
+            
+            // إيقاف مؤشر الكتابة
+            socket.to(userSockets.get(data.receiverId)).emit('user_stop_typing', {
+                userId: user._id
+            });
+        } catch (error) {
+            console.error('خطأ إرسال الرسالة:', error);
+            socket.emit('message_error', { 
+                success: false,
+                error: 'فشل إرسال الرسالة' 
+            });
+        }
+    });
+
+    // تفاعل مع الرسالة
+    socket.on('react_to_message', async (data) => {
+        try {
+            const user = connectedUsers.get(socket.id);
+            if (!user) return;
+
+            const messages = readLocalFile('local-messages.json');
+            const messageIndex = messages.findIndex(m => m._id === data.messageId);
+            
+            if (messageIndex !== -1) {
+                if (!messages[messageIndex].reactions) {
+                    messages[messageIndex].reactions = [];
+                }
+                
+                // إزالة التفاعل السابق لنفس المستخدم
+                messages[messageIndex].reactions = messages[messageIndex].reactions
+                    .filter(r => r.userId !== user._id);
+                
+                // إضافة التفاعل الجديد
+                if (data.emoji) {
+                    messages[messageIndex].reactions.push({
+                        userId: user._id,
+                        userName: user.fullName,
+                        emoji: data.emoji,
+                        timestamp: new Date().toISOString()
+                    });
+                }
+                
+                writeLocalFile('local-messages.json', messages);
+                
+                // بث التفاعل للمستخدمين المعنيين
+                const message = messages[messageIndex];
+                if (message.channelId) {
+                    io.emit('message_reacted', {
+                        messageId: data.messageId,
+                        reactions: message.reactions
+                    });
+                } else {
+                    const participants = [message.senderId, message.receiverId];
+                    participants.forEach(participantId => {
+                        const participantSocket = userSockets.get(participantId);
+                        if (participantSocket) {
+                            io.to(participantSocket).emit('message_reacted', {
+                                messageId: data.messageId,
+                                reactions: message.reactions
+                            });
+                        }
+                    });
+                }
+            }
+        } catch (error) {
+            console.error('خطأ في التفاعل:', error);
+        }
+    });
+
+    // كتابة رسالة
+    socket.on('typing_start', (data) => {
+        const user = connectedUsers.get(socket.id);
+        if (!user) return;
+
+        typingUsers.set(user._id, {
+            receiverId: data.receiverId,
+            channelId: data.channelId,
+            timestamp: Date.now()
+        });
+        
+        if (data.channelId) {
+            // إرسال لمشتركي القناة
+            socket.to(data.channelId).emit('user_typing', {
+                userId: user._id,
+                userName: user.fullName,
+                channelId: data.channelId
+            });
+        } else {
+            // إرسال للمستلم
+            const receiverSocketId = userSockets.get(data.receiverId);
+            if (receiverSocketId) {
+                io.to(receiverSocketId).emit('user_typing', {
+                    userId: user._id,
+                    userName: user.fullName
+                });
+            }
+        }
+    });
+
+    socket.on('typing_stop', (data) => {
+        const user = connectedUsers.get(socket.id);
+        if (!user) return;
+
+        typingUsers.delete(user._id);
+        
+        if (data.channelId) {
+            socket.to(data.channelId).emit('user_stop_typing', {
+                userId: user._id,
+                channelId: data.channelId
+            });
+        } else {
+            const receiverSocketId = userSockets.get(data.receiverId);
+            if (receiverSocketId) {
+                io.to(receiverSocketId).emit('user_stop_typing', {
+                    userId: user._id
+                });
+            }
+        }
+    });
+
+    // إدارة الخصوصية
+    socket.on('update_privacy', async (data) => {
+        const user = connectedUsers.get(socket.id);
+        if (!user) return;
+
+        try {
+            const users = readLocalFile('local-users.json');
+            const userIndex = users.findIndex(u => u._id === user._id);
+            
+            if (userIndex !== -1) {
+                users[userIndex].privacy = {
+                    ...users[userIndex].privacy,
+                    ...data,
+                    updatedAt: new Date().toISOString()
+                };
+                writeLocalFile('local-users.json', users);
+                
+                socket.emit('privacy_updated', { 
+                    success: true,
+                    privacy: users[userIndex].privacy 
+                });
+
+                // تحديث بيانات المستخدم المتصل
+                connectedUsers.set(socket.id, {
+                    ...connectedUsers.get(socket.id),
+                    privacy: users[userIndex].privacy
+                });
+            }
+        } catch (error) {
+            console.error('خطأ في تحديث الخصوصية:', error);
+            socket.emit('privacy_updated', { 
+                success: false,
+                error: 'فشل تحديث الإعدادات' 
+            });
+        }
+    });
+
+    // تحديث حالة المستخدم
+    socket.on('update_presence', (data) => {
+        const user = connectedUsers.get(socket.id);
+        if (!user) return;
+
+        userPresence.set(user._id, {
+            ...userPresence.get(user._id),
+            status: data.status || 'online',
+            customStatus: data.customStatus,
+            updatedAt: new Date().toISOString()
+        });
+
+        // إعلام الاتصالات الأخرى للمستخدم نفسه
+        socket.broadcast.emit('user_presence_updated', {
+            userId: user._id,
+            presence: userPresence.get(user._id)
+        });
+    });
+
+    // إشعارات القراءة
+    socket.on('mark_messages_read', (data) => {
+        const user = connectedUsers.get(socket.id);
+        if (!user) return;
+
+        markMessagesAsRead(user._id, data.conversationId, data.channelId);
+    });
+
+    // إدارة المكالمات
+    socket.on('call_user', (data) => {
+        const user = connectedUsers.get(socket.id);
+        if (!user) return;
+
+        const receiverSocketId = userSockets.get(data.receiverId);
+        if (receiverSocketId) {
+            const callId = uuidv4();
+            activeCalls.set(callId, {
+                callId,
+                callerId: user._id,
+                callerName: user.fullName,
+                receiverId: data.receiverId,
+                type: data.type || 'audio',
+                status: 'ringing',
+                createdAt: new Date().toISOString()
+            });
+
+            io.to(receiverSocketId).emit('incoming_call', {
+                callId,
+                callerId: user._id,
+                callerName: user.fullName,
+                callerAvatar: user.avatar,
+                type: data.type || 'audio'
+            });
+
+            socket.emit('call_initiated', { callId });
+        }
+    });
+
+    socket.on('answer_call', (data) => {
+        const user = connectedUsers.get(socket.id);
+        if (!user) return;
+
+        const call = activeCalls.get(data.callId);
+        if (call && call.receiverId === user._id) {
+            call.status = 'answered';
+            call.answeredAt = new Date().toISOString();
+            
+            const callerSocketId = userSockets.get(call.callerId);
+            if (callerSocketId) {
+                io.to(callerSocketId).emit('call_answered', {
+                    callId: data.callId,
+                    answererId: user._id
+                });
+            }
+        }
+    });
+
+    socket.on('end_call', (data) => {
+        const call = activeCalls.get(data.callId);
+        if (call) {
+            const participants = [call.callerId, call.receiverId];
+            participants.forEach(participantId => {
+                const participantSocket = userSockets.get(participantId);
+                if (participantSocket) {
+                    io.to(participantSocket).emit('call_ended', {
+                        callId: data.callId,
+                        duration: data.duration,
+                        endedBy: data.endedBy
+                    });
+                }
+            });
+            activeCalls.delete(data.callId);
+        }
+    });
+
+    socket.on('disconnect', () => {
+        const user = connectedUsers.get(socket.id);
+        if (user) {
+            connectedUsers.delete(socket.id);
+            userSockets.delete(user._id);
+            typingUsers.delete(user._id);
+            
+            // تحديث حالة الاتصال
+            updateUserOnlineStatus(user._id, false);
+            
+            // تحديث الحضور
+            userPresence.set(user._id, {
+                ...userPresence.get(user._id),
+                status: 'offline',
+                lastSeen: new Date().toISOString()
+            });
+            
+            // إعلام الآخرين بغياب المستخدم
+            socket.broadcast.emit('user_offline', {
+                userId: user._id,
+                fullName: user.fullName,
+                lastSeen: new Date().toISOString()
+            });
+
+            // إنهاء المكالمات النشطة
+            activeCalls.forEach((call, callId) => {
+                if (call.callerId === user._id || call.receiverId === user._id) {
+                    activeCalls.delete(callId);
+                    const otherUserId = call.callerId === user._id ? call.receiverId : call.callerId;
+                    const otherUserSocket = userSockets.get(otherUserId);
+                    if (otherUserSocket) {
+                        io.to(otherUserSocket).emit('call_ended', {
+                            callId,
+                            reason: 'user_disconnected'
+                        });
+                    }
+                }
+            });
+        }
+        console.log('👤 مستخدم غير متصل:', socket.id);
+    });
 });
 
-// 🚀 بدء الخادم
-server.listen(PORT, () => {
-  console.log('='.repeat(50));
-  console.log('🚀 منصة التعليمية تعمل بنجاح!');
-  console.log('='.repeat(50));
-  console.log(`📍 الرابط: http://localhost:${PORT}`);
-  console.log(`📊 الإحصائيات: http://localhost:${PORT}/api/stats`);
-  console.log(`💾 التخزين: ملف data.json محلي`);
-  console.log('👤 المستخدم الافتراضي: admin / admin123');
-  console.log('='.repeat(50));
+// دوال مساعدة للنظام
+function updateUserOnlineStatus(userId, isOnline) {
+    const users = readLocalFile('local-users.json');
+    const userIndex = users.findIndex(u => u._id === userId);
+    
+    if (userIndex !== -1) {
+        users[userIndex].isOnline = isOnline;
+        users[userIndex].lastSeen = new Date().toISOString();
+        writeLocalFile('local-users.json', users);
+    }
+}
+
+function createNotification(notificationData) {
+    const notifications = readLocalFile('local-notifications.json');
+    const newNotification = {
+        _id: uuidv4(),
+        ...notificationData,
+        read: false,
+        createdAt: new Date().toISOString()
+    };
+
+    notifications.push(newNotification);
+    writeLocalFile('local-notifications.json', notifications);
+
+    // إرسال الإشعار للمستخدم إذا كان متصلاً
+    const userSocketId = userSockets.get(notificationData.userId);
+    if (userSocketId) {
+        io.to(userSocketId).emit('new_notification', newNotification);
+    }
+
+    return newNotification;
+}
+
+function sendUnreadNotifications(userId, socket) {
+    const notifications = readLocalFile('local-notifications.json');
+    const unreadNotifications = notifications.filter(n => 
+        n.userId === userId && !n.read
+    ).slice(-10); // آخر 10 إشعارات غير مقروءة
+
+    unreadNotifications.forEach(notification => {
+        socket.emit('new_notification', notification);
+    });
+}
+
+function markMessagesAsRead(userId, conversationId, channelId) {
+    const messages = readLocalFile('local-messages.json');
+    let updated = false;
+
+    messages.forEach(message => {
+        if (!message.read && message.receiverId === userId) {
+            if (conversationId && message.senderId === conversationId) {
+                message.read = true;
+                message.readAt = new Date().toISOString();
+                updated = true;
+            } else if (channelId && message.channelId === channelId) {
+                message.read = true;
+                message.readAt = new Date().toISOString();
+                updated = true;
+            }
+        }
+    });
+
+    if (updated) {
+        writeLocalFile('local-messages.json', messages);
+        
+        // إعلام المرسل بتحديث حالة القراءة
+        if (conversationId) {
+            const senderSocketId = userSockets.get(conversationId);
+            if (senderSocketId) {
+                io.to(senderSocketId).emit('messages_read', {
+                    readerId: userId,
+                    conversationId: conversationId
+                });
+            }
+        }
+    }
+}
+
+// نظام الـ Stories المتقدم
+app.post('/api/stories', authenticateToken, upload.single('story'), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ 
+                success: false,
+                message: 'لم يتم رفع أي ملف' 
+            });
+        }
+
+        const { caption, duration, allowReplies = true, allowSharing = true } = req.body;
+
+        const stories = readLocalFile('local-stories.json');
+        
+        // حذف الـ Stories المنتهية
+        const now = new Date();
+        const activeStories = stories.filter(story => {
+            const storyTime = new Date(story.createdAt);
+            return (now - storyTime) < (24 * 60 * 60 * 1000);
+        });
+
+        // تحديد المدة بناءً على نوع الملف
+        let storyDuration = duration || (req.file.mimetype.startsWith('video/') ? 30 : 7);
+
+        const newStory = {
+            _id: uuidv4(),
+            userId: req.user._id,
+            userName: req.user.fullName,
+            userAvatar: req.user.avatar || null,
+            mediaUrl: `/stories/${req.file.filename}`,
+            mediaType: req.file.mimetype.startsWith('image/') ? 'image' : 'video',
+            duration: storyDuration,
+            caption: caption || '',
+            createdAt: new Date().toISOString(),
+            expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+            views: [],
+            reactions: [],
+            replies: [],
+            savedBy: [],
+            allowReplies: allowReplies !== 'false',
+            allowSharing: allowSharing !== 'false',
+            settings: {
+                allowScreenshots: true,
+                showViewCount: true
+            },
+            metadata: {
+                fileSize: req.file.size,
+                mimeType: req.file.mimetype,
+                dimensions: null
+            }
+        };
+
+        // معالجة الصور للحصول على الأبعاد
+        if (req.file.mimetype.startsWith('image/')) {
+            try {
+                const metadata = await sharp(req.file.path).metadata();
+                newStory.metadata.dimensions = {
+                    width: metadata.width,
+                    height: metadata.height
+                };
+            } catch (error) {
+                console.error('خطأ في معالجة الصورة:', error);
+            }
+        }
+
+        activeStories.push(newStory);
+        writeLocalFile('local-stories.json', activeStories);
+
+        // بث الـ Story الجديد للمتابعين
+        io.emit('new_story', newStory);
+
+        res.json({
+            success: true,
+            message: 'تم نشر الـ Story بنجاح',
+            story: newStory
+        });
+    } catch (error) {
+        console.error('خطأ نشر Story:', error);
+        
+        // حذف الملف إذا فشلت العملية
+        if (req.file && fs.existsSync(req.file.path)) {
+            fs.unlinkSync(req.file.path);
+        }
+        
+        res.status(500).json({ 
+            success: false,
+            message: 'خطأ في الخادم أثناء نشر الـ Story' 
+        });
+    }
+});
+
+app.get('/api/stories', authenticateToken, async (req, res) => {
+    try {
+        const stories = readLocalFile('local-stories.json');
+        const now = new Date();
+        
+        // تصفية الـ Stories النشطة فقط
+        const activeStories = stories.filter(story => new Date(story.expiresAt) > now);
+        
+        // تجميع الـ Stories بالمستخدم مع مراعاة الإعدادات
+        const storiesByUser = {};
+        activeStories.forEach(story => {
+            const user = readLocalFile('local-users.json').find(u => u._id === story.userId);
+            if (!user) return;
+
+            // التحقق من إعدادات الخصوصية
+            if (user.privacy?.hideStories && user._id !== req.user._id) {
+                return;
+            }
+
+            if (!storiesByUser[story.userId]) {
+                storiesByUser[story.userId] = {
+                    user: {
+                        _id: user._id,
+                        fullName: user.fullName,
+                        avatar: user.avatar,
+                        isOnline: userSockets.has(user._id),
+                        privacy: user.privacy
+                    },
+                    stories: []
+                };
+            }
+            
+            // إضافة معلومات المشاهدة للمستخدم الحالي
+            const userView = story.views.find(view => view.userId === req.user._id);
+            storiesByUser[story.userId].stories.push({
+                ...story,
+                viewed: !!userView,
+                viewCount: story.views.length,
+                canReply: story.allowReplies,
+                canShare: story.allowSharing
+            });
+        });
+
+        res.json({
+            success: true,
+            stories: Object.values(storiesByUser)
+        });
+    } catch (error) {
+        console.error('خطأ جلب Stories:', error);
+        res.status(500).json({ 
+            success: false,
+            message: 'خطأ في الخادم' 
+        });
+    }
+});
+
+app.post('/api/stories/:storyId/view', authenticateToken, async (req, res) => {
+    try {
+        const { storyId } = req.params;
+        const stories = readLocalFile('local-stories.json');
+        
+        const storyIndex = stories.findIndex(s => s._id === storyId);
+        if (storyIndex !== -1) {
+            const user = req.user;
+            const users = readLocalFile('local-users.json');
+            const storyOwner = users.find(u => u._id === stories[storyIndex].userId);
+            
+            // التحقق من إعدادات الخصوصية
+            if (storyOwner?.privacy?.hideStoryViews !== true) {
+                if (!stories[storyIndex].views.some(view => view.userId === user._id)) {
+                    stories[storyIndex].views.push({
+                        userId: user._id,
+                        userName: user.fullName,
+                        viewedAt: new Date().toISOString()
+                    });
+                    
+                    writeLocalFile('local-stories.json', stories);
+                    
+                    // إعلام صاحب الـ Story بالمشاهدة
+                    const storyOwnerSocket = userSockets.get(stories[storyIndex].userId);
+                    if (storyOwnerSocket) {
+                        io.to(storyOwnerSocket).emit('story_viewed', {
+                            storyId,
+                            viewer: {
+                                userId: user._id,
+                                userName: user.fullName
+                            },
+                            viewCount: stories[storyIndex].views.length
+                        });
+                    }
+                }
+            }
+        }
+
+        res.json({ 
+            success: true,
+            message: 'تم تسجيل المشاهدة' 
+        });
+    } catch (error) {
+        console.error('خطأ تسجيل مشاهدة:', error);
+        res.status(500).json({ 
+            success: false,
+            message: 'خطأ في الخادم' 
+        });
+    }
+});
+
+app.post('/api/stories/:storyId/reply', authenticateToken, async (req, res) => {
+    try {
+        const { storyId } = req.params;
+        const { text } = req.body;
+        
+        if (!text || text.trim().length === 0) {
+            return res.status(400).json({ 
+                success: false,
+                message: 'الرد لا يمكن أن يكون فارغاً' 
+            });
+        }
+
+        const stories = readLocalFile('local-stories.json');
+        const storyIndex = stories.findIndex(s => s._id === storyId);
+        
+        if (storyIndex === -1) {
+            return res.status(404).json({ 
+                success: false,
+                message: 'الـ Story غير موجود' 
+            });
+        }
+
+        if (!stories[storyIndex].allowReplies) {
+            return res.status(403).json({ 
+                success: false,
+                message: 'الردود غير مسموحة على هذا الـ Story' 
+            });
+        }
+
+        const reply = {
+            _id: uuidv4(),
+            userId: req.user._id,
+            userName: req.user.fullName,
+            userAvatar: req.user.avatar,
+            text: text.trim(),
+            timestamp: new Date().toISOString()
+        };
+
+        if (!stories[storyIndex].replies) {
+            stories[storyIndex].replies = [];
+        }
+
+        stories[storyIndex].replies.push(reply);
+        writeLocalFile('local-stories.json', stories);
+
+        // إعلام صاحب الـ Story بالرد
+        const storyOwnerSocket = userSockets.get(stories[storyIndex].userId);
+        if (storyOwnerSocket) {
+            io.to(storyOwnerSocket).emit('story_replied', {
+                storyId,
+                reply: reply
+            });
+        }
+
+        res.json({
+            success: true,
+            message: 'تم إرسال الرد بنجاح',
+            reply: reply
+        });
+    } catch (error) {
+        console.error('خطأ إرسال الرد:', error);
+        res.status(500).json({ 
+            success: false,
+            message: 'خطأ في الخادم' 
+        });
+    }
+});
+
+app.post('/api/stories/:storyId/save', authenticateToken, async (req, res) => {
+    try {
+        const { storyId } = req.params;
+        const stories = readLocalFile('local-stories.json');
+        
+        const storyIndex = stories.findIndex(s => s._id === storyId);
+        if (storyIndex === -1) {
+            return res.status(404).json({ 
+                success: false,
+                message: 'الـ Story غير موجود' 
+            });
+        }
+
+        if (!stories[storyIndex].savedBy.includes(req.user._id)) {
+            stories[storyIndex].savedBy.push(req.user._id);
+            writeLocalFile('local-stories.json', stories);
+        }
+
+        res.json({ 
+            success: true,
+            message: 'تم حفظ الـ Story' 
+        });
+    } catch (error) {
+        console.error('خطأ حفظ Story:', error);
+        res.status(500).json({ 
+            success: false,
+            message: 'خطأ في الخادم' 
+        });
+    }
+});
+
+app.delete('/api/stories/:storyId', authenticateToken, async (req, res) => {
+    try {
+        const { storyId } = req.params;
+        const stories = readLocalFile('local-stories.json');
+        
+        const storyIndex = stories.findIndex(s => s._id === storyId);
+        if (storyIndex === -1) {
+            return res.status(404).json({ 
+                success: false,
+                message: 'الـ Story غير موجود' 
+            });
+        }
+
+        const story = stories[storyIndex];
+        
+        // التحقق من الصلاحيات
+        if (story.userId !== req.user._id && req.user.role !== 'admin') {
+            return res.status(403).json({ 
+                success: false,
+                message: 'غير مصرح لك بحذف هذا الـ Story' 
+            });
+        }
+
+        // حذف الملف من الخادم
+        try {
+            if (fs.existsSync(path.join(__dirname, story.mediaUrl))) {
+                fs.unlinkSync(path.join(__dirname, story.mediaUrl));
+            }
+        } catch (fileError) {
+            console.error('خطأ في حذف ملف الـ Story:', fileError);
+        }
+
+        stories.splice(storyIndex, 1);
+        writeLocalFile('local-stories.json', stories);
+
+        io.emit('story_deleted', { storyId });
+
+        res.json({
+            success: true,
+            message: 'تم حذف الـ Story بنجاح'
+        });
+    } catch (error) {
+        console.error('خطأ حذف Story:', error);
+        res.status(500).json({ 
+            success: false,
+            message: 'خطأ في الخادم' 
+        });
+    }
+});
+
+// نظام الـ Story Highlights
+app.post('/api/stories/highlights', authenticateToken, upload.single('cover'), async (req, res) => {
+    try {
+        const { title, storyIds } = req.body;
+        
+        if (!title || !storyIds) {
+            return res.status(400).json({ 
+                success: false,
+                message: 'العنوان وروابط الـ Stories مطلوبة' 
+            });
+        }
+
+        const users = readLocalFile('local-users.json');
+        const userIndex = users.findIndex(u => u._id === req.user._id);
+        
+        if (userIndex === -1) {
+            return res.status(404).json({ 
+                success: false,
+                message: 'المستخدم غير موجود' 
+            });
+        }
+
+        if (!users[userIndex].highlights) {
+            users[userIndex].highlights = [];
+        }
+
+        const highlight = {
+            _id: uuidv4(),
+            title: title.trim(),
+            cover: req.file ? `/story-highlights/${req.file.filename}` : null,
+            storyIds: JSON.parse(storyIds),
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+        };
+
+        users[userIndex].highlights.push(highlight);
+        writeLocalFile('local-users.json', users);
+
+        res.json({
+            success: true,
+            message: 'تم إنشاء الـ Highlight بنجاح',
+            highlight: highlight
+        });
+    } catch (error) {
+        console.error('خطأ إنشاء Highlight:', error);
+        res.status(500).json({ 
+            success: false,
+            message: 'خطأ في الخادم' 
+        });
+    }
 });
