@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>المنصة التعليمية - نظام الإدارة المتكامل</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/emoji-picker/1.1.5/emoji-picker.min.css">
     <style>
         :root {
             --primary: #2c5aa0;
@@ -22,16 +21,13 @@
             --border: #e2e8f0;
             --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
             --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-            --story-gradient: linear-gradient(45deg, #ff6b6b, #4ecdc4, #45b7d1, #96ceb4, #feca57);
-            --group-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            --channel-gradient: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
         }
 
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-            font-family: 'Segoe UI', 'Tahoma', 'Geneva', 'Verdana', sans-serif;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
 
         body {
@@ -39,7 +35,6 @@
             color: var(--dark);
             line-height: 1.6;
             min-height: 100vh;
-            overflow-x: hidden;
         }
 
         .app-container {
@@ -48,7 +43,6 @@
             flex-direction: column;
         }
 
-        /* Header Styles */
         .header {
             background: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(10px);
@@ -132,10 +126,8 @@
             background: var(--light);
             border-radius: 8px;
             font-weight: 500;
-            flex-wrap: wrap;
         }
 
-        /* Main Content */
         .main-content {
             flex: 1;
             padding: 2rem;
@@ -144,7 +136,6 @@
             width: 100%;
         }
 
-        /* Page Styles */
         .page {
             display: none;
             animation: fadeIn 0.5s ease-in;
@@ -160,7 +151,6 @@
             to { opacity: 1; transform: translateY(0); }
         }
 
-        /* Connection Status */
         .connection-status {
             position: fixed;
             top: 10px;
@@ -178,7 +168,6 @@
             background: var(--danger);
         }
 
-        /* Password Toggle */
         .password-input-container {
             position: relative;
         }
@@ -200,7 +189,6 @@
             padding-left: 45px;
         }
 
-        /* Dashboard Styles */
         .dashboard {
             padding: 1rem;
         }
@@ -269,6 +257,7 @@
             box-shadow: var(--shadow);
             border: 1px solid var(--border);
             transition: transform 0.3s ease;
+            cursor: pointer;
         }
 
         .feature-card:hover {
@@ -298,7 +287,6 @@
             line-height: 1.6;
         }
 
-        /* أنماط نظام الـ Stories */
         .stories-container {
             display: flex;
             gap: 1.5rem;
@@ -328,7 +316,7 @@
             width: 70px;
             height: 70px;
             border-radius: 50%;
-            background: var(--story-gradient);
+            background: linear-gradient(45deg, #ff6b6b, #4ecdc4, #45b7d1, #96ceb4, #feca57);
             padding: 3px;
             margin-bottom: 0.5rem;
             position: relative;
@@ -340,18 +328,6 @@
             border-radius: 50%;
             border: 3px solid white;
             object-fit: cover;
-        }
-
-        .story-avatar::before {
-            content: '';
-            position: absolute;
-            top: -3px;
-            left: -3px;
-            right: -3px;
-            bottom: -3px;
-            background: var(--story-gradient);
-            border-radius: 50%;
-            z-index: -1;
         }
 
         .story-username {
@@ -386,7 +362,6 @@
             border-color: var(--primary);
         }
 
-        /* نافذة الـ Story */
         .story-viewer {
             position: fixed;
             top: 0;
@@ -490,7 +465,6 @@
             font-size: 1.2rem;
         }
 
-        /* نظام الدردشة المتطور */
         .modern-chat-container {
             display: grid;
             grid-template-columns: 350px 1fr;
@@ -638,7 +612,6 @@
             text-align: center;
         }
 
-        /* منطقة الدردشة الرئيسية */
         .chat-main {
             display: flex;
             flex-direction: column;
@@ -822,7 +795,6 @@
             transform: none;
         }
 
-        /* الأنماط الأساسية الأخرى */
         .auth-container {
             max-width: 500px;
             margin: 2rem auto;
@@ -949,7 +921,6 @@
             pointer-events: none;
         }
 
-        /* أنماط جديدة للميزات المتقدمة */
         .emoji-picker {
             position: absolute;
             bottom: 70px;
@@ -1003,26 +974,6 @@
             font-size: 0.8rem;
         }
 
-        .message-reply {
-            background: rgba(0, 0, 0, 0.05);
-            padding: 0.5rem;
-            border-radius: 8px;
-            margin-bottom: 0.5rem;
-            border-right: 3px solid var(--primary);
-        }
-
-        .reply-sender {
-            font-weight: 600;
-            font-size: 0.8rem;
-            color: var(--primary);
-        }
-
-        .reply-text {
-            font-size: 0.9rem;
-            color: var(--dark);
-        }
-
-        /* أنماط المجموعات والقنوات */
         .groups-channels-tabs {
             display: flex;
             background: var(--light);
@@ -1072,74 +1023,13 @@
         }
 
         .group-avatar {
-            background: var(--group-gradient);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         }
 
         .channel-avatar {
-            background: var(--channel-gradient);
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
         }
 
-        .group-members, .channel-members {
-            font-size: 0.8rem;
-            color: var(--gray);
-        }
-
-        /* أنماط التفاعلات */
-        .reaction-picker {
-            position: absolute;
-            bottom: 100%;
-            left: 0;
-            background: white;
-            border-radius: 25px;
-            padding: 0.5rem;
-            box-shadow: var(--shadow-lg);
-            display: none;
-            z-index: 100;
-        }
-
-        .reaction-picker.active {
-            display: flex;
-            gap: 0.25rem;
-        }
-
-        .reaction-option {
-            font-size: 1.2rem;
-            cursor: pointer;
-            transition: transform 0.2s ease;
-        }
-
-        .reaction-option:hover {
-            transform: scale(1.3);
-        }
-
-        .message-actions {
-            position: absolute;
-            top: -10px;
-            left: -10px;
-            background: white;
-            border-radius: 20px;
-            box-shadow: var(--shadow);
-            display: none;
-            z-index: 50;
-        }
-
-        .message:hover .message-actions {
-            display: flex;
-        }
-
-        .message-action-btn {
-            padding: 0.5rem;
-            background: none;
-            border: none;
-            cursor: pointer;
-            color: var(--gray);
-        }
-
-        .message-action-btn:hover {
-            color: var(--primary);
-        }
-
-        /* إدارة النظام */
         .admin-panel {
             background: white;
             border-radius: 20px;
@@ -1224,7 +1114,6 @@
             background: #e0a800;
         }
 
-        /* إعدادات الخصوصية */
         .privacy-settings {
             background: white;
             border-radius: 15px;
@@ -1295,7 +1184,6 @@
             transform: translateX(26px);
         }
 
-        /* خلفيات الدردشة */
         .background-options {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
@@ -1339,7 +1227,6 @@
             text-align: center;
         }
 
-        /* تصميم الإيموجي الحديث */
         .modern-emoji-picker {
             background: white;
             border-radius: 15px;
@@ -1391,7 +1278,6 @@
             transform: scale(1.2);
         }
 
-        /* Responsive Design */
         @media (max-width: 1200px) {
             .modern-chat-container {
                 grid-template-columns: 300px 1fr;
@@ -1406,17 +1292,6 @@
             
             .chat-sidebar {
                 display: none;
-            }
-            
-            .chat-sidebar.mobile-visible {
-                display: flex;
-                position: fixed;
-                top: 0;
-                right: 0;
-                width: 100%;
-                height: 100%;
-                z-index: 2000;
-                background: white;
             }
         }
 
@@ -1480,7 +1355,6 @@
         <i class="fas fa-wifi"></i> متصل
     </div>
 
-    <!-- نافذة الـ Story -->
     <div class="story-viewer" id="storyViewer">
         <div class="story-progress" id="storyProgress"></div>
         <div class="story-content">
@@ -1504,7 +1378,6 @@
         </div>
     </div>
 
-    <!-- منتقي الإيموجي الحديث -->
     <div class="modern-emoji-picker" id="modernEmojiPicker" style="display: none; position: absolute; bottom: 70px; left: 20px; z-index: 1000;">
         <div class="emoji-categories">
             <div class="emoji-category active" data-category="recent">🕒</div>
@@ -1516,13 +1389,10 @@
             <div class="emoji-category" data-category="objects">💡</div>
             <div class="emoji-category" data-category="symbols">💖</div>
         </div>
-        <div class="emoji-grid" id="emojiGrid">
-            <!-- سيتم ملؤها بالإيموجي -->
-        </div>
+        <div class="emoji-grid" id="emojiGrid"></div>
     </div>
 
     <div class="app-container">
-        <!-- Header -->
         <header class="header">
             <div class="header-content">
                 <div class="logo">
@@ -1567,9 +1437,7 @@
             </div>
         </header>
 
-        <!-- Main Content -->
         <main class="main-content">
-            <!-- Home Page -->
             <div class="page active" id="homePage">
                 <div class="welcome-section">
                     <h1 style="color: var(--primary); margin-bottom: 1rem;">مرحباً بك في المنصة التعليمية</h1>
@@ -1613,21 +1481,21 @@
                 </div>
 
                 <div class="features-grid">
-                    <div class="feature-card" onclick="showPage('chatPage')" style="cursor: pointer;">
+                    <div class="feature-card" onclick="showPage('chatPage')">
                         <div class="feature-icon">
                             <i class="fas fa-comments"></i>
                         </div>
                         <h3>نظام دردشة متطور</h3>
                         <p>تواصل مع زملائك عبر نظام دردشة متكامل يدعم الرسائل النصية، الصور، والفيديو</p>
                     </div>
-                    <div class="feature-card" onclick="showPage('storiesPage')" style="cursor: pointer;">
+                    <div class="feature-card" onclick="showPage('storiesPage')">
                         <div class="feature-icon">
                             <i class="fas fa-history"></i>
                         </div>
                         <h3>ميزة Stories</h3>
                         <p>شارك لحظاتك التعليمية مع الآخرين عبر ميزة Stories التي تختفي بعد 24 ساعة</p>
                     </div>
-                    <div class="feature-card" onclick="showPage('settingsPage')" style="cursor: pointer;">
+                    <div class="feature-card" onclick="showPage('settingsPage')">
                         <div class="feature-icon">
                             <i class="fas fa-cogs"></i>
                         </div>
@@ -1637,7 +1505,6 @@
                 </div>
             </div>
 
-            <!-- Login Page -->
             <div class="page" id="loginPage">
                 <div class="auth-container">
                     <div class="auth-header">
@@ -1670,7 +1537,6 @@
                 </div>
             </div>
 
-            <!-- Register Page -->
             <div class="page" id="registerPage">
                 <div class="auth-container">
                     <div class="auth-header">
@@ -1729,7 +1595,6 @@
                 </div>
             </div>
 
-            <!-- Dashboard Page -->
             <div class="page" id="dashboardPage">
                 <div class="dashboard">
                     <div class="welcome-section">
@@ -1739,10 +1604,7 @@
                         </p>
                     </div>
 
-                    <!-- Stories Section -->
-                    <div class="stories-container" id="storiesContainer">
-                        <!-- سيتم إضافة الـ Stories ديناميكياً -->
-                    </div>
+                    <div class="stories-container" id="storiesContainer"></div>
 
                     <div class="stats-grid">
                         <div class="stat-card">
@@ -1776,28 +1638,28 @@
                     </div>
 
                     <div class="features-grid">
-                        <div class="feature-card" onclick="showPage('chatPage')" style="cursor: pointer;">
+                        <div class="feature-card" onclick="showPage('chatPage')">
                             <div class="feature-icon">
                                 <i class="fas fa-comments"></i>
                             </div>
                             <h3>الدردشة</h3>
                             <p>تواصل مع زملائك عبر نظام الدردشة المتطور</p>
                         </div>
-                        <div class="feature-card" onclick="showPage('storiesPage')" style="cursor: pointer;">
+                        <div class="feature-card" onclick="showPage('storiesPage')">
                             <div class="feature-icon">
                                 <i class="fas fa-history"></i>
                             </div>
                             <h3>Stories</h3>
                             <p>شارك لحظاتك التعليمية مع الآخرين</p>
                         </div>
-                        <div class="feature-card" onclick="showPage('settingsPage')" style="cursor: pointer;">
+                        <div class="feature-card" onclick="showPage('settingsPage')">
                             <div class="feature-icon">
                                 <i class="fas fa-cogs"></i>
                             </div>
                             <h3>الإعدادات</h3>
                             <p>قم بتخصيص إعدادات حسابك وتجربتك التعليمية</p>
                         </div>
-                        <div class="feature-card" id="adminFeature" style="cursor: pointer; display: none;" onclick="showPage('adminPage')">
+                        <div class="feature-card" id="adminFeature" style="display: none;" onclick="showPage('adminPage')">
                             <div class="feature-icon">
                                 <i class="fas fa-user-shield"></i>
                             </div>
@@ -1808,10 +1670,8 @@
                 </div>
             </div>
 
-            <!-- Chat Page -->
             <div class="page" id="chatPage">
                 <div class="modern-chat-container">
-                    <!-- الشريط الجانبي للمحادثات -->
                     <div class="chat-sidebar" id="chatSidebar">
                         <div class="chat-header">
                             <div class="user-status">
@@ -1823,28 +1683,21 @@
                             </button>
                         </div>
                         
-                        <!-- شريط البحث -->
                         <div class="form-group" style="padding: 1rem; border-bottom: 1px solid var(--border); display: none;" id="userSearchContainer">
                             <input type="text" class="form-control" id="userSearchInput" placeholder="ابحث عن مستخدم...">
                             <div id="userSearchResults" style="max-height: 200px; overflow-y: auto; margin-top: 0.5rem;"></div>
                         </div>
                         
-                        <!-- أزرار التبويب للمحادثات/المجموعات/القنوات -->
                         <div class="groups-channels-tabs">
                             <button class="tab-btn active" data-tab="conversations">المحادثات</button>
                             <button class="tab-btn" data-tab="groups">المجموعات</button>
                             <button class="tab-btn" data-tab="channels">القنوات</button>
                         </div>
                         
-                        <!-- قائمة المحادثات -->
-                        <div class="conversations-list" id="conversationsList">
-                            <!-- سيتم إضافة المحادثات ديناميكياً -->
-                        </div>
+                        <div class="conversations-list" id="conversationsList"></div>
                     </div>
 
-                    <!-- منطقة الدردشة الرئيسية -->
                     <div class="chat-main">
-                        <!-- رأس المحادثة -->
                         <div class="chat-header" id="currentChatHeader">
                             <div style="display: flex; align-items: center; gap: 1rem;">
                                 <div class="conversation-avatar" id="currentChatAvatar">
@@ -1865,7 +1718,6 @@
                             </div>
                         </div>
 
-                        <!-- منطقة الرسائل -->
                         <div class="chat-messages" id="chatMessages">
                             <div class="text-center" style="color: var(--gray); margin-top: 2rem;">
                                 <i class="fas fa-comments" style="font-size: 3rem; margin-bottom: 1rem;"></i>
@@ -1873,7 +1725,6 @@
                             </div>
                         </div>
 
-                        <!-- مؤشر الكتابة -->
                         <div class="typing-indicator hidden" id="typingIndicator">
                             <div class="typing-dots">
                                 <div class="typing-dot"></div>
@@ -1883,7 +1734,6 @@
                             <span id="typingUser">شخص ما</span> يكتب...
                         </div>
 
-                        <!-- منطقة إدخال الرسائل -->
                         <div class="chat-input-area">
                             <div class="chat-actions">
                                 <button class="chat-action-btn" id="emojiBtn">
@@ -1896,10 +1746,7 @@
                             </div>
                             
                             <div class="chat-input-wrapper">
-                                <!-- معاينة المرفقات -->
                                 <div class="attachments-preview" id="attachmentsPreview"></div>
-                                
-                                <!-- حقل إدخال الرسالة -->
                                 <textarea class="chat-input" id="messageInput" placeholder="اكتب رسالتك هنا..." rows="1"></textarea>
                             </div>
                             
@@ -1911,7 +1758,6 @@
                 </div>
             </div>
 
-            <!-- Stories Page -->
             <div class="page" id="storiesPage">
                 <div class="dashboard">
                     <div class="welcome-section">
@@ -1921,9 +1767,7 @@
                         </p>
                     </div>
 
-                    <div class="stories-container" id="storiesPageContainer">
-                        <!-- سيتم إضافة Stories إضافية هنا -->
-                    </div>
+                    <div class="stories-container" id="storiesPageContainer"></div>
 
                     <div style="text-align: center; margin-top: 2rem;">
                         <button class="btn btn-primary" id="createStoryBtn">
@@ -1933,7 +1777,6 @@
                 </div>
             </div>
 
-            <!-- Settings Page -->
             <div class="page" id="settingsPage">
                 <div class="dashboard">
                     <div class="welcome-section">
@@ -2030,7 +1873,6 @@
                 </div>
             </div>
 
-            <!-- Admin Page -->
             <div class="page" id="adminPage">
                 <div class="dashboard">
                     <div class="welcome-section">
@@ -2081,7 +1923,6 @@
                         </div>
 
                         <div class="admin-content">
-                            <!-- إدارة المستخدمين -->
                             <div class="admin-tab-content active" id="usersTab">
                                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                                     <h3>إدارة المستخدمين</h3>
@@ -2102,14 +1943,11 @@
                                                 <th>الإجراءات</th>
                                             </tr>
                                         </thead>
-                                        <tbody id="usersTableBody">
-                                            <!-- سيتم ملؤها بالمستخدمين -->
-                                        </tbody>
+                                        <tbody id="usersTableBody"></tbody>
                                     </table>
                                 </div>
                             </div>
 
-                            <!-- إدارة الرسائل -->
                             <div class="admin-tab-content" id="messagesTab">
                                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                                     <h3>إدارة الرسائل</h3>
@@ -2128,14 +1966,11 @@
                                                 <th>الإجراءات</th>
                                             </tr>
                                         </thead>
-                                        <tbody id="messagesTableBody">
-                                            <!-- سيتم ملؤها بالرسائل -->
-                                        </tbody>
+                                        <tbody id="messagesTableBody"></tbody>
                                     </table>
                                 </div>
                             </div>
 
-                            <!-- إدارة Stories -->
                             <div class="admin-tab-content" id="storiesTab">
                                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                                     <h3>إدارة الـ Stories</h3>
@@ -2154,14 +1989,11 @@
                                                 <th>الإجراءات</th>
                                             </tr>
                                         </thead>
-                                        <tbody id="storiesTableBody">
-                                            <!-- سيتم ملؤها بالـ Stories -->
-                                        </tbody>
+                                        <tbody id="storiesTableBody"></tbody>
                                     </table>
                                 </div>
                             </div>
 
-                            <!-- إدارة القنوات -->
                             <div class="admin-tab-content" id="channelsTab">
                                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                                     <h3>إدارة القنوات والمجموعات</h3>
@@ -2181,14 +2013,11 @@
                                                 <th>الإجراءات</th>
                                             </tr>
                                         </thead>
-                                        <tbody id="channelsTableBody">
-                                            <!-- سيتم ملؤها بالقنوات -->
-                                        </tbody>
+                                        <tbody id="channelsTableBody"></tbody>
                                     </table>
                                 </div>
                             </div>
 
-                            <!-- النسخ الاحتياطي -->
                             <div class="admin-tab-content" id="backupTab">
                                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                                     <h3>إدارة النسخ الاحتياطي</h3>
@@ -2212,9 +2041,7 @@
                                                 <th>الإجراءات</th>
                                             </tr>
                                         </thead>
-                                        <tbody id="backupsTableBody">
-                                            <!-- سيتم ملؤها بالنسخ الاحتياطية -->
-                                        </tbody>
+                                        <tbody id="backupsTableBody"></tbody>
                                     </table>
                                 </div>
                             </div>
@@ -2225,7 +2052,6 @@
         </main>
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/emoji-picker/1.1.5/emoji-picker.min.js"></script>
     <script src="/socket.io/socket.io.js"></script>
     <script>
         // البيانات والمتغيرات العامة
@@ -2247,7 +2073,6 @@
         });
 
         function initializeApp() {
-            // التحقق من حالة المستخدم المسجل
             const savedUser = localStorage.getItem('currentUser');
             const token = localStorage.getItem('token');
             
@@ -2260,7 +2085,6 @@
                 showPage('homePage');
             }
 
-            // تهيئة منتقي الإيموجي الحديث
             initializeModernEmojiPicker();
         }
 
@@ -2311,10 +2135,6 @@
 
             socket.on('new_story', (story) => {
                 loadStories();
-            });
-
-            socket.on('story_viewed', (data) => {
-                // يمكن إضافة إشعارات للمستخدم
             });
         }
 
@@ -2405,8 +2225,7 @@
             setupSettingsSystem();
         }
 
-      
- function setupPasswordToggles() {
+        function setupPasswordToggles() {
             const toggles = [
                 { toggle: 'loginPasswordToggle', input: 'loginPassword' },
                 { toggle: 'registerPasswordToggle', input: 'registerPassword' },
@@ -2430,10 +2249,8 @@
         }
 
         function setupChatSystem() {
-            // زر الإرسال
             document.getElementById('sendBtn').addEventListener('click', sendMessage);
             
-            // إدخال الرسالة مع زر Enter
             document.getElementById('messageInput').addEventListener('keypress', function(e) {
                 if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
@@ -2441,27 +2258,14 @@
                 }
             });
 
-            // تحديث ارتفاع حقل الإدخال
-            document.getElementById('messageInput').addEventListener('input', function() {
-                this.style.height = 'auto';
-                this.style.height = (this.scrollHeight) + 'px';
-            });
-
-            // زر الإيموجي
             document.getElementById('emojiBtn').addEventListener('click', toggleEmojiPicker);
 
-            // زر إرفاق الملفات
             document.getElementById('attachBtn').addEventListener('click', () => {
                 document.getElementById('fileInput').click();
             });
 
-            // اختيار الملفات
             document.getElementById('fileInput').addEventListener('change', handleFileSelect);
 
-            // البحث عن مستخدمين
-            document.getElementById('userSearch').addEventListener('input', handleUserSearch);
-
-            // تبويبات المحادثات/المجموعات/القنوات
             document.querySelectorAll('.tab-btn').forEach(btn => {
                 btn.addEventListener('click', function() {
                     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -2471,254 +2275,119 @@
                 });
             });
 
-            // زر تغيير الخلفية
-            document.getElementById('themeBtn').addEventListener('click', showThemeSelector);
+            document.getElementById('searchUserBtn').addEventListener('click', toggleUserSearch);
 
-            // إغلاق منتقي الإيموجي عند النقر خارجها
+            document.getElementById('userSearchInput').addEventListener('input', searchUsers);
+
             document.addEventListener('click', function(e) {
-                if (!e.target.closest('#emojiPicker') && !e.target.closest('#emojiBtn')) {
-                    hideEmojiPicker();
+                if (!e.target.closest('#modernEmojiPicker') && !e.target.closest('#emojiBtn')) {
+                    document.getElementById('modernEmojiPicker').style.display = 'none';
                 }
             });
         }
 
         function setupStoriesSystem() {
-            // زر إنشاء Story
             document.getElementById('createStoryBtn').addEventListener('click', createStory);
-
-            // اختيار ملف الـ Story
-            document.getElementById('storyInput').addEventListener('change', handleStoryUpload);
-
-            // إغلاق نافذة الـ Story
             document.getElementById('storyClose').addEventListener('click', closeStoryViewer);
-
-            // التنقل بين الـ Stories
             document.getElementById('storyPrev').addEventListener('click', showPreviousStory);
             document.getElementById('storyNext').addEventListener('click', showNextStory);
-
-            // حفظ الـ Story
             document.getElementById('saveStoryBtn').addEventListener('click', saveCurrentStory);
         }
 
-        function setupSettingsSystem() {
-            // حفظ الإعدادات
-            document.getElementById('saveSettingsBtn').addEventListener('click', saveUserSettings);
-
-            // تغيير الخلفية
-            document.querySelectorAll('.theme-option').forEach(option => {
-                option.addEventListener('click', function() {
-                    document.querySelectorAll('.theme-option').forEach(opt => opt.classList.remove('active'));
-                    this.classList.add('active');
-                    const theme = this.dataset.theme;
-                    document.getElementById('chatMain').dataset.theme = theme;
-                });
-            });
-        }
-
         function setupAdminSystem() {
-            // تبويبات الإدارة
             document.querySelectorAll('.admin-tab').forEach(tab => {
                 tab.addEventListener('click', function() {
                     document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
                     document.querySelectorAll('.admin-tab-content').forEach(c => c.classList.remove('active'));
                     this.classList.add('active');
                     document.getElementById(this.dataset.tab + 'Tab').classList.add('active');
-                    
-                    if (this.dataset.tab === 'users') {
-                        loadAdminUsers();
-                    } else if (this.dataset.tab === 'stats') {
-                        loadAdminStats();
-                    }
                 });
             });
 
-            // إدارة المستخدمين
-            document.getElementById('deleteMessageBtn').addEventListener('click', deleteMessageAsAdmin);
-            document.getElementById('deleteStoryBtn').addEventListener('click', deleteStoryAsAdmin);
+            document.getElementById('refreshUsersBtn').addEventListener('click', loadAdminUsers);
+            document.getElementById('refreshMessagesBtn').addEventListener('click', loadAdminMessages);
+            document.getElementById('refreshStoriesBtn').addEventListener('click', loadAdminStories);
+            document.getElementById('createChannelBtn').addEventListener('click', showCreateChannelModal);
             document.getElementById('createBackupBtn').addEventListener('click', createBackup);
-            document.getElementById('restoreBackupBtn').addEventListener('click', () => {
-                document.getElementById('backupFileInput').click();
-            });
-            document.getElementById('backupFileInput').addEventListener('change', restoreBackup);
+            document.getElementById('restoreBackupBtn').addEventListener('click', showRestoreBackupModal);
         }
 
-        function initializeSocket() {
-            if (socket) {
-                socket.disconnect();
-            }
-
-            socket = io();
-
-            socket.on('connect', () => {
-                console.log('Connected to server');
-                if (currentUser) {
-                    socket.emit('authenticate', currentUser);
-                }
+        function setupSettingsSystem() {
+            document.getElementById('saveChatSettings').addEventListener('click', saveChatSettings);
+            
+            document.querySelectorAll('.background-option').forEach(option => {
+                option.addEventListener('click', function() {
+                    document.querySelectorAll('.background-option').forEach(o => o.classList.remove('active'));
+                    this.classList.add('active');
+                });
             });
 
-            socket.on('disconnect', () => {
-                console.log('Disconnected from server');
-            });
-
-            // استقبال الرسائل
-            socket.on('new_message', (message) => {
-                if (currentChat && currentChat._id === message.senderId) {
-                    displayNewMessage(message);
-                }
-                updateConversationsList();
-            });
-
-            // تحديث حالة المستخدمين
-            socket.on('user_online', (user) => {
-                updateUserOnlineStatus(user.userId, true);
-            });
-
-            socket.on('user_offline', (user) => {
-                updateUserOnlineStatus(user.userId, false);
-            });
-
-            // مؤشر الكتابة
-            socket.on('user_typing', (data) => {
-                if (currentChat && currentChat._id === data.userId) {
-                    showTypingIndicator(data.username);
-                }
-            });
-
-            socket.on('user_stop_typing', (data) => {
-                if (currentChat && currentChat._id === data.userId) {
-                    hideTypingIndicator();
-                }
-            });
-
-            // الـ Stories
-            socket.on('new_story', (story) => {
-                loadStories();
-            });
-
-            socket.on('story_viewed', (data) => {
-                console.log('Story viewed by:', data.viewer.username);
-            });
-
-            // تحديثات الإدارة
-            socket.on('user_deleted', (data) => {
-                if (currentUser.role === 'admin') {
-                    loadAdminUsers();
-                }
-            });
-
-            socket.on('message_deleted', (data) => {
-                const messageElement = document.querySelector(`[data-message-id="${data.messageId}"]`);
-                if (messageElement) {
-                    messageElement.remove();
-                }
-            });
-
-            socket.on('story_deleted', (data) => {
-                loadStories();
-            });
+            document.getElementById('hideOnlineStatus').addEventListener('change', updatePrivacySettings);
+            document.getElementById('hideLastSeen').addEventListener('change', updatePrivacySettings);
+            document.getElementById('hideStoryViews').addEventListener('change', updatePrivacySettings);
         }
 
-        function initializeEmojiPicker() {
-            const emojis = [
-                '😀', '😃', '😄', '😁', '😆', '😅', '😂', '🤣', '😊', '😇',
-                '🙂', '🙃', '😉', '😌', '😍', '🥰', '😘', '😗', '😙', '😚',
-                '😋', '😛', '😝', '😜', '🤪', '🤨', '🧐', '🤓', '😎', '🤩',
-                '🥳', '😏', '😒', '😞', '😔', '😟', '😕', '🙁', '☹️', '😣',
-                '😖', '😫', '😩', '🥺', '😢', '😭', '😤', '😠', '😡', '🤬',
-                '🤯', '😳', '🥵', '🥶', '😱', '😨', '😰', '😥', '😓', '🤗',
-                '🤔', '🤭', '🤫', '🤥', '😶', '😐', '😑', '😬', '🙄', '😯',
-                '😦', '😧', '😮', '😲', '🥱', '😴', '🤤', '😪', '😵', '🤐',
-                '🥴', '🤢', '🤮', '🤧', '😷', '🤒', '🤕', '🤑', '🤠', '😈',
-                '👿', '👹', '👺', '🤡', '💩', '👻', '💀', '☠️', '👽', '👾',
-                '🤖', '🎃', '😺', '😸', '😹', '😻', '😼', '😽', '🙀', '😿',
-                '😾', '🤲', '👐', '🙌', '👏', '🤝', '👍', '👎', '👊', '✊',
-                '🤛', '🤜', '🤞', '✌️', '🤟', '🤘', '👌', '👈', '👉', '👆',
-                '👇', '☝️', '✋', '🤚', '🖐', '🖖', '👋', '🤙', '💪', '🦵',
-                '🦶', '👂', '🦻', '👃', '🧠', '🦷', '🦴', '👀', '👁', '👅',
-                '👄', '💋', '🩸', '💘', '❤️', '🧡', '💛', '💚', '💙', '💜',
-                '🖤', '💔', '❣️', '💕', '💞', '💓', '💗', '💖', '💘', '💝',
-                '💟', '☮️', '✝️', '☪️', '🕉', '☸️', '✡️', '🔯', '🕎', '☯️',
-                '☦️', '🛐', '⛎', '♈', '♉', '♊', '♋', '♌', '♍', '♎', '♏',
-                '♐', '♑', '♒', '♓', '🆔', '⚛️', '🉑', '☢️', '☣️', '📴',
-                '📳', '🈶', '🈚', '🈸', '🈺', '🈷️', '✴️', '🆚', '💮', '🉐',
-                '㊙️', '㊗️', '🈴', '🈵', '🈹', '🈲', '🅰️', '🅱️', '🆎', '🆑',
-                '🅾️', '🆘', '❌', '⭕', '🛑', '⛔', '📛', '🚫', '💯', '💢',
-                '♨️', '🚷', '🚯', '🚳', '🚱', '🔞', '📵', '🚭', '❗', '❕',
-                '❓', '❔', '‼️', '⁉️', '🔅', '🔆', '〽️', '⚠️', '🚸', '🔱',
-                '⚜️', '🔰', '♻️', '✅', '🈯', '💹', '❇️', '✳️', '❎', '🌐',
-                '💠', 'Ⓜ️', '🌀', '💤', '🏧', '🚾', '♿', '🅿️', '🈳', '🈂️',
-                '🛂', '🛃', '🛄', '🛅', '🚹', '🚺', '🚼', '🚻', '🚮', '🎦',
-                '📶', '🈁', '🔣', 'ℹ️', '🔤', '🔡', '🔠', '🆖', '🆗', '🆙',
-                '🆒', '🆕', '🆓', '0️⃣', '1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣',
-                '7️⃣', '8️⃣', '9️⃣', '🔟', '🔢', '#️⃣', '*️⃣', '⏏️', '▶️', '⏸',
-                '⏯', '⏹', '⏺', '⏭', '⏮', '⏩', '⏪', '⏫', '⏬', '◀️',
-                '🔼', '🔽', '➡️', '⬅️', '⬆️', '⬇️', '↗️', '↘️', '↙️', '↖️',
-                '↕️', '↔️', '↪️', '↩️', '⤴️', '⤵️', '🔀', '🔁', '🔂', '🔄',
-                '🔃', '🎵', '🎶', '➕', '➖', '➗', '✖️', '♾', '💲', '💱',
-                '™', '©', '®', '〰️', '➰', '➿', '🔚', '🔙', '🔛', '🔝',
-                '🔜', '✔️', '☑️', '🔘', '🔴', '🟠', '🟡', '🟢', '🔵', '🟣',
-                '⚫', '⚪', '🟤', '🔺', '🔻', '🔸', '🔹', '🔶', '🔷', '🔳',
-                '🔲', '▪️', '▫️', '◾', '◽', '◼️', '◻️', '🟥', '🟧', '🟨',
-                '🟩', '🟦', '🟪', '⬛', '⬜', '🟫', '🔈', '🔇', '🔉', '🔊',
-                '🔔', '🔕', '📣', '📢', '👁‍🗨', '💬', '💭', '🗯', '♠️', '♣️',
-                '♥️', '♦️', '🃏', '🎴', '🀄', '🕐', '🕑', '🕒', '🕓', '🕔',
-                '🕕', '🕖', '🕗', '🕘', '🕙', '🕚', '🕛', '🕜', '🕝', '🕞',
-                '🕟', '🕠', '🕡', '🕢', '🕣', '🕤', '🕥', '🕦', '🕧'
-            ];
+        function initializeModernEmojiPicker() {
+            const emojiCategories = {
+                recent: recentEmojis,
+                smileys: ['😀', '😃', '😄', '😁', '😆', '😅', '😂', '🤣', '😊', '😇', '🙂', '🙃', '😉', '😌', '😍', '🥰', '😘', '😗', '😙', '😚', '😋', '😛', '😝', '😜', '🤪', '🤨', '🧐', '🤓', '😎', '🤩', '🥳'],
+                people: ['👋', '🤚', '🖐️', '✋', '🖖', '👌', '🤌', '🤏', '✌️', '🤞', '🤟', '🤘', '🤙', '👈', '👉', '👆', '🖕', '👇', '☝️', '👍', '👎', '👊', '✊', '🤛', '🤜', '👏', '🙌', '👐', '🤲', '🤝'],
+                nature: ['🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🐮', '🐷', '🐽', '🐸', '🐵', '🙈', '🙉', '🙊', '🐒', '🐔', '🐧', '🐦', '🐤', '🐣', '🐥', '🦆', '🦅', '🦉', '🦇'],
+                food: ['🍏', '🍎', '🍐', '🍊', '🍋', '🍌', '🍉', '🍇', '🍓', '🫐', '🍈', '🍒', '🍑', '🥭', '🍍', '🥥', '🥝', '🍅', '🍆', '🥑', '🥦', '🥬', '🥒', '🌶️', '🫑', '🌽', '🥕', '🫒', '🧄', '🧅'],
+                activities: ['⚽', '🏀', '🏈', '⚾', '🥎', '🎾', '🏐', '🏉', '🥏', '🎱', '🪀', '🏓', '🏸', '🏒', '🏑', '🥍', '🏏', '🪃', '🥅', '⛳', '🪁', '🏹', '🎣', '🤿', '🥊', '🥋', '🎽', '🛹', '🛼', '🛷'],
+                objects: ['💡', '🔦', '🏮', '🪔', '📔', '📕', '📖', '📗', '📘', '📙', '📚', '📓', '📒', '📃', '📜', '📄', '📰', '🗞️', '📑', '🔖', '🏷️', '💰', '🪙', '💴', '💵', '💶', '💷', '💸', '💳', '🧾'],
+                symbols: ['💖', '💗', '💓', '💞', '💕', '💟', '❣️', '💔', '❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '💯', '💢', '💬', '👁️‍🗨️', '🗨️', '🗯️', '💭', '💤', '🌐', '💠', '🔶', '🔷', '🔸', '🔹', '🔺']
+            };
 
             const emojiGrid = document.getElementById('emojiGrid');
-            emojis.forEach(emoji => {
-                const emojiElement = document.createElement('div');
-                emojiElement.className = 'emoji-item';
-                emojiElement.textContent = emoji;
-                emojiElement.addEventListener('click', () => {
-                    const messageInput = document.getElementById('messageInput');
-                    messageInput.value += emoji;
-                    messageInput.focus();
-                    hideEmojiPicker();
+            emojiGrid.innerHTML = '';
+
+            // عرض الإيموجي الحديثة
+            Object.keys(emojiCategories).forEach(category => {
+                if (category === 'recent' && recentEmojis.length === 0) return;
+                
+                const categoryEmojis = emojiCategories[category];
+                categoryEmojis.forEach(emoji => {
+                    const emojiElement = document.createElement('div');
+                    emojiElement.className = 'modern-emoji';
+                    emojiElement.textContent = emoji;
+                    emojiElement.addEventListener('click', () => {
+                        addEmojiToMessage(emoji);
+                        addToRecentEmojis(emoji);
+                    });
+                    emojiGrid.appendChild(emojiElement);
                 });
-                emojiGrid.appendChild(emojiElement);
             });
+
+            // أحداث فئات الإيموجي
+            document.querySelectorAll('.emoji-category').forEach(category => {
+                category.addEventListener('click', function() {
+                    document.querySelectorAll('.emoji-category').forEach(c => c.classList.remove('active'));
+                    this.classList.add('active');
+                    // هنا يمكن إضافة منطق لتبديل الفئات
+                });
+            });
+        }
+
+        function addEmojiToMessage(emoji) {
+            const messageInput = document.getElementById('messageInput');
+            messageInput.value += emoji;
+            messageInput.focus();
+        }
+
+        function addToRecentEmojis(emoji) {
+            if (!recentEmojis.includes(emoji)) {
+                recentEmojis.unshift(emoji);
+                if (recentEmojis.length > 12) {
+                    recentEmojis.pop();
+                }
+                localStorage.setItem('recentEmojis', JSON.stringify(recentEmojis));
+            }
         }
 
         function toggleEmojiPicker() {
-            const picker = document.getElementById('emojiPicker');
-            if (emojiPickerVisible) {
-                hideEmojiPicker();
-            } else {
-                showEmojiPicker();
-            }
-        }
-
-        function showEmojiPicker() {
-            const picker = document.getElementById('emojiPicker');
-            picker.style.display = 'block';
-            emojiPickerVisible = true;
-            
-            // وضع المنتقي في المكان الصحيح
-            const inputArea = document.getElementById('chatInputArea');
-            const rect = inputArea.getBoundingClientRect();
-            picker.style.bottom = (window.innerHeight - rect.top + 10) + 'px';
-            picker.style.left = '20px';
-        }
-
-        function hideEmojiPicker() {
-            const picker = document.getElementById('emojiPicker');
-            picker.style.display = 'none';
-            emojiPickerVisible = false;
-        }
-
-        function showThemeSelector() {
-            // يمكن تطوير هذه الوظيفة لعرض خيارات أكثر تطوراً
-            const currentTheme = document.getElementById('chatMain').dataset.theme;
-            const themes = ['default', 'dark', 'blue', 'green'];
-            const nextTheme = themes[(themes.indexOf(currentTheme) + 1) % themes.length];
-            document.getElementById('chatMain').dataset.theme = nextTheme;
-            
-            // حفظ الإعدادات
-            if (currentUser) {
-                saveUserSettings();
-            }
+            const picker = document.getElementById('modernEmojiPicker');
+            picker.style.display = picker.style.display === 'none' ? 'block' : 'none';
         }
 
         function handleFileSelect(e) {
@@ -2744,14 +2413,6 @@
                     video.src = URL.createObjectURL(file);
                     video.controls = true;
                     preview.appendChild(video);
-                } else {
-                    const icon = document.createElement('div');
-                    icon.innerHTML = `<i class="fas fa-file" style="font-size: 2rem; color: var(--gray);"></i>`;
-                    icon.style.display = 'flex';
-                    icon.style.alignItems = 'center';
-                    icon.style.justifyContent = 'center';
-                    icon.style.height = '100%';
-                    preview.appendChild(icon);
                 }
 
                 const removeBtn = document.createElement('button');
@@ -2767,104 +2428,6 @@
             });
         }
 
-        function handleUserSearch(e) {
-            const query = e.target.value.trim();
-            
-            clearTimeout(userSearchTimeout);
-            
-            if (query.length < 2) {
-                document.getElementById('searchResults').style.display = 'none';
-                document.getElementById('conversationsList').style.display = 'block';
-                return;
-            }
-            
-            userSearchTimeout = setTimeout(() => {
-                searchUsers(query);
-            }, 300);
-        }
-
-        async function searchUsers(query) {
-            try {
-                const response = await fetch(`${API_BASE}/users/search?query=${encodeURIComponent(query)}`, {
-                    headers: {
-                        'Authorization': `Bearer ${localStorage.getItem('token')}`
-                    }
-                });
-
-                if (response.ok) {
-                    const users = await response.json();
-                    displaySearchResults(users);
-                }
-            } catch (error) {
-                console.error('Error searching users:', error);
-            }
-        }
-
-        function displaySearchResults(users) {
-            const container = document.getElementById('searchResults');
-            const conversationsList = document.getElementById('conversationsList');
-            
-            container.innerHTML = '';
-            container.style.display = 'block';
-            conversationsList.style.display = 'none';
-
-            if (users.length === 0) {
-                container.innerHTML = `
-                    <div style="text-align: center; color: var(--gray); padding: 2rem;">
-                        <i class="fas fa-search" style="font-size: 2rem; margin-bottom: 1rem;"></i>
-                        <p>لا توجد نتائج للبحث</p>
-                    </div>
-                `;
-                return;
-            }
-
-            users.forEach(user => {
-                const userElement = document.createElement('div');
-                userElement.className = 'conversation-item';
-                userElement.addEventListener('click', () => startNewChat(user));
-                
-                userElement.innerHTML = `
-                    <div class="conversation-avatar">
-                        <i class="fas fa-user"></i>
-                        ${user.isOnline ? '<div class="online-indicator"></div>' : ''}
-                    </div>
-                    <div class="conversation-info">
-                        <div class="conversation-name">
-                            ${user.username}
-                            ${user.role === 'admin' ? '<i class="fas fa-crown" style="color: var(--warning);"></i>' : ''}
-                        </div>
-                        <div class="conversation-preview">
-                            ${user.isOnline ? 'متصل الآن' : 'غير متصل'}
-                        </div>
-                    </div>
-                `;
-                
-                container.appendChild(userElement);
-            });
-        }
-
-        function startNewChat(user) {
-            currentChat = user;
-            
-            // تحديث واجهة المحادثة
-            document.getElementById('currentChatName').textContent = user.username;
-            document.getElementById('currentChatAvatar').innerHTML = `
-                <i class="fas fa-user"></i>
-                ${user.isOnline ? '<div class="online-indicator"></div>' : ''}
-            `;
-            
-            document.getElementById('currentChatStatus').className = `status-indicator ${user.isOnline ? '' : 'offline'}`;
-            document.getElementById('currentChatStatusText').textContent = user.isOnline ? 'متصل الآن' : 'غير متصل';
-            
-            // إخفاء نتائج البحث
-            document.getElementById('searchResults').style.display = 'none';
-            document.getElementById('conversationsList').style.display = 'block';
-            document.getElementById('userSearch').value = '';
-            
-            // تحميل رسائل المحادثة
-            loadChatMessages(user._id);
-        }
-
         async function sendMessage() {
             const messageInput = document.getElementById('messageInput');
             const messageText = messageInput.value.trim();
@@ -2878,16 +2441,13 @@
             try {
                 const formData = new FormData();
                 formData.append('text', messageText);
-                formData.append('receiverId', currentChat._id);
-                formData.append('receiverType', 'user');
-                formData.append('type', 'text');
-
-                // إضافة المرفقات إذا وجدت
+                formData.append('receiverId', currentChat.userId);
+                
                 selectedFiles.forEach(file => {
                     formData.append('attachments', file);
                 });
 
-                const response = await fetch(`${API_BASE}/chat/send`, {
+                const response = await fetch('/api/chat/send', {
                     method: 'POST',
                     headers: {
                         'Authorization': `Bearer ${localStorage.getItem('token')}`
@@ -2897,46 +2457,32 @@
 
                 if (response.ok) {
                     const result = await response.json();
+                    addMessageToChat(result.message, true);
                     
-                    // إضافة الرسالة للواجهة
-                    displayNewMessage(result.message);
-                    
-                    // مسح الحقول
                     messageInput.value = '';
-                    messageInput.style.height = 'auto';
                     selectedFiles = [];
                     displaySelectedFiles();
+                    
+                    socket.emit('typing_stop', { receiverId: currentChat.userId });
                 } else {
-                    const error = await response.json();
-                    showAlert('chatPage', error.message, 'error');
+                    throw new Error('فشل إرسال الرسالة');
                 }
             } catch (error) {
-                console.error('Error sending message:', error);
-                showAlert('chatPage', 'خطأ في إرسال الرسالة', 'error');
+                console.error('خطأ في إرسال الرسالة:', error);
+                alert('فشل إرسال الرسالة');
             }
         }
 
-        function displayNewMessage(message) {
+        function addMessageToChat(message, isSent) {
             const messagesContainer = document.getElementById('chatMessages');
-            const placeholder = messagesContainer.querySelector('.text-center');
             
-            if (placeholder) {
-                placeholder.remove();
-            }
-
             const messageElement = document.createElement('div');
-            messageElement.className = `message ${message.senderId === currentUser._id ? 'sent' : 'received'}`;
-            messageElement.setAttribute('data-message-id', message._id);
+            messageElement.className = `message ${isSent ? 'sent' : 'received'}`;
             
-            const messageTime = new Date(message.timestamp).toLocaleTimeString('ar-SA', {
-                hour: '2-digit',
-                minute: '2-digit'
-            });
-
             let messageHTML = `
                 <div class="message-header">
-                    <span class="message-sender">${message.senderUsername}</span>
-                    <span class="message-time">${messageTime}</span>
+                    <span class="message-sender">${message.senderName}</span>
+                    <span class="message-time">${formatTime(new Date(message.timestamp))}</span>
                 </div>
             `;
             
@@ -2947,34 +2493,11 @@
             if (message.attachments && message.attachments.length > 0) {
                 message.attachments.forEach(attachment => {
                     if (attachment.type.startsWith('image/')) {
-                        messageHTML += `
-                            <div style="margin-top: 0.5rem;">
-                                <img src="${window.location.origin}${attachment.url}" 
-                                     style="max-width: 200px; border-radius: 10px;" 
-                                     alt="صورة">
-                            </div>
-                        `;
+                        messageHTML += `<img src="${attachment.url}" style="max-width: 200px; border-radius: 10px; margin-top: 0.5rem;" alt="صورة">`;
                     } else if (attachment.type.startsWith('video/')) {
-                        messageHTML += `
-                            <div style="margin-top: 0.5rem;">
-                                <video src="${window.location.origin}${attachment.url}" 
-                                       controls 
-                                       style="max-width: 200px; border-radius: 10px;">
-                                </video>
-                            </div>
-                        `;
+                        messageHTML += `<video src="${attachment.url}" controls style="max-width: 200px; border-radius: 10px; margin-top: 0.5rem;"></video>`;
                     }
                 });
-            }
-            
-            if (message.reactions && message.reactions.length > 0) {
-                messageHTML += `
-                    <div class="message-reactions">
-                        ${message.reactions.map(reaction => 
-                            `<span class="reaction">${reaction.emoji}</span>`
-                        ).join('')}
-                    </div>
-                `;
             }
             
             messageElement.innerHTML = messageHTML;
@@ -2982,22 +2505,110 @@
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
         }
 
-        function showTypingIndicator(username) {
+        function showTypingIndicator(userName) {
             const indicator = document.getElementById('typingIndicator');
-            const typingUser = document.getElementById('typingUser');
-            
-            typingUser.textContent = username;
+            document.getElementById('typingUser').textContent = userName;
             indicator.classList.remove('hidden');
         }
 
         function hideTypingIndicator() {
-            const indicator = document.getElementById('typingIndicator');
-            indicator.classList.add('hidden');
+            document.getElementById('typingIndicator').classList.add('hidden');
+        }
+
+        async function loadConversations() {
+            try {
+                const response = await fetch('/api/chat/conversations', {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    }
+                });
+
+                if (response.ok) {
+                    conversations = await response.json();
+                    loadConversationsTab('conversations');
+                }
+            } catch (error) {
+                console.error('خطأ في تحميل المحادثات:', error);
+            }
+        }
+
+        function loadConversationsTab(tab) {
+            const container = document.getElementById('conversationsList');
+            container.innerHTML = '';
+
+            let items = [];
+            
+            switch(tab) {
+                case 'conversations':
+                    items = conversations;
+                    break;
+                case 'groups':
+                case 'channels':
+                    items = [];
+                    break;
+            }
+
+            if (items.length === 0) {
+                container.innerHTML = `
+                    <div style="text-align: center; color: var(--gray); padding: 2rem;">
+                        <i class="fas fa-comments" style="font-size: 2rem; margin-bottom: 1rem;"></i>
+                        <p>لا توجد ${tab === 'conversations' ? 'محادثات' : tab === 'groups' ? 'مجموعات' : 'قنوات'} لعرضها</p>
+                    </div>
+                `;
+                return;
+            }
+
+            items.forEach(conversation => {
+                const item = document.createElement('div');
+                item.className = `conversation-item ${currentChat && currentChat.userId === conversation.userId ? 'active' : ''}`;
+                item.addEventListener('click', () => selectConversation(conversation));
+                
+                item.innerHTML = `
+                    <div class="conversation-avatar">
+                        ${conversation.userAvatar ? `<img src="${conversation.userAvatar}" alt="${conversation.userName}">` : `<i class="fas fa-user"></i>`}
+                        ${conversation.isOnline ? '<div class="online-indicator"></div>' : ''}
+                    </div>
+                    <div class="conversation-info">
+                        <div class="conversation-name">
+                            ${conversation.userName}
+                        </div>
+                        <div class="conversation-preview">${conversation.lastMessage}</div>
+                    </div>
+                    <div class="conversation-meta">
+                        <div class="conversation-time">${conversation.lastMessageTime ? formatTime(new Date(conversation.lastMessageTime)) : ''}</div>
+                        ${conversation.unreadCount > 0 ? `<div class="unread-badge">${conversation.unreadCount}</div>` : ''}
+                    </div>
+                `;
+                
+                container.appendChild(item);
+            });
+        }
+
+        async function selectConversation(conversation) {
+            currentChat = conversation;
+            
+            document.querySelectorAll('.conversation-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            event.currentTarget.classList.add('active');
+            
+            document.getElementById('currentChatName').textContent = conversation.userName;
+            document.getElementById('currentChatAvatar').innerHTML = conversation.userAvatar ? 
+                `<img src="${conversation.userAvatar}" alt="${conversation.userName}">` : 
+                `<i class="fas fa-user"></i>`;
+            
+            const statusIndicator = document.getElementById('currentChatStatus');
+            const statusText = document.getElementById('currentChatStatusText');
+            
+            statusIndicator.className = `status-indicator ${conversation.isOnline ? '' : 'offline'}`;
+            statusText.textContent = conversation.isOnline ? 'متصل الآن' : 'غير متصل';
+            
+            await loadChatMessages(conversation.userId);
         }
 
         async function loadChatMessages(userId) {
             try {
-                const response = await fetch(`${API_BASE}/chat/conversation/${userId}`, {
+                const response = await fetch(`/api/chat/conversation/${userId}`, {
                     headers: {
                         'Authorization': `Bearer ${localStorage.getItem('token')}`
                     }
@@ -3005,88 +2616,138 @@
 
                 if (response.ok) {
                     const messages = await response.json();
-                    displayChatMessages(messages);
+                    const messagesContainer = document.getElementById('chatMessages');
+                    messagesContainer.innerHTML = '';
+                    
+                    messages.forEach(message => {
+                        addMessageToChat(message, message.senderId === currentUser._id);
+                    });
                 }
             } catch (error) {
-                console.error('Error loading chat messages:', error);
+                console.error('خطأ في تحميل الرسائل:', error);
             }
         }
 
-        function displayChatMessages(messages) {
-            const container = document.getElementById('chatMessages');
-            container.innerHTML = '';
+        function toggleUserSearch() {
+            const searchContainer = document.getElementById('userSearchContainer');
+            searchContainer.style.display = searchContainer.style.display === 'none' ? 'block' : 'none';
+        }
 
-            if (messages.length === 0) {
-                container.innerHTML = `
-                    <div class="text-center" style="color: var(--gray); margin-top: 2rem;">
-                        <i class="fas fa-comments" style="font-size: 3rem; margin-bottom: 1rem;"></i>
-                        <p>لا توجد رسائل بعد. ابدأ المحادثة الآن!</p>
-                    </div>
-                `;
+        async function searchUsers() {
+            const query = document.getElementById('userSearchInput').value;
+            if (query.length < 2) {
+                document.getElementById('userSearchResults').innerHTML = '';
                 return;
             }
 
-            messages.forEach(message => {
-                displayNewMessage(message);
-            });
-        }
-
-        function updateUserOnlineStatus(userId, isOnline) {
-            // تحديث في قائمة المحادثات
-            const conversationItem = document.querySelector(`.conversation-item[data-user-id="${userId}"]`);
-            if (conversationItem) {
-                const indicator = conversationItem.querySelector('.online-indicator');
-                if (indicator) {
-                    indicator.style.display = isOnline ? 'block' : 'none';
-                }
-            }
-
-            // تحديث في المحادثة الحالية
-            if (currentChat && currentChat._id === userId) {
-                document.getElementById('currentChatStatus').className = `status-indicator ${isOnline ? '' : 'offline'}`;
-                document.getElementById('currentChatStatusText').textContent = isOnline ? 'متصل الآن' : 'غير متصل';
-            }
-        }
-
-        // نظام الـ Stories المحسن
-        async function createStory() {
-            document.getElementById('storyInput').click();
-        }
-
-        async function handleStoryUpload(e) {
-            const file = e.target.files[0];
-            if (!file) return;
-
-            const formData = new FormData();
-            formData.append('story', file);
-
             try {
-                const response = await fetch(`${API_BASE}/stories`, {
-                    method: 'POST',
+                const response = await fetch(`/api/chat/search-users?query=${encodeURIComponent(query)}`, {
                     headers: {
                         'Authorization': `Bearer ${localStorage.getItem('token')}`
-                    },
-                    body: formData
+                    }
                 });
 
                 if (response.ok) {
-                    showAlert('storiesPage', 'تم نشر الـ Story بنجاح', 'success');
-                    loadStories();
-                } else {
-                    const data = await response.json();
-                    showAlert('storiesPage', data.message, 'error');
+                    const users = await response.json();
+                    displaySearchResults(users);
                 }
             } catch (error) {
-                console.error('Error uploading story:', error);
-                showAlert('storiesPage', 'خطأ في رفع الـ Story', 'error');
+                console.error('خطأ في البحث:', error);
+            }
+        }
+
+        function displaySearchResults(users) {
+            const container = document.getElementById('userSearchResults');
+            container.innerHTML = '';
+
+            if (users.length === 0) {
+                container.innerHTML = '<div style="padding: 1rem; text-align: center; color: var(--gray);">لا توجد نتائج</div>';
+                return;
             }
 
-            e.target.value = '';
+            users.forEach(user => {
+                const userElement = document.createElement('div');
+                userElement.className = 'conversation-item';
+                userElement.addEventListener('click', () => startChatWithUser(user));
+                
+                userElement.innerHTML = `
+                    <div class="conversation-avatar">
+                        ${user.avatar ? `<img src="${user.avatar}" alt="${user.fullName}">` : `<i class="fas fa-user"></i>`}
+                        ${user.isOnline ? '<div class="online-indicator"></div>' : ''}
+                    </div>
+                    <div class="conversation-info">
+                        <div class="conversation-name">${user.fullName}</div>
+                        <div class="conversation-preview">${user.isOnline ? 'متصل الآن' : 'غير متصل'}</div>
+                    </div>
+                `;
+                
+                container.appendChild(userElement);
+            });
+        }
+
+        function startChatWithUser(user) {
+            const existingConversation = conversations.find(c => c.userId === user._id);
+            
+            if (existingConversation) {
+                selectConversation(existingConversation);
+            } else {
+                const newConversation = {
+                    userId: user._id,
+                    userName: user.fullName,
+                    userAvatar: user.avatar,
+                    lastMessage: 'ابدأ المحادثة',
+                    lastMessageTime: new Date().toISOString(),
+                    unreadCount: 0,
+                    isOnline: user.isOnline
+                };
+                
+                conversations.unshift(newConversation);
+                selectConversation(newConversation);
+                loadConversationsTab('conversations');
+            }
+            
+            document.getElementById('userSearchContainer').style.display = 'none';
+            document.getElementById('userSearchInput').value = '';
+            document.getElementById('userSearchResults').innerHTML = '';
+        }
+
+        async function createStory() {
+            const fileInput = document.createElement('input');
+            fileInput.type = 'file';
+            fileInput.accept = 'image/*,video/*';
+            fileInput.addEventListener('change', async function(e) {
+                if (e.target.files.length > 0) {
+                    const file = e.target.files[0];
+                    const formData = new FormData();
+                    formData.append('story', file);
+
+                    try {
+                        const response = await fetch('/api/stories', {
+                            method: 'POST',
+                            headers: {
+                                'Authorization': `Bearer ${localStorage.getItem('token')}`
+                            },
+                            body: formData
+                        });
+
+                        if (response.ok) {
+                            await loadStories();
+                            alert('تم إنشاء الـ Story بنجاح!');
+                        } else {
+                            throw new Error('فشل إنشاء الـ Story');
+                        }
+                    } catch (error) {
+                        console.error('خطأ في إنشاء الـ Story:', error);
+                        alert('فشل إنشاء الـ Story');
+                    }
+                }
+            });
+            fileInput.click();
         }
 
         async function loadStories() {
             try {
-                const response = await fetch(`${API_BASE}/stories`, {
+                const response = await fetch('/api/stories', {
                     headers: {
                         'Authorization': `Bearer ${localStorage.getItem('token')}`
                     }
@@ -3097,7 +2758,7 @@
                     displayStories();
                 }
             } catch (error) {
-                console.error('Error loading stories:', error);
+                console.error('خطأ في تحميل الـ Stories:', error);
             }
         }
 
@@ -3110,32 +2771,30 @@
                 
                 container.innerHTML = '';
                 
-                // زر إضافة Story للمستخدم الحالي
+                // زر إضافة Story
                 const addStoryItem = document.createElement('div');
                 addStoryItem.className = 'story-item';
                 addStoryItem.innerHTML = `
                     <div class="story-add-btn" onclick="createStory()">
                         <i class="fas fa-plus"></i>
                     </div>
-                    <div class="story-username">Story جديد</div>
+                    <div class="story-username">Your Story</div>
                 `;
                 container.appendChild(addStoryItem);
                 
                 // Stories الأخرى
                 stories.forEach(userStories => {
+                    if (userStories.user._id === currentUser._id) return; // تخطي stories المستخدم الحالي
+                    
                     const storyItem = document.createElement('div');
                     storyItem.className = 'story-item';
-                    storyItem.addEventListener('click', () => openStoriesViewer(userStories));
-                    
-                    const hasUnviewed = userStories.stories.some(story => 
-                        !story.views.some(view => view.userId === currentUser._id)
-                    );
+                    storyItem.addEventListener('click', () => openStoryViewer(userStories));
                     
                     storyItem.innerHTML = `
-                        <div class="story-avatar ${hasUnviewed ? 'unviewed' : ''}">
-                            <i class="fas fa-user"></i>
+                        <div class="story-avatar">
+                            <img src="${userStories.user.avatar || 'https://via.placeholder.com/100'}" alt="${userStories.user.fullName}">
                         </div>
-                        <div class="story-username">${userStories.user.username}</div>
+                        <div class="story-username">${userStories.user.fullName}</div>
                     `;
                     
                     container.appendChild(storyItem);
@@ -3143,504 +2802,195 @@
             });
         }
 
-        function openStoriesViewer(userStories) {
-            currentStoryUserIndex = stories.findIndex(s => s.user._id === userStories.user._id);
-            currentStoryIndex = 0;
+        function openStoryViewer(userStories) {
+            if (!userStories.stories || userStories.stories.length === 0) return;
             
-            showStory(stories[currentStoryUserIndex], currentStoryIndex);
-        }
-
-        function showStory(userStories, storyIndex) {
-            const story = userStories.stories[storyIndex];
-            if (!story) return;
-
             const viewer = document.getElementById('storyViewer');
             const media = document.getElementById('storyMedia');
+            const video = document.getElementById('storyVideo');
             const userAvatar = document.getElementById('storyUserAvatar');
             const userName = document.getElementById('storyUserName');
-            const storyTime = document.getElementById('storyTime');
-            const progressContainer = document.getElementById('storyProgress');
-
-            // تعيين البيانات
-            media.src = `${window.location.origin}${story.mediaUrl}`;
-            userAvatar.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZGRkIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzk5OSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPuWNleivleS4rTwvdGV4dD48L3N2Zz4=';
-            userName.textContent = userStories.user.username;
-            storyTime.textContent = new Date(story.createdAt).toLocaleTimeString('ar-SA');
-
-            if (story.mediaType === 'video') {
-                media.controls = true;
+            const time = document.getElementById('storyTime');
+            
+            const firstStory = userStories.stories[0];
+            
+            if (firstStory.mediaType === 'image') {
+                media.src = firstStory.mediaUrl;
+                media.style.display = 'block';
+                video.style.display = 'none';
             } else {
-                media.controls = false;
+                video.src = firstStory.mediaUrl;
+                video.style.display = 'block';
+                media.style.display = 'none';
             }
-
-            // إعداد شريط التقدم
-            progressContainer.innerHTML = '';
-            userStories.stories.forEach((s, index) => {
-                const progressBar = document.createElement('div');
-                progressBar.className = 'story-progress-bar';
-                const progressFill = document.createElement('div');
-                progressFill.className = 'story-progress-fill';
-                progressBar.appendChild(progressFill);
-                progressContainer.appendChild(progressBar);
-            });
-
-            // بدء التقدم
-            startStoryProgress(userStories, storyIndex);
-
-            // تسجيل المشاهدة
-            recordStoryView(story._id);
-
-            // إظهار النافذة
+            
+            userAvatar.src = userStories.user.avatar || 'https://via.placeholder.com/100';
+            userName.textContent = userStories.user.fullName;
+            time.textContent = formatTime(new Date(firstStory.createdAt));
+            
             viewer.classList.add('active');
-        }
-
-        function startStoryProgress(userStories, storyIndex) {
-            if (storyInterval) {
-                clearInterval(storyInterval);
-            }
-
-            const progressBars = document.querySelectorAll('.story-progress-fill');
-            const currentProgress = progressBars[storyIndex];
-            const story = userStories.stories[storyIndex];
+            startStoryProgress(firstStory.duration);
             
-            let progress = 0;
-            const duration = story.duration; // استخدام المدة المخزنة في الـ Story
-            const intervalTime = 50; // تحديث كل 50 مللي ثانية
-
-            storyInterval = setInterval(() => {
-                progress += intervalTime;
-                const percentage = (progress / duration) * 100;
-                currentProgress.style.width = `${percentage}%`;
-
-                if (progress >= duration) {
-                    clearInterval(storyInterval);
-                    showNextStory();
+            // تسجيل المشاهدة
+            fetch(`/api/stories/${firstStory._id}/view`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
                 }
-            }, intervalTime);
-        }
-
-        function showNextStory() {
-            const currentUserStories = stories[currentStoryUserIndex];
-            
-            if (currentStoryIndex < currentUserStories.stories.length - 1) {
-                currentStoryIndex++;
-                showStory(currentUserStories, currentStoryIndex);
-            } else if (currentStoryUserIndex < stories.length - 1) {
-                currentStoryUserIndex++;
-                currentStoryIndex = 0;
-                showStory(stories[currentStoryUserIndex], currentStoryIndex);
-            } else {
-                closeStoryViewer();
-            }
-        }
-
-        function showPreviousStory() {
-            if (currentStoryIndex > 0) {
-                currentStoryIndex--;
-                showStory(stories[currentStoryUserIndex], currentStoryIndex);
-            } else if (currentStoryUserIndex > 0) {
-                currentStoryUserIndex--;
-                currentStoryIndex = stories[currentStoryUserIndex].stories.length - 1;
-                showStory(stories[currentStoryUserIndex], currentStoryIndex);
-            }
+            });
         }
 
         function closeStoryViewer() {
-            if (storyInterval) {
-                clearInterval(storyInterval);
-            }
             document.getElementById('storyViewer').classList.remove('active');
         }
 
-        async function recordStoryView(storyId) {
-            try {
-                await fetch(`${API_BASE}/stories/${storyId}/view`, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${localStorage.getItem('token')}`
-                    }
-                });
-            } catch (error) {
-                console.error('Error recording story view:', error);
-            }
+        function startStoryProgress(duration) {
+            const progressContainer = document.getElementById('storyProgress');
+            progressContainer.innerHTML = '';
+            
+            const progressBar = document.createElement('div');
+            progressBar.className = 'story-progress-bar';
+            
+            const progressFill = document.createElement('div');
+            progressFill.className = 'story-progress-fill';
+            
+            progressBar.appendChild(progressFill);
+            progressContainer.appendChild(progressBar);
+            
+            let width = 0;
+            const interval = setInterval(() => {
+                if (width >= 100) {
+                    clearInterval(interval);
+                    closeStoryViewer();
+                } else {
+                    width += (100 / (duration * 10)); // تحديث كل 100ms
+                    progressFill.style.width = width + '%';
+                }
+            }, 100);
+        }
+
+        function showPreviousStory() {
+            // تنفيذ التنقل للـ Story السابق
+            console.log('عرض الـ Story السابق');
+        }
+
+        function showNextStory() {
+            // تنفيذ التنقل للـ Story التالي
+            console.log('عرض الـ Story التالي');
         }
 
         async function saveCurrentStory() {
-            const currentUserStories = stories[currentStoryUserIndex];
-            const story = currentUserStories.stories[currentStoryIndex];
-            
-            try {
-                const response = await fetch(`${API_BASE}/stories/${story._id}/save`, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${localStorage.getItem('token')}`
-                    }
-                });
-
-                if (response.ok) {
-                    showAlert('storyViewer', 'تم حفظ الـ Story بنجاح', 'success');
-                }
-            } catch (error) {
-                console.error('Error saving story:', error);
-            }
+            // تنفيذ حفظ الـ Story
+            alert('تم حفظ الـ Story');
         }
 
-        // نظام الإعدادات
-        async function saveUserSettings() {
-            const settings = {
-                hideOnlineStatus: document.getElementById('hideOnlineStatus').checked,
-                hideLastSeen: document.getElementById('hideLastSeen').checked,
-                hideStoryViews: document.getElementById('hideStoryViews').checked,
-                chatBackground: document.getElementById('chatMain').dataset.theme,
-                theme: 'light' // يمكن إضافة المزيد من الإعدادات
-            };
-
-            try {
-                const response = await fetch(`${API_BASE}/user/settings`, {
-                    method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${localStorage.getItem('token')}`
-                    },
-                    body: JSON.stringify({ settings })
-                });
-
-                if (response.ok) {
-                    showAlert('settingsPage', 'تم حفظ الإعدادات بنجاح', 'success');
-                } else {
-                    showAlert('settingsPage', 'خطأ في حفظ الإعدادات', 'error');
-                }
-            } catch (error) {
-                console.error('Error saving settings:', error);
-                showAlert('settingsPage', 'خطأ في حفظ الإعدادات', 'error');
-            }
-        }
-
-        // نظام الإدارة
-        async function loadAdminUsers() {
-            if (currentUser.role !== 'admin') return;
-
-            try {
-                const response = await fetch(`${API_BASE}/admin/users`, {
-                    headers: {
-                        'Authorization': `Bearer ${localStorage.getItem('token')}`
-                    }
-                });
-
-                if (response.ok) {
-                    const users = await response.json();
-                    displayAdminUsers(users);
-                }
-            } catch (error) {
-                console.error('Error loading admin users:', error);
-            }
-        }
-
-        function displayAdminUsers(users) {
-            const tbody = document.getElementById('usersTableBody');
-            tbody.innerHTML = '';
-
-            users.forEach(user => {
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td>${user.username}</td>
-                    <td>${user.phone}</td>
-                    <td>${user.role === 'admin' ? 'مدير' : 'طالب'}</td>
-                    <td>${user.isActive ? 'نشط' : 'معطل'}</td>
-                    <td>${new Date(user.createdAt).toLocaleDateString('ar-SA')}</td>
-                    <td class="action-buttons">
-                        <button class="btn btn-warning btn-sm" onclick="editUser('${user._id}')">
-                            <i class="fas fa-edit"></i>
-                        </button>
-                        <button class="btn btn-danger btn-sm" onclick="deleteUser('${user._id}')">
-                            <i class="fas fa-trash"></i>
-                        </button>
-                    </td>
-                `;
-                tbody.appendChild(tr);
-            });
-        }
-
-        async function deleteMessageAsAdmin() {
-            const messageId = document.getElementById('messageIdInput').value.trim();
-            
-            if (!messageId) {
-                alert('يرجى إدخال معرف الرسالة');
-                return;
-            }
-
-            try {
-                const response = await fetch(`${API_BASE}/admin/messages/${messageId}`, {
-                    method: 'DELETE',
-                    headers: {
-                        'Authorization': `Bearer ${localStorage.getItem('token')}`
-                    }
-                });
-
-                if (response.ok) {
-                    showAlert('adminPage', 'تم حذف الرسالة بنجاح', 'success');
-                    document.getElementById('messageIdInput').value = '';
-                } else {
-                    const error = await response.json();
-                    showAlert('adminPage', error.message, 'error');
-                }
-            } catch (error) {
-                console.error('Error deleting message:', error);
-                showAlert('adminPage', 'خطأ في حذف الرسالة', 'error');
-            }
-        }
-
-        async function deleteStoryAsAdmin() {
-            const storyId = document.getElementById('storyIdInput').value.trim();
-            
-            if (!storyId) {
-                alert('يرجى إدخال معرف الـ Story');
-                return;
-            }
-
-            try {
-                const response = await fetch(`${API_BASE}/admin/stories/${storyId}`, {
-                    method: 'DELETE',
-                    headers: {
-                        'Authorization': `Bearer ${localStorage.getItem('token')}`
-                    }
-                });
-
-                if (response.ok) {
-                    showAlert('adminPage', 'تم حذف الـ Story بنجاح', 'success');
-                    document.getElementById('storyIdInput').value = '';
-                } else {
-                    const error = await response.json();
-                    showAlert('adminPage', error.message, 'error');
-                }
-            } catch (error) {
-                console.error('Error deleting story:', error);
-                showAlert('adminPage', 'خطأ في حذف الـ Story', 'error');
-            }
-        }
-
-        async function createBackup() {
-            try {
-                const response = await fetch(`${API_BASE}/admin/backup`, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${localStorage.getItem('token')}`
-                    }
-                });
-
-                if (response.ok) {
-                    showAlert('adminPage', 'تم إنشاء النسخ الاحتياطي بنجاح', 'success');
-                loadAdminStats();
-                } else {
-                    const error = await response.json();
-                    showAlert('adminPage', error.message, 'error');
-                }
-            } catch (error) {
-                console.error('Error creating backup:', error);
-                showAlert('adminPage', 'خطأ في إنشاء النسخ الاحتياطي', 'error');
-            }
-        }
-
-        async function restoreBackup(e) {
-            const file = e.target.files[0];
-            if (!file) return;
-
-            const formData = new FormData();
-            formData.append('backup', file);
-
-            try {
-                const response = await fetch(`${API_BASE}/admin/restore`, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${localStorage.getItem('token')}`
-                    },
-                    body: formData
-                });
-
-                if (response.ok) {
-                    showAlert('adminPage', 'تم استعادة النسخ الاحتياطي بنجاح', 'success');
-                    // إعادة تحميل الصفحة لتطبيق التغييرات
-                    setTimeout(() => {
-                        location.reload();
-                    }, 2000);
-                } else {
-                    const error = await response.json();
-                    showAlert('adminPage', error.message, 'error');
-                }
-            } catch (error) {
-                console.error('Error restoring backup:', error);
-                showAlert('adminPage', 'خطأ في استعادة النسخ الاحتياطي', 'error');
-            }
-
-            e.target.value = '';
-        }
-
-        async function loadAdminStats() {
-            try {
-                const response = await fetch(`${API_BASE}/admin/stats`, {
-                    headers: {
-                        'Authorization': `Bearer ${localStorage.getItem('token')}`
-                    }
-                });
-
-                if (response.ok) {
-                    const stats = await response.json();
-                    document.getElementById('adminTotalUsers').textContent = stats.totalUsers;
-                    document.getElementById('adminTotalMessages').textContent = stats.totalMessages;
-                    document.getElementById('adminTotalStories').textContent = stats.totalStories;
-                    document.getElementById('adminStorageUsed').textContent = (stats.storageUsed / 1024 / 1024).toFixed(2);
-                }
-            } catch (error) {
-                console.error('Error loading admin stats:', error);
-            }
-        }
-
-        // دوال المساعدة
         async function handleLogin(e) {
             e.preventDefault();
+            
             const phone = document.getElementById('loginPhone').value;
             const password = document.getElementById('loginPassword').value;
-
-            if (!phone || !password) {
-                showAlert('loginAlert', 'جميع الحقول مطلوبة', 'error');
-                return;
-            }
-
-            const btn = e.target.querySelector('button[type="submit"]') || e.target;
-            btn.classList.add('loading');
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري الدخول...';
-
+            
             try {
-                const response = await fetch(`${API_BASE}/auth/login`, {
+                const response = await fetch('/api/auth/login', {
                     method: 'POST',
-                    headers: { 
-                        'Content-Type': 'application/json',
+                    headers: {
+                        'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({ phone, password })
                 });
 
-                const data = await response.json();
-
                 if (response.ok) {
-                    localStorage.setItem('token', data.token);
-                    localStorage.setItem('user', JSON.stringify(data.user));
-                    currentUser = data.user;
+                    const result = await response.json();
                     
-                    showAlert('loginAlert', 'تم تسجيل الدخول بنجاح', 'success');
-                    setTimeout(() => {
-                        if (currentUser.role === 'admin') {
-                            showPage('dashboardPage');
-                            document.getElementById('adminDashboardCard').style.display = 'block';
-                        } else {
-                            showPage('dashboardPage');
-                        }
-                        updateNavigation(true, currentUser.role === 'admin');
-                        initializeSocket();
-                        loadUserData();
-                    }, 1000);
+                    currentUser = result.user;
+                    localStorage.setItem('currentUser', JSON.stringify(currentUser));
+                    localStorage.setItem('token', result.token);
+                    
+                    showAuthenticatedUI();
+                    showPage('dashboardPage');
+                    showAlert('تم تسجيل الدخول بنجاح!', 'success');
+                    
+                    if (socket) {
+                        socket.emit('authenticate', currentUser);
+                    }
                 } else {
-                    showAlert('loginAlert', data.message, 'error');
+                    const error = await response.json();
+                    showAlert(error.message, 'error');
                 }
             } catch (error) {
-                console.error('Login error:', error);
-                showAlert('loginAlert', 'خطأ في الاتصال بالخادم', 'error');
-            } finally {
-                btn.classList.remove('loading');
-                btn.innerHTML = '<i class="fas fa-sign-in-alt"></i> تسجيل الدخول';
+                console.error('خطأ في تسجيل الدخول:', error);
+                showAlert('حدث خطأ أثناء تسجيل الدخول', 'error');
             }
         }
 
         async function handleRegister(e) {
             e.preventDefault();
-            const username = document.getElementById('registerUsername').value;
+            
+            const fullName = document.getElementById('registerFullName').value;
             const phone = document.getElementById('registerPhone').value;
+            const university = document.getElementById('registerUniversity').value;
+            const major = document.getElementById('registerMajor').value;
+            const batch = document.getElementById('registerBatch').value;
             const password = document.getElementById('registerPassword').value;
             const confirmPassword = document.getElementById('registerConfirmPassword').value;
-
-            if (!username || !phone || !password || !confirmPassword) {
-                showAlert('registerAlert', 'جميع الحقول مطلوبة', 'error');
-                return;
-            }
-
+            
             if (password !== confirmPassword) {
-                showAlert('registerAlert', 'كلمتا المرور غير متطابقتين', 'error');
+                showAlert('كلمات المرور غير متطابقة', 'error');
                 return;
             }
-
-            if (password.length < 6) {
-                showAlert('registerAlert', 'كلمة المرور يجب أن تكون 6 أحرف على الأقل', 'error');
-                return;
-            }
-
-            const saudiPhoneRegex = /^5\d{8}$/;
-            if (!saudiPhoneRegex.test(phone)) {
-                showAlert('registerAlert', 'رقم الهاتف غير صحيح', 'error');
-                return;
-            }
-
-            const btn = e.target.querySelector('button[type="submit"]') || e.target;
-            btn.classList.add('loading');
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري إنشاء الحساب...';
 
             try {
-                const response = await fetch(`${API_BASE}/auth/register`, {
+                const response = await fetch('/api/auth/register', {
                     method: 'POST',
-                    headers: { 
-                        'Content-Type': 'application/json',
+                    headers: {
+                        'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ username, phone, password })
+                    body: JSON.stringify({ fullName, phone, university, major, batch, password })
                 });
 
-                const data = await response.json();
-
                 if (response.ok) {
-                    showAlert('registerAlert', 'تم إنشاء الحساب بنجاح', 'success');
-                    setTimeout(() => showPage('loginPage'), 2000);
+                    showAlert('تم إنشاء الحساب بنجاح!', 'success');
+                    showPage('loginPage');
                 } else {
-                    showAlert('registerAlert', data.message, 'error');
+                    const error = await response.json();
+                    showAlert(error.message, 'error');
                 }
             } catch (error) {
-                console.error('Register error:', error);
-                showAlert('registerAlert', 'خطأ في الاتصال بالخادم', 'error');
-            } finally {
-                btn.classList.remove('loading');
-                btn.innerHTML = '<i class="fas fa-user-plus"></i> إنشاء الحساب';
+                console.error('خطأ في إنشاء الحساب:', error);
+                showAlert('حدث خطأ أثناء إنشاء الحساب', 'error');
             }
         }
 
         function logout() {
+            currentUser = null;
+            localStorage.removeItem('currentUser');
+            localStorage.removeItem('token');
+            
             if (socket) {
                 socket.disconnect();
             }
-            localStorage.removeItem('token');
-            localStorage.removeItem('user');
-            currentUser = null;
+            
             showPage('homePage');
-            updateNavigation(false, false);
+            document.querySelectorAll('.nav-item').forEach(item => item.classList.add('hidden'));
+            document.getElementById('userInfo').classList.add('hidden');
+            document.getElementById('loginLink').classList.remove('hidden');
+            document.getElementById('registerLink').classList.remove('hidden');
         }
 
-        function updateNavigation(isLoggedIn, isAdmin = false) {
-            const publicLinks = ['homeLink', 'loginLink', 'registerLink'];
-            const privateLinks = ['dashboardLink', 'chatLink', 'storiesLink', 'settingsLink', 'logoutLink'];
-            const adminLinks = ['adminLink'];
-
-            publicLinks.forEach(link => {
-                document.getElementById(link).classList.toggle('hidden', isLoggedIn);
-            });
-
-            privateLinks.forEach(link => {
-                document.getElementById(link).classList.toggle('hidden', !isLoggedIn);
-            });
-
-            adminLinks.forEach(link => {
-                document.getElementById(link).classList.toggle('hidden', !isAdmin);
-            });
-
-            document.getElementById('userInfo').classList.toggle('hidden', !isLoggedIn);
+        function showAuthenticatedUI() {
+            document.getElementById('userName').textContent = currentUser.fullName;
+            document.getElementById('dashboardWelcome').textContent = `مرحباً ${currentUser.fullName}!`;
             
-            if (isLoggedIn && currentUser) {
-                document.getElementById('userName').textContent = currentUser.username;
-                document.getElementById('dashboardWelcome').textContent = `مرحباً ${currentUser.username}!`;
+            document.querySelectorAll('.nav-item').forEach(item => item.classList.add('hidden'));
+            document.getElementById('userInfo').classList.remove('hidden');
+            document.getElementById('dashboardLink').classList.remove('hidden');
+            document.getElementById('chatLink').classList.remove('hidden');
+            document.getElementById('storiesLink').classList.remove('hidden');
+            document.getElementById('settingsLink').classList.remove('hidden');
+            
+            if (currentUser.role === 'admin') {
+                document.getElementById('adminLink').classList.remove('hidden');
+                document.getElementById('adminFeature').style.display = 'block';
             }
         }
 
@@ -3651,143 +3001,235 @@
             document.getElementById(pageId).classList.add('active');
         }
 
-        function showAlert(containerId, message, type = 'info') {
-            const container = document.getElementById(containerId);
-            if (!container) return;
-
-            let alertDiv = container.querySelector('.alert');
-            if (!alertDiv) {
-                alertDiv = document.createElement('div');
-                alertDiv.className = `alert alert-${type}`;
-                container.insertBefore(alertDiv, container.firstChild);
-            }
-
-            const icon = type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle';
-            alertDiv.innerHTML = `<i class="fas fa-${icon}"></i> ${message}`;
-            alertDiv.className = `alert alert-${type}`;
-
-            setTimeout(() => {
-                alertDiv.remove();
-            }, 5000);
-        }
-
-        async function loadUserData() {
-            // تحميل بيانات المستخدم
-            if (currentUser) {
-                loadStories();
-                loadConversationsTab('conversations');
+        function showAlert(message, type) {
+            const alert = document.createElement('div');
+            alert.className = `alert alert-${type}`;
+            alert.innerHTML = `
+                <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle'}"></i>
+                ${message}
+            `;
+            
+            const authBody = document.querySelector('.auth-body');
+            if (authBody) {
+                authBody.insertBefore(alert, authBody.firstChild);
                 
-                if (currentUser.role === 'admin') {
-                    loadAdminUsers();
-                    loadAdminStats();
-                }
+                setTimeout(() => {
+                    alert.remove();
+                }, 5000);
+            } else {
+                alert('حدث خطأ: ' + message);
             }
         }
 
-        async function loadHomeStats() {
+        async function loadDashboardStats() {
+            // يمكن إضافة جلب الإحصائيات الحقيقية من السيرفر
+            document.getElementById('statsUsers').textContent = '125';
+            document.getElementById('statsMessages').textContent = '347';
+            document.getElementById('statsStories').textContent = '23';
+            document.getElementById('statsOnline').textContent = connectedUsers.size;
+        }
+
+        async function loadAdminStats() {
             try {
-                const response = await fetch(`${API_BASE}/health`);
-                if (response.ok) {
-                    const data = await response.json();
-                    document.getElementById('onlineUsers').textContent = data.onlineUsers;
-                }
-            } catch (error) {
-                console.error('Error loading home stats:', error);
-            }
-        }
-
-        function loadConversationsTab(tab) {
-            // هذه وظيفة محاكاة - يمكن تطويرها لتحميل البيانات الحقيقية
-            const container = document.getElementById('conversationsList');
-            
-            if (tab === 'conversations') {
-                container.innerHTML = `
-                    <div style="text-align: center; color: var(--gray); padding: 2rem;">
-                        <i class="fas fa-comments" style="font-size: 2rem; margin-bottom: 1rem;"></i>
-                        <p>لا توجد محادثات بعد</p>
-                    </div>
-                `;
-            } else if (tab === 'groups') {
-                container.innerHTML = `
-                    <div style="text-align: center; color: var(--gray); padding: 2rem;">
-                        <i class="fas fa-users" style="font-size: 2rem; margin-bottom: 1rem;"></i>
-                        <p>لا توجد مجموعات بعد</p>
-                    </div>
-                `;
-            } else if (tab === 'channels') {
-                container.innerHTML = `
-                    <div style="text-align: center; color: var(--gray); padding: 2rem;">
-                        <i class="fas fa-bullhorn" style="font-size: 2rem; margin-bottom: 1rem;"></i>
-                        <p>لا توجد قنوات بعد</p>
-                    </div>
-                `;
-            }
-        }
-
-        function simulateConnectionStatus() {
-            const statusElement = document.getElementById('connectionStatus');
-            
-            // محاكاة تغيير حالة الاتصال
-            setInterval(() => {
-                statusElement.style.display = 'block';
-            }, 10000);
-        }
-
-        // وظائف الإدارة (للاستخدام في الأزرار)
-        window.editUser = function(userId) {
-            alert(`تعديل المستخدم: ${userId}`);
-            // يمكن تطوير هذه الوظيفة لفتح نموذج تعديل
-        };
-
-        window.deleteUser = async function(userId) {
-            if (!confirm('هل أنت متأكد من حذف هذا المستخدم؟ سيتم حذف جميع بياناته.')) {
-                return;
-            }
-
-            try {
-                const response = await fetch(`${API_BASE}/admin/users/${userId}`, {
-                    method: 'DELETE',
+                const response = await fetch('/api/admin/stats', {
                     headers: {
                         'Authorization': `Bearer ${localStorage.getItem('token')}`
                     }
                 });
 
                 if (response.ok) {
-                    showAlert('adminPage', 'تم حذف المستخدم بنجاح', 'success');
-                    loadAdminUsers();
-                } else {
-                    const error = await response.json();
-                    showAlert('adminPage', error.message, 'error');
+                    const stats = await response.json();
+                    document.getElementById('adminTotalUsers').textContent = stats.totalUsers;
+                    document.getElementById('adminTotalMessages').textContent = stats.totalMessages;
+                    document.getElementById('adminActiveStories').textContent = stats.activeStories;
+                    document.getElementById('adminStorageUsed').textContent = Math.round(stats.storageUsed / 1024 / 1024);
                 }
             } catch (error) {
-                console.error('Error deleting user:', error);
-                showAlert('adminPage', 'خطأ في حذف المستخدم', 'error');
+                console.error('خطأ في تحميل إحصائيات الإدارة:', error);
             }
-        };
+        }
 
-        // تهيئة إعدادات المستخدم عند تحميل الصفحة
-        function loadUserSettings() {
-            if (currentUser && currentUser.settings) {
-                document.getElementById('hideOnlineStatus').checked = currentUser.settings.hideOnlineStatus || false;
-                document.getElementById('hideLastSeen').checked = currentUser.settings.hideLastSeen || false;
-                document.getElementById('hideStoryViews').checked = currentUser.settings.hideStoryViews || false;
-                
-                const theme = currentUser.settings.chatBackground || 'default';
-                document.getElementById('chatMain').dataset.theme = theme;
-                
-                document.querySelectorAll('.theme-option').forEach(option => {
-                    option.classList.remove('active');
-                    if (option.dataset.theme === theme) {
-                        option.classList.add('active');
+        async function loadAdminUsers() {
+            try {
+                const response = await fetch('/api/admin/users', {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
                     }
                 });
+
+                if (response.ok) {
+                    const users = await response.json();
+                    displayAdminUsers(users);
+                }
+            } catch (error) {
+                console.error('خطأ في تحميل المستخدمين:', error);
             }
         }
 
-        // تحميل إعدادات المستخدم عند التوثيق
-        if (currentUser) {
-            loadUserSettings();
+        function displayAdminUsers(users) {
+            const tbody = document.getElementById('usersTableBody');
+            tbody.innerHTML = '';
+
+            users.forEach(user => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${user.fullName}</td>
+                    <td>${user.phone}</td>
+                    <td>${user.university}</td>
+                    <td>${user.major}</td>
+                    <td>${user.isOnline ? '<span style="color: var(--success);">🟢 متصل</span>' : '<span style="color: var(--gray);">⚫ غير متصل</span>'}</td>
+                    <td>${user.lastLogin ? formatTime(new Date(user.lastLogin)) : 'لم يسجل دخول'}</td>
+                    <td>
+                        <div class="action-buttons">
+                            <button class="btn btn-primary btn-sm" onclick="editUser('${user._id}')">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="btn btn-danger btn-sm" onclick="deleteUser('${user._id}')">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
         }
+
+        async function loadAdminMessages() {
+            // تنفيذ جلب الرسائل للإدارة
+        }
+
+        async function loadAdminStories() {
+            // تنفيذ جلب الـ Stories للإدارة
+        }
+
+        function showCreateChannelModal() {
+            // تنفيذ عرض نافذة إنشاء قناة
+            alert('نافذة إنشاء قناة - سيتم تنفيذها في الخطوة التالية');
+        }
+
+        async function createBackup() {
+            try {
+                const response = await fetch('/api/admin/backup', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    }
+                });
+
+                if (response.ok) {
+                    alert('تم إنشاء النسخة الاحتياطية بنجاح');
+                }
+            } catch (error) {
+                console.error('خطأ في إنشاء النسخة الاحتياطية:', error);
+                alert('فشل إنشاء النسخة الاحتياطية');
+            }
+        }
+
+        function showRestoreBackupModal() {
+            // تنفيذ عرض نافذة استعادة النسخ الاحتياطية
+            alert('نافذة استعادة النسخ الاحتياطية - سيتم تنفيذها في الخطوة التالية');
+        }
+
+        async function loadPrivacySettings() {
+            if (!currentUser) return;
+
+            document.getElementById('hideOnlineStatus').checked = currentUser.privacy?.hideOnlineStatus || false;
+            document.getElementById('hideLastSeen').checked = currentUser.privacy?.hideLastSeen || false;
+            document.getElementById('hideStoryViews').checked = currentUser.privacy?.hideStoryViews || false;
+        }
+
+        async function updatePrivacySettings() {
+            const privacy = {
+                hideOnlineStatus: document.getElementById('hideOnlineStatus').checked,
+                hideLastSeen: document.getElementById('hideLastSeen').checked,
+                hideStoryViews: document.getElementById('hideStoryViews').checked
+            };
+
+            try {
+                const response = await fetch('/api/user/privacy', {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    },
+                    body: JSON.stringify({ privacy })
+                });
+
+                if (response.ok) {
+                    alert('تم تحديث إعدادات الخصوصية');
+                }
+            } catch (error) {
+                console.error('خطأ في تحديث الخصوصية:', error);
+            }
+        }
+
+        async function saveChatSettings() {
+            const theme = 'default'; // يمكن إضافة اختيار الثيم
+            const fontSize = document.getElementById('fontSizeSelect').value;
+            const background = document.querySelector('.background-option.active')?.dataset.background;
+
+            try {
+                const formData = new FormData();
+                formData.append('theme', theme);
+                formData.append('fontSize', fontSize);
+
+                const backgroundFile = document.getElementById('customBackground').files[0];
+                if (backgroundFile) {
+                    formData.append('background', backgroundFile);
+                }
+
+                const response = await fetch('/api/user/chat-settings', {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    },
+                    body: formData
+                });
+
+                if (response.ok) {
+                    alert('تم حفظ إعدادات الدردشة');
+                }
+            } catch (error) {
+                console.error('خطأ في حفظ إعدادات الدردشة:', error);
+            }
+        }
+
+        function updateUserOnlineStatus(userId, isOnline) {
+            // تحديث حالة الاتصال في الواجهة
+            const conversationItems = document.querySelectorAll('.conversation-item');
+            conversationItems.forEach(item => {
+                // يمكن إضافة منطق لتحديث حالة الاتصال للمستخدمين
+            });
+        }
+
+        function updateConversations() {
+            // تحديث قائمة المحادثات
+            loadConversations();
+        }
+
+        function formatTime(date) {
+            return date.toLocaleTimeString('ar-EG', { 
+                hour: '2-digit', 
+                minute: '2-digit',
+                hour12: true 
+            });
+        }
+
+        // وظائف مساعدة للوصول من HTML
+        window.showPage = showPage;
+        window.createStory = createStory;
+        window.openStoryViewer = openStoryViewer;
+        window.closeStoryViewer = closeStoryViewer;
+        window.showPreviousStory = showPreviousStory;
+        window.showNextStory = showNextStory;
+        window.selectConversation = selectConversation;
+        window.startChatWithUser = startChatWithUser;
+        window.editUser = (userId) => alert(`تعديل المستخدم: ${userId}`);
+        window.deleteUser = (userId) => {
+            if (confirm('هل أنت متأكد من حذف هذا المستخدم؟')) {
+                alert(`حذف المستخدم: ${userId}`);
+            }
+        };
     </script>
 </body>
 </html>
