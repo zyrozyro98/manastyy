@@ -8,6 +8,8 @@ const fs = require('fs');
 const crypto = require('crypto');
 const http = require('http');
 const socketIo = require('socket.io');
+const sharp = require('sharp');
+const moment = require('moment');
 const { v4: uuidv4 } = require('uuid');
 require('dotenv').config();
 
@@ -30,10 +32,13 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(express.static(__dirname));
 
+// معدلات الأمان
+app.disable('x-powered-by');
+
 // تهيئة الملفات والمجلدات
 function initializeApp() {
-    const files = ['local-users.json', 'local-messages.json', 'local-stories.json', 'local-channels.json', 'local-backups.json', 'local-settings.json'];
-    const folders = ['uploads', 'stories', 'channels', 'avatars', 'backups', 'chat-backgrounds'];
+    const files = ['local-users.json', 'local-messages.json', 'local-images.json', 'local-stories.json', 'local-channels.json', 'local-backups.json', 'local-settings.json'];
+    const folders = ['uploads', 'temp', 'stories', 'channels', 'avatars', 'backups', 'chat-backgrounds'];
     
     files.forEach(file => {
         if (!fs.existsSync(file)) {
@@ -57,6 +62,7 @@ function initializeApp() {
             theme: "light",
             maxFileSize: 25,
             storyDuration: 24,
+            allowScreenshots: true,
             backupInterval: 24,
             createdAt: new Date().toISOString()
         };
@@ -107,12 +113,14 @@ function createBackup() {
         const backups = readLocalFile('local-backups.json');
         backups.push(backupData);
         
+        // حفظ فقط آخر 10 نسخ احتياطية
         if (backups.length > 10) {
             backups.splice(0, backups.length - 10);
         }
         
         writeLocalFile('local-backups.json', backups);
         
+        // حفظ نسخة في ملف منفصل
         const backupFilename = `backups/backup-${timestamp}.json`;
         fs.writeFileSync(backupFilename, JSON.stringify(backupData, null, 2));
         
@@ -127,7 +135,7 @@ function createBackup() {
 // جدولة النسخ الاحتياطي التلقائي
 setInterval(() => {
     createBackup();
-}, 24 * 60 * 60 * 1000);
+}, 24 * 60 * 60 * 1000); // كل 24 ساعة
 
 // تخزين متقدم للصور والملفات
 const storage = multer.diskStorage({
@@ -149,7 +157,7 @@ const storage = multer.diskStorage({
 const upload = multer({
     storage: storage,
     limits: {
-        fileSize: 25 * 1024 * 1024,
+        fileSize: 25 * 1024 * 1024, // 25MB
         files: 10
     },
     fileFilter: (req, file, cb) => {
@@ -198,6 +206,7 @@ io.on('connection', (socket) => {
         connectedUsers.set(socket.id, userData);
         userSockets.set(userData._id, socket.id);
         
+        // تحديث حالة الاتصال
         updateUserOnlineStatus(userData._id, true);
         
         console.log(`✅ المستخدم ${userData.fullName} تم توثيقه`);
@@ -229,6 +238,7 @@ io.on('connection', (socket) => {
             messages.push(newMessage);
             writeLocalFile('local-messages.json', messages);
 
+            // إرسال للمستلم إذا كان متصل
             const receiverSocketId = userSockets.get(data.receiverId);
             if (receiverSocketId) {
                 io.to(receiverSocketId).emit('new_message', newMessage);
@@ -236,6 +246,7 @@ io.on('connection', (socket) => {
 
             socket.emit('message_sent', newMessage);
             
+            // إرسال إشعار للمستخدم
             if (receiverSocketId) {
                 io.to(receiverSocketId).emit('message_notification', {
                     from: user.fullName,
@@ -244,6 +255,7 @@ io.on('connection', (socket) => {
                 });
             }
 
+            // إيقاف مؤشر الكتابة
             socket.to(receiverSocketId).emit('user_stop_typing', {
                 userId: user._id
             });
@@ -277,6 +289,7 @@ io.on('connection', (socket) => {
                 
                 writeLocalFile('local-messages.json', messages);
                 
+                // بث التفاعل للمستخدمين المعنيين
                 io.emit('message_reacted', {
                     messageId: data.messageId,
                     reactions: messages[messageIndex].reactions
@@ -338,6 +351,25 @@ io.on('connection', (socket) => {
         }
     });
 
+    // تحديث إعدادات الدردشة
+    socket.on('update_chat_settings', (data) => {
+        const user = connectedUsers.get(socket.id);
+        if (!user) return;
+
+        const users = readLocalFile('local-users.json');
+        const userIndex = users.findIndex(u => u._id === user._id);
+        
+        if (userIndex !== -1) {
+            users[userIndex].chatSettings = {
+                ...users[userIndex].chatSettings,
+                ...data
+            };
+            writeLocalFile('local-users.json', users);
+            
+            socket.emit('chat_settings_updated', users[userIndex].chatSettings);
+        }
+    });
+
     socket.on('disconnect', () => {
         const user = connectedUsers.get(socket.id);
         if (user) {
@@ -345,8 +377,10 @@ io.on('connection', (socket) => {
             userSockets.delete(user._id);
             typingUsers.delete(user._id);
             
+            // تحديث حالة الاتصال
             updateUserOnlineStatus(user._id, false);
             
+            // إعلام الآخرين بغياب المستخدم
             socket.broadcast.emit('user_offline', {
                 userId: user._id
             });
@@ -377,10 +411,11 @@ app.post('/api/stories', authenticateToken, upload.single('story'), async (req, 
 
         const stories = readLocalFile('local-stories.json');
         
+        // حذف الـ Stories المنتهية
         const now = new Date();
         const activeStories = stories.filter(story => {
             const storyTime = new Date(story.createdAt);
-            return (now - storyTime) < (24 * 60 * 60 * 1000);
+            return (now - storyTime) < (24 * 60 * 60 * 1000); // 24 ساعة
         });
 
         const newStory = {
@@ -390,7 +425,7 @@ app.post('/api/stories', authenticateToken, upload.single('story'), async (req, 
             userAvatar: req.user.avatar || null,
             mediaUrl: `/stories/${req.file.filename}`,
             mediaType: req.file.mimetype.startsWith('image/') ? 'image' : 'video',
-            duration: req.file.mimetype.startsWith('video/') ? 30 : 7,
+            duration: req.file.mimetype.startsWith('video/') ? 30 : 7, // ثواني
             createdAt: new Date().toISOString(),
             expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
             views: [],
@@ -402,6 +437,7 @@ app.post('/api/stories', authenticateToken, upload.single('story'), async (req, 
         activeStories.push(newStory);
         writeLocalFile('local-stories.json', activeStories);
 
+        // بث الـ Story الجديد للمتابعين
         io.emit('new_story', newStory);
 
         res.json({
@@ -419,8 +455,10 @@ app.get('/api/stories', authenticateToken, async (req, res) => {
         const stories = readLocalFile('local-stories.json');
         const now = new Date();
         
+        // تصفية الـ Stories النشطة فقط
         const activeStories = stories.filter(story => new Date(story.expiresAt) > now);
         
+        // تجميع الـ Stories بالمستخدم مع مراعاة الإعدادات
         const storiesByUser = {};
         activeStories.forEach(story => {
             if (!storiesByUser[story.userId]) {
@@ -454,6 +492,7 @@ app.post('/api/stories/:storyId/view', authenticateToken, async (req, res) => {
             const users = readLocalFile('local-users.json');
             const storyOwner = users.find(u => u._id === stories[storyIndex].userId);
             
+            // التحقق من إعدادات الخصوصية
             if (storyOwner?.privacy?.hideStoryViews !== true) {
                 if (!stories[storyIndex].views.some(view => view.userId === user._id)) {
                     stories[storyIndex].views.push({
@@ -464,6 +503,7 @@ app.post('/api/stories/:storyId/view', authenticateToken, async (req, res) => {
                     
                     writeLocalFile('local-stories.json', stories);
                     
+                    // إعلام صاحب الـ Story بالمشاهدة
                     const storyOwnerSocket = userSockets.get(stories[storyIndex].userId);
                     if (storyOwnerSocket) {
                         io.to(storyOwnerSocket).emit('story_viewed', {
@@ -524,7 +564,7 @@ app.post('/api/channels', authenticateToken, requireAdmin, upload.single('channe
             createdBy: req.user._id,
             createdAt: new Date().toISOString(),
             isPublic: isPublic !== 'false',
-            type: type || 'channel',
+            type: type || 'channel', // channel or group
             members: [req.user._id],
             admins: [req.user._id],
             settings: {
@@ -600,6 +640,7 @@ app.delete('/api/channels/:channelId', authenticateToken, requireAdmin, async (r
         const deletedChannel = channels.splice(channelIndex, 1)[0];
         writeLocalFile('local-channels.json', channels);
 
+        // حذف الرسائل المرتبطة بالقناة
         const messages = readLocalFile('local-messages.json');
         const filteredMessages = messages.filter(m => m.channelId !== channelId);
         writeLocalFile('local-messages.json', filteredMessages);
@@ -654,6 +695,7 @@ app.post('/api/chat/send', authenticateToken, upload.array('attachments', 5), as
         messages.push(newMessage);
         writeLocalFile('local-messages.json', messages);
 
+        // إرسال عبر WebSocket
         if (channelId) {
             io.emit('channel_message', newMessage);
         } else {
@@ -682,14 +724,14 @@ app.get('/api/chat/conversations', authenticateToken, async (req, res) => {
         const userConversations = {};
         
         messages.forEach(msg => {
-            if (msg.channelId) return;
+            if (msg.channelId) return; // تجاهل رسائل القنوات
             
             const otherUserId = msg.senderId === req.user._id ? msg.receiverId : msg.senderId;
             
             if (otherUserId && otherUserId !== req.user._id) {
                 if (!userConversations[otherUserId]) {
                     const user = users.find(u => u._id === otherUserId);
-                    if (user && user.role !== 'admin') {
+                    if (user && user.role !== 'admin') { // استبعاد المدير من قائمة المحادثات
                         const conversationMessages = messages.filter(m => 
                             (m.senderId === req.user._id && m.receiverId === otherUserId) ||
                             (m.senderId === otherUserId && m.receiverId === req.user._id)
@@ -734,7 +776,7 @@ app.get('/api/chat/search-users', authenticateToken, async (req, res) => {
         const filteredUsers = users
             .filter(user => 
                 user._id !== req.user._id && 
-                user.role !== 'admin' &&
+                user.role !== 'admin' && // استبعاد المدير من نتائج البحث
                 user.fullName.toLowerCase().includes(query.toLowerCase())
             )
             .map(user => ({
@@ -745,28 +787,9 @@ app.get('/api/chat/search-users', authenticateToken, async (req, res) => {
                 lastSeen: user.lastSeen
             }));
 
-        res.json(filteredUsers);
+        res.json(filteruredUsers);
     } catch (error) {
         console.error('خطأ البحث:', error);
-        res.status(500).json({ message: 'خطأ في الخادم' });
-    }
-});
-
-// الحصول على رسائل محادثة محددة
-app.get('/api/chat/conversation/:userId', authenticateToken, async (req, res) => {
-    try {
-        const { userId } = req.params;
-        const messages = readLocalFile('local-messages.json');
-        
-        const conversationMessages = messages.filter(msg => 
-            !msg.channelId &&
-            ((msg.senderId === req.user._id && msg.receiverId === userId) ||
-             (msg.senderId === userId && msg.receiverId === req.user._id))
-        ).sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-        
-        res.json(conversationMessages);
-    } catch (error) {
-        console.error('خطأ جلب رسائل المحادثة:', error);
         res.status(500).json({ message: 'خطأ في الخادم' });
     }
 });
@@ -863,6 +886,7 @@ app.post('/api/auth/login', async (req, res) => {
             return res.status(400).json({ message: 'بيانات الدخول غير صحيحة' });
         }
 
+        // تحديث آخر دخول
         user.lastLogin = new Date().toISOString();
         user.lastSeen = new Date().toISOString();
         writeLocalFile('local-users.json', users);
@@ -940,6 +964,7 @@ app.put('/api/admin/users/:userId', authenticateToken, requireAdmin, async (req,
             return res.status(404).json({ message: 'المستخدم غير موجود' });
         }
 
+        // تحديث البيانات المسموح بها
         const allowedUpdates = ['fullName', 'university', 'major', 'batch', 'isActive'];
         allowedUpdates.forEach(field => {
             if (updates[field] !== undefined) {
@@ -973,6 +998,7 @@ app.delete('/api/admin/users/:userId', authenticateToken, requireAdmin, async (r
         const deletedUser = users.splice(userIndex, 1)[0];
         writeLocalFile('local-users.json', users);
 
+        // حذف البيانات المرتبطة بالمستخدم
         const messages = readLocalFile('local-messages.json');
         const filteredMessages = messages.filter(m => 
             m.senderId !== userId && m.receiverId !== userId
@@ -1051,6 +1077,7 @@ app.get('/api/admin/stats', authenticateToken, requireAdmin, async (req, res) =>
     try {
         const users = readLocalFile('local-users.json');
         const messages = readLocalFile('local-messages.json');
+        const images = readLocalFile('local-images.json');
         const stories = readLocalFile('local-stories.json');
         const channels = readLocalFile('local-channels.json');
 
@@ -1064,8 +1091,10 @@ app.get('/api/admin/stats', authenticateToken, requireAdmin, async (req, res) =>
             totalMessages: messages.length,
             messagesToday: messages.filter(m => new Date(m.timestamp) >= today).length,
             unreadMessages: messages.filter(m => !m.read).length,
+            totalImages: images.length,
             activeStories: stories.filter(s => new Date(s.expiresAt) > now).length,
             totalChannels: channels.length,
+            storageUsed: images.reduce((total, img) => total + (img.fileSize || 0), 0),
             newUsersToday: users.filter(u => new Date(u.createdAt) >= today && u.role === 'student').length
         };
 
@@ -1098,7 +1127,7 @@ app.post('/api/admin/backup', authenticateToken, requireAdmin, async (req, res) 
 app.get('/api/admin/backups', authenticateToken, requireAdmin, async (req, res) => {
     try {
         const backups = readLocalFile('local-backups.json');
-        res.json(backups.reverse());
+        res.json(backups.reverse()); // الأحدث أولاً
     } catch (error) {
         console.error('خطأ جلب النسخ الاحتياطية:', error);
         res.status(500).json({ message: 'خطأ في الخادم' });
@@ -1116,12 +1145,14 @@ app.post('/api/admin/restore', authenticateToken, requireAdmin, async (req, res)
             return res.status(404).json({ message: 'النسخة الاحتياطية غير موجودة' });
         }
 
+        // استعادة البيانات
         writeLocalFile('local-users.json', backup.users || []);
         writeLocalFile('local-messages.json', backup.messages || []);
         writeLocalFile('local-stories.json', backup.stories || []);
         writeLocalFile('local-channels.json', backup.channels || []);
         writeLocalFile('local-settings.json', backup.settings || []);
 
+        // إعادة تشغيل نظام WebSocket
         connectedUsers.clear();
         userSockets.clear();
         typingUsers.clear();
@@ -1255,17 +1286,20 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
+// صفحة الإدارة
 app.get('/admin', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
+// مسار الصحة
 app.get('/health', (req, res) => {
     res.json({ 
         status: '✅ النظام يعمل بشكل طبيعي',
         timestamp: new Date().toISOString(),
         version: '4.0.0',
         environment: process.env.NODE_ENV || 'development',
-        onlineUsers: connectedUsers.size
+        onlineUsers: connectedUsers.size,
+        totalConnections: connectedUsers.size
     });
 });
 
@@ -1274,6 +1308,7 @@ app.use((req, res, next) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('X-Frame-Options', 'DENY');
     res.setHeader('X-XSS-Protection', '1; mode=block');
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
     next();
 });
 
@@ -1303,5 +1338,5 @@ server.listen(PORT, '0.0.0.0', () => {
     console.log(`💾 نظام النسخ الاحتياطي التلقائي مفعل`);
     
     setTimeout(createAdminUser, 2000);
-    setTimeout(createBackup, 5000);
+    setTimeout(createBackup, 5000); // نسخة احتياطية أولية
 });
