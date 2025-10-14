@@ -1,12 +1,13 @@
 {
   "name": "educational-platform",
-  "version": "1.0.0",
+  "version": "4.2.0",
   "type": "module",
-  "description": "منصة تعليمية متطورة مع نظام دردشة وستوريات",
+  "description": "منصة تعليمية متطورة مع نظام دردشة وستوريات وتخزين في Google Sheets",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node --watch server.js"
+    "dev": "node --watch server.js",
+    "setup-sheets": "node setup-sheets.js"
   },
   "dependencies": {
     "express": "^4.18.2",
@@ -17,15 +18,22 @@
     "sharp": "^0.33.0",
     "uuid": "^9.0.1",
     "socket.io": "^4.7.5",
-    "dotenv": "^16.3.1"
+    "dotenv": "^16.3.1",
+    "mongoose": "^7.5.0",
+    "helmet": "^7.0.0",
+    "compression": "^1.7.4",
+    "morgan": "^1.10.0",
+    "express-rate-limit": "^6.8.1",
+    "googleapis": "^126.0.1"
   },
   "keywords": [
     "educational",
     "platform",
     "chat",
     "stories",
-    "arabic"
+    "arabic",
+    "google-sheets"
   ],
-  "author": "Your Name",
+  "author": "Educational Platform Team",
   "license": "MIT"
 }
