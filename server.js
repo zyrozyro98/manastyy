@@ -1328,6 +1328,43 @@ app.post('/api/backup/restore/:filename', authenticateToken, requireAdmin, async
     }
 });
 
+app.delete('/api/backup/delete/:filename', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const { filename } = req.params;
+        const backupPath = path.join(BACKUP_DIR, filename);
+        
+        if (!fs.existsSync(backupPath)) {
+            return res.status(404).json({
+                success: false,
+                message: 'النسخة الاحتياطية غير موجودة'
+            });
+        }
+
+        fs.unlinkSync(backupPath);
+        
+        // تحديث قائمة النسخ الاحتياطية
+        const data = localStorageService.loadData();
+        data.backups = data.backups.filter(backup => backup.filename !== filename);
+        localStorageService.saveData(data);
+        
+        await auditLog('BACKUP_DELETED', req.user._id, 'system', 'backup', {
+            filename: filename
+        });
+        
+        res.json({
+            success: true,
+            message: 'تم حذف النسخة الاحتياطية بنجاح'
+        });
+    } catch (error) {
+        console.error('خطأ في حذف النسخة الاحتياطية:', error);
+        res.status(500).json({
+            success: false,
+            message: 'حدث خطأ أثناء حذف النسخة الاحتياطية',
+            error: error.message
+        });
+    }
+});
+
 app.get('/api/export/:format?', authenticateToken, requireAdmin, async (req, res) => {
     try {
         const format = req.params.format || 'json';
@@ -1650,6 +1687,18 @@ app.post('/api/stories', authenticateToken, upload.single('story'), async (req, 
             hasCaption: !!caption
         });
 
+        // إرسال إشعار للمتابعين
+        io.emit('new_story', {
+            story: {
+                ...story.toObject(),
+                userId: {
+                    _id: req.user._id,
+                    fullName: req.user.fullName,
+                    avatar: req.user.avatar
+                }
+            }
+        });
+
         res.status(201).json({
             success: true,
             message: 'تم نشر الستوري بنجاح',
@@ -1685,6 +1734,54 @@ app.get('/api/stories', authenticateToken, async (req, res) => {
             success: false,
             message: 'حدث خطأ أثناء جلب الستوريات',
             code: 'STORIES_FETCH_ERROR'
+        });
+    }
+});
+
+app.post('/api/stories/:storyId/view', authenticateToken, async (req, res) => {
+    try {
+        const { storyId } = req.params;
+        
+        const story = await Story.findById(storyId);
+        if (!story) {
+            return res.status(404).json({
+                success: false,
+                message: 'الستوري غير موجود'
+            });
+        }
+
+        // التحقق إذا كان المستخدم قد شاهد الستوري مسبقاً
+        const alreadyViewed = story.views.some(view => 
+            view.userId.toString() === req.user._id.toString()
+        );
+
+        if (!alreadyViewed) {
+            story.views.push({
+                userId: req.user._id,
+                viewedAt: new Date()
+            });
+            
+            story.metrics.viewCount += 1;
+            await story.save();
+            
+            // إرسال تحديث للمستخدمين
+            io.emit('story_viewed', {
+                storyId: story._id,
+                views: story.views
+            });
+        }
+
+        res.json({
+            success: true,
+            message: 'تم تسجيل المشاهدة'
+        });
+
+    } catch (error) {
+        console.error('خطأ في تسجيل مشاهدة الستوري:', error);
+        res.status(500).json({
+            success: false,
+            message: 'حدث خطأ أثناء تسجيل المشاهدة',
+            code: 'STORY_VIEW_ERROR'
         });
     }
 });
@@ -1772,6 +1869,30 @@ app.get('/api/channels', authenticateToken, async (req, res) => {
             success: false,
             message: 'حدث خطأ أثناء جلب القنوات',
             code: 'CHANNELS_FETCH_ERROR'
+        });
+    }
+});
+
+// مسارات المحادثات
+app.get('/api/conversations', authenticateToken, async (req, res) => {
+    try {
+        const conversations = await Conversation.find({
+            participants: req.user._id
+        })
+        .populate('participants', 'fullName avatar isOnline')
+        .populate('lastMessage')
+        .sort({ updatedAt: -1 });
+
+        res.json({
+            success: true,
+            conversations
+        });
+    } catch (error) {
+        console.error('خطأ في جلب المحادثات:', error);
+        res.status(500).json({
+            success: false,
+            message: 'حدث خطأ أثناء جلب المحادثات',
+            code: 'CONVERSATIONS_FETCH_ERROR'
         });
     }
 });
@@ -1900,8 +2021,9 @@ app.get('/api/messages/:conversationId', authenticateToken, async (req, res) => 
 io.on('connection', (socket) => {
     console.log('👤 مستخدم متصل:', socket.id);
 
-    socket.on('user_connected', async (userId) => {
+    socket.on('user_connected', async (data) => {
         try {
+            const { userId } = data;
             connectedUsers.set(userId.toString(), socket.id);
             userSockets.set(socket.id, userId.toString());
             
@@ -1945,6 +2067,69 @@ io.on('connection', (socket) => {
             userName: data.userName,
             isTyping: false
         });
+    });
+
+    socket.on('send_message', async (data) => {
+        try {
+            const { conversationId, content, messageType } = data;
+            
+            const message = new Message({
+                conversationId,
+                senderId: data.userId,
+                content,
+                messageType
+            });
+            
+            await message.save();
+            await saveMessageToLocal(message);
+            
+            const conversation = await Conversation.findByIdAndUpdate(
+                conversationId,
+                { lastMessage: message._id },
+                { new: true }
+            );
+            
+            // إرسال الرسالة لجميع المشاركين في المحادثة
+            io.to(conversationId).emit('new_message', {
+                message: {
+                    ...message.toObject(),
+                    senderId: {
+                        _id: data.userId,
+                        fullName: data.userName
+                    }
+                }
+            });
+            
+        } catch (error) {
+            console.error('خطأ في إرسال الرسالة:', error);
+        }
+    });
+
+    socket.on('view_story', async (data) => {
+        try {
+            const { storyId } = data;
+            const userId = userSockets.get(socket.id);
+            
+            if (!userId) return;
+            
+            const story = await Story.findById(storyId);
+            if (story && !story.views.some(view => view.userId.toString() === userId)) {
+                story.views.push({
+                    userId,
+                    viewedAt: new Date()
+                });
+                
+                story.metrics.viewCount += 1;
+                await story.save();
+                
+                io.emit('story_viewed', {
+                    storyId: story._id,
+                    views: story.views
+                });
+            }
+        } catch (error) {
+            console.error('خطأ في تسجيل مشاهدة الستوري:', error);
+        }
     });
 
     socket.on('message_read', async (data) => {
