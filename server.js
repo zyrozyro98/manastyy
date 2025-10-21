@@ -31,7 +31,7 @@ const io = new Server(server, {
 
 // إعدادات البيئة
 const PORT = process.env.PORT || 3000;
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/educational_platform';
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://mongodb.railway.internal:27017/educational_platform';
 const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key-2024';
 const NODE_ENV = process.env.NODE_ENV || 'development';
 const BACKUP_DIR = path.join(__dirname, 'backups');
@@ -2233,7 +2233,6 @@ process.on('SIGINT', async () => {
         console.error('❌ خطأ في الإيقاف النظيف:', error);
         process.exit(1);
     }
-});
 // خدمة ملفات الـ Static (Frontend)
 app.use(express.static(path.join(__dirname, 'public')));
 
