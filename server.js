@@ -34,7 +34,16 @@ const PORT = process.env.PORT || 3000;
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/educational_platform';
 const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key-2024';
 const NODE_ENV = process.env.NODE_ENV || 'development';
-const SPREADSHEET_ID = process.env.SPREADSHEET_ID || '1fW18ZxsUqntEfRxIv0-srLnzg7izBgmQpqZpfqyq3UA';
+const BACKUP_DIR = path.join(__dirname, 'backups');
+const EXPORT_DIR = path.join(__dirname, 'exports');
+
+// إنشاء المجلدات اللازمة
+const requiredDirs = ['uploads', 'uploads/profiles', 'uploads/stories', 'uploads/channels', 'uploads/files', BACKUP_DIR, EXPORT_DIR];
+requiredDirs.forEach(dir => {
+    if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+    }
+});
 
 // وسائط الأمان والتحسين
 app.use(helmet({
@@ -47,7 +56,7 @@ app.use(morgan(NODE_ENV === 'production' ? 'combined' : 'dev'));
 // Rate Limiting
 const limiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 دقيقة
-    max: NODE_ENV === 'production' ? 100 : 1000, // حد الطلبات
+    max: NODE_ENV === 'production' ? 100 : 1000,
     message: {
         success: false,
         message: 'تم تجاوز عدد الطلبات المسموح بها، يرجى المحاولة لاحقاً'
@@ -63,16 +72,9 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use('/uploads', express.static('uploads'));
+app.use('/exports', express.static('exports'));
 
-// إنشاء مجلدات التحميلات
-const uploadDirs = ['uploads', 'uploads/profiles', 'uploads/stories', 'uploads/channels', 'uploads/files'];
-uploadDirs.forEach(dir => {
-    if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-    }
-});
-
-// إعداد multer المتقدم للتحميلات
+// إعداد multer للتحميلات
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
         let uploadPath = 'uploads/';
@@ -80,6 +82,7 @@ const storage = multer.diskStorage({
         else if (file.fieldname === 'story') uploadPath += 'stories/';
         else if (file.fieldname === 'channelAvatar') uploadPath += 'channels/';
         else if (file.fieldname === 'file') uploadPath += 'files/';
+        else if (file.fieldname === 'backup') uploadPath += 'backups/';
         cb(null, uploadPath);
     },
     filename: function (req, file, cb) {
@@ -95,7 +98,8 @@ const fileFilter = (req, file, cb) => {
         'story': ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'video/mp4', 'video/quicktime', 'video/webm'],
         'channelAvatar': ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
         'file': ['image/jpeg', 'image/png', 'image/gif', 'application/pdf', 'text/plain', 
-                'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']
+                'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
+        'backup': ['application/json']
     };
     
     if (allowedTypes[file.fieldname]?.includes(file.mimetype)) {
@@ -113,7 +117,7 @@ const upload = multer({
     fileFilter: fileFilter
 });
 
-// نماذج MongoDB المتقدمة
+// نماذج MongoDB
 const userSchema = new mongoose.Schema({
     fullName: { type: String, required: true, trim: true },
     phone: { type: String, required: true, unique: true, index: true },
@@ -183,7 +187,7 @@ userSchema.methods.incrementLoginAttempts = function() {
     
     const updates = { $inc: { 'security.loginAttempts': 1 } };
     if (this.security.loginAttempts + 1 >= 5) {
-        updates.$set = { 'security.lockUntil': Date.now() + 2 * 60 * 60 * 1000 }; // 2 ساعة
+        updates.$set = { 'security.lockUntil': Date.now() + 2 * 60 * 60 * 1000 };
     }
     return this.updateOne(updates);
 };
@@ -217,7 +221,7 @@ const storySchema = new mongoose.Schema({
     }],
     location: {
         type: { type: String, enum: ['Point'], default: 'Point' },
-        coordinates: { type: [Number] } // [longitude, latitude]
+        coordinates: { type: [Number] }
     },
     tags: [{ type: String }],
     expiresAt: { type: Date, required: true },
@@ -243,7 +247,7 @@ const messageSchema = new mongoose.Schema({
     messageType: { type: String, enum: ['text', 'image', 'video', 'file', 'voice', 'location'], default: 'text' },
     fileUrl: { type: String },
     fileSize: { type: Number },
-    duration: { type: Number }, // للملفات الصوتية
+    duration: { type: Number },
     location: {
         latitude: { type: Number },
         longitude: { type: Number },
@@ -292,7 +296,7 @@ const conversationSchema = new mongoose.Schema({
         allowInvites: { type: Boolean, default: true },
         approvalRequired: { type: Boolean, default: false },
         slowMode: { type: Boolean, default: false },
-        slowModeDelay: { type: Number, default: 0 } // بالثواني
+        slowModeDelay: { type: Number, default: 0 }
     },
     metadata: {
         createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
@@ -346,13 +350,12 @@ const channelSchema = new mongoose.Schema({
     ]
 });
 
-// النماذج الإضافية
 const notificationSchema = new mongoose.Schema({
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     type: { type: String, enum: ['message', 'story', 'channel', 'system', 'friend_request'], required: true },
     title: { type: String, required: true },
     message: { type: String, required: true },
-    data: { type: mongoose.Schema.Types.Mixed }, // بيانات إضافية
+    data: { type: mongoose.Schema.Types.Mixed },
     isRead: { type: Boolean, default: false },
     actionUrl: { type: String },
     expiresAt: { type: Date }
@@ -384,132 +387,381 @@ const Channel = mongoose.model('Channel', channelSchema);
 const Notification = mongoose.model('Notification', notificationSchema);
 const Report = mongoose.model('Report', reportSchema);
 
-// خدمة Google Sheets المبسطة
-class GoogleSheetsService {
+// نظام التخزين المحلي والنسخ الاحتياطي
+class LocalStorageService {
     constructor() {
-        this.initialized = false;
+        this.dataFile = path.join(__dirname, 'local_data.json');
+        this.init();
     }
 
-    async appendData(spreadsheetId, range, values) {
-        console.log('📝 محاكاة حفظ البيانات في Sheets:', {
-            spreadsheetId,
-            range,
-            values: values[0]
-        });
-        return { success: true, simulated: true };
+    init() {
+        if (!fs.existsSync(this.dataFile)) {
+            this.saveData({
+                users: [],
+                messages: [],
+                stories: [],
+                channels: [],
+                backups: [],
+                exports: [],
+                lastBackup: null,
+                stats: {
+                    totalUsers: 0,
+                    totalMessages: 0,
+                    totalStories: 0,
+                    totalChannels: 0
+                }
+            });
+        }
     }
 
-    async readData(spreadsheetId, range) {
-        console.log('📖 محاكاة قراءة البيانات من Sheets:', { spreadsheetId, range });
-        return [['بيانات', 'محاكاة']];
+    loadData() {
+        try {
+            const data = fs.readFileSync(this.dataFile, 'utf8');
+            return JSON.parse(data);
+        } catch (error) {
+            console.error('خطأ في تحميل البيانات المحلية:', error);
+            return this.getDefaultData();
+        }
     }
 
-    async updateData(spreadsheetId, range, values) {
-        console.log('🔄 محاكاة تحديث البيانات في Sheets:', {
-            spreadsheetId,
-            range,
-            values: values[0]
-        });
-        return { success: true, simulated: true };
+    saveData(data) {
+        try {
+            fs.writeFileSync(this.dataFile, JSON.stringify(data, null, 2));
+            return true;
+        } catch (error) {
+            console.error('خطأ في حفظ البيانات المحلية:', error);
+            return false;
+        }
+    }
+
+    getDefaultData() {
+        return {
+            users: [],
+            messages: [],
+            stories: [],
+            channels: [],
+            backups: [],
+            exports: [],
+            lastBackup: null,
+            stats: {
+                totalUsers: 0,
+                totalMessages: 0,
+                totalStories: 0,
+                totalChannels: 0
+            }
+        };
+    }
+
+    async createBackup() {
+        try {
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+            const backupFile = path.join(BACKUP_DIR, `backup-${timestamp}.json`);
+            
+            const backupData = {
+                timestamp: new Date().toISOString(),
+                data: this.loadData(),
+                collections: {
+                    users: await User.find().select('-password').lean(),
+                    stories: await Story.find().lean(),
+                    messages: await Message.find().lean(),
+                    channels: await Channel.find().lean()
+                }
+            };
+
+            fs.writeFileSync(backupFile, JSON.stringify(backupData, null, 2));
+            
+            // تحديث سجل النسخ الاحتياطية
+            const data = this.loadData();
+            data.backups.push({
+                filename: `backup-${timestamp}.json`,
+                timestamp: new Date().toISOString(),
+                size: JSON.stringify(backupData).length
+            });
+            
+            // الاحتفاظ بـ 10 نسخ احتياطية فقط
+            if (data.backups.length > 10) {
+                const oldBackup = data.backups.shift();
+                const oldBackupPath = path.join(BACKUP_DIR, oldBackup.filename);
+                if (fs.existsSync(oldBackupPath)) {
+                    fs.unlinkSync(oldBackupPath);
+                }
+            }
+            
+            data.lastBackup = new Date().toISOString();
+            this.saveData(data);
+            
+            return { success: true, filename: `backup-${timestamp}.json` };
+        } catch (error) {
+            console.error('خطأ في إنشاء النسخة الاحتياطية:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    async restoreBackup(backupFile) {
+        try {
+            const backupPath = path.join(BACKUP_DIR, backupFile);
+            if (!fs.existsSync(backupPath)) {
+                return { success: false, error: 'النسخة الاحتياطية غير موجودة' };
+            }
+
+            const backupData = JSON.parse(fs.readFileSync(backupPath, 'utf8'));
+            
+            // استعادة البيانات المحلية
+            this.saveData(backupData.data);
+            
+            // استعادة بيانات MongoDB
+            if (backupData.collections) {
+                if (backupData.collections.users) {
+                    await User.deleteMany({});
+                    await User.insertMany(backupData.collections.users);
+                }
+                
+                if (backupData.collections.stories) {
+                    await Story.deleteMany({});
+                    await Story.insertMany(backupData.collections.stories);
+                }
+                
+                if (backupData.collections.messages) {
+                    await Message.deleteMany({});
+                    await Message.insertMany(backupData.collections.messages);
+                }
+                
+                if (backupData.collections.channels) {
+                    await Channel.deleteMany({});
+                    await Channel.insertMany(backupData.collections.channels);
+                }
+            }
+
+            return { success: true, message: 'تم استعادة النسخة الاحتياطية بنجاح' };
+        } catch (error) {
+            console.error('خطأ في استعادة النسخة الاحتياطية:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    async exportData(format = 'json') {
+        try {
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+            const exportData = {
+                exportInfo: {
+                    timestamp: new Date().toISOString(),
+                    format: format,
+                    version: '1.0'
+                },
+                collections: {
+                    users: await User.find().select('-password -security').lean(),
+                    stories: await Story.find().lean(),
+                    messages: await Message.find().lean(),
+                    channels: await Channel.find().lean(),
+                    localData: this.loadData()
+                }
+            };
+
+            let filename, fileContent;
+
+            if (format === 'json') {
+                filename = `export-${timestamp}.json`;
+                fileContent = JSON.stringify(exportData, null, 2);
+            } else if (format === 'csv') {
+                // تحويل البيانات إلى CSV (مبسط)
+                filename = `export-${timestamp}.zip`;
+                fileContent = this.convertToCSV(exportData);
+            }
+
+            const exportPath = path.join(EXPORT_DIR, filename);
+            fs.writeFileSync(exportPath, fileContent);
+
+            // تحديث سجل التصدير
+            const data = this.loadData();
+            data.exports.push({
+                filename: filename,
+                timestamp: new Date().toISOString(),
+                format: format,
+                size: fileContent.length
+            });
+            this.saveData(data);
+
+            return { success: true, filename, path: exportPath };
+        } catch (error) {
+            console.error('خطأ في تصدير البيانات:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    convertToCSV(data) {
+        // تحويل مبكر للبيانات إلى CSV
+        // يمكن تطوير هذا الجزء ليكون أكثر تعقيداً
+        let csvContent = '';
+
+        // تصدير المستخدمين
+        if (data.collections.users) {
+            csvContent += 'المستخدمين\n';
+            csvContent += 'الاسم,الهاتف,الجامعة,التخصص,الدور\n';
+            data.collections.users.forEach(user => {
+                csvContent += `${user.fullName},${user.phone},${user.university},${user.major},${user.role}\n`;
+            });
+            csvContent += '\n';
+        }
+
+        return csvContent;
+    }
+
+    async importData(filePath) {
+        try {
+            const fileContent = fs.readFileSync(filePath, 'utf8');
+            const importData = JSON.parse(fileContent);
+
+            if (!importData.collections) {
+                return { success: false, error: 'تنسيق ملف الاستيراد غير صالح' };
+            }
+
+            // استيراد البيانات
+            if (importData.collections.users) {
+                await User.deleteMany({});
+                await User.insertMany(importData.collections.users);
+            }
+
+            if (importData.collections.stories) {
+                await Story.deleteMany({});
+                await Story.insertMany(importData.collections.stories);
+            }
+
+            if (importData.collections.messages) {
+                await Message.deleteMany({});
+                await Message.insertMany(importData.collections.messages);
+            }
+
+            if (importData.collections.channels) {
+                await Channel.deleteMany({});
+                await Channel.insertMany(importData.collections.channels);
+            }
+
+            if (importData.collections.localData) {
+                this.saveData(importData.collections.localData);
+            }
+
+            return { success: true, message: 'تم استيراد البيانات بنجاح' };
+        } catch (error) {
+            console.error('خطأ في استيراد البيانات:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    updateStats() {
+        const data = this.loadData();
+        data.stats = {
+            totalUsers: data.users.length,
+            totalMessages: data.messages.length,
+            totalStories: data.stories.length,
+            totalChannels: data.channels.length,
+            lastUpdate: new Date().toISOString()
+        };
+        this.saveData(data);
+        return data.stats;
     }
 }
 
-const googleSheetsService = new GoogleSheetsService();
+const localStorageService = new LocalStorageService();
 
-// دوال التخزين في Google Sheets
-const saveUserToSheets = async (user) => {
+// دوال التخزين المحلي
+const saveUserToLocal = async (user) => {
     try {
-        const values = [
-            [
-                user._id.toString(),
-                user.fullName,
-                user.phone,
-                user.university,
-                user.major,
-                user.batch,
-                user.role,
-                user.isOnline ? 'نعم' : 'لا',
-                user.isActive ? 'نشط' : 'موقوف',
-                new Date(user.createdAt).toLocaleDateString('ar-EG'),
-                new Date().toLocaleString('ar-EG')
-            ]
-        ];
+        const data = localStorageService.loadData();
+        const userIndex = data.users.findIndex(u => u._id === user._id.toString());
+        
+        const userData = {
+            _id: user._id.toString(),
+            fullName: user.fullName,
+            phone: user.phone,
+            university: user.university,
+            major: user.major,
+            batch: user.batch,
+            role: user.role,
+            isOnline: user.isOnline,
+            isActive: user.isActive,
+            createdAt: user.createdAt,
+            lastSeen: user.lastSeen
+        };
 
-        await googleSheetsService.appendData(SPREADSHEET_ID, 'المستخدمين!A:K', values);
-        console.log('✅ تم حفظ المستخدم في Google Sheets');
+        if (userIndex >= 0) {
+            data.users[userIndex] = userData;
+        } else {
+            data.users.push(userData);
+        }
+
+        localStorageService.saveData(data);
+        localStorageService.updateStats();
+        console.log('✅ تم حفظ المستخدم في التخزين المحلي');
     } catch (error) {
-        console.error('❌ خطأ في حفظ المستخدم في Sheets:', error);
+        console.error('❌ خطأ في حفظ المستخدم محلياً:', error);
     }
 };
 
-const saveMessageToSheets = async (message) => {
+const saveMessageToLocal = async (message) => {
     try {
-        const values = [
-            [
-                message._id.toString(),
-                message.conversationId.toString(),
-                message.senderId.toString(),
-                message.content.substring(0, 100), // أول 100 حرف فقط
-                message.messageType,
-                new Date(message.createdAt).toLocaleString('ar-EG'),
-                message.readBy.length,
-                'نشط'
-            ]
-        ];
+        const data = localStorageService.loadData();
+        data.messages.push({
+            _id: message._id.toString(),
+            conversationId: message.conversationId.toString(),
+            senderId: message.senderId.toString(),
+            content: message.content.substring(0, 100),
+            messageType: message.messageType,
+            createdAt: message.createdAt,
+            readCount: message.readBy.length
+        });
 
-        await googleSheetsService.appendData(SPREADSHEET_ID, 'الرسائل!A:H', values);
-        console.log('✅ تم حفظ الرسالة في Google Sheets');
+        localStorageService.saveData(data);
+        localStorageService.updateStats();
+        console.log('✅ تم حفظ الرسالة في التخزين المحلي');
     } catch (error) {
-        console.error('❌ خطأ في حفظ الرسالة في Sheets:', error);
+        console.error('❌ خطأ في حفظ الرسالة محلياً:', error);
     }
 };
 
-const saveStoryToSheets = async (story) => {
+const saveStoryToLocal = async (story) => {
     try {
-        const values = [
-            [
-                story._id.toString(),
-                story.userId.toString(),
-                story.mediaType,
-                story.caption || 'بدون وصف',
-                new Date(story.createdAt).toLocaleString('ar-EG'),
-                new Date(story.expiresAt).toLocaleString('ar-EG'),
-                story.views.length,
-                story.reactions.length,
-                'نشط'
-            ]
-        ];
+        const data = localStorageService.loadData();
+        data.stories.push({
+            _id: story._id.toString(),
+            userId: story.userId.toString(),
+            mediaType: story.mediaType,
+            caption: story.caption || 'بدون وصف',
+            createdAt: story.createdAt,
+            expiresAt: story.expiresAt,
+            views: story.views.length,
+            reactions: story.reactions.length
+        });
 
-        await googleSheetsService.appendData(SPREADSHEET_ID, 'الستوريات!A:I', values);
-        console.log('✅ تم حفظ الستوري في Google Sheets');
+        localStorageService.saveData(data);
+        localStorageService.updateStats();
+        console.log('✅ تم حفظ الستوري في التخزين المحلي');
     } catch (error) {
-        console.error('❌ خطأ في حفظ الستوري في Sheets:', error);
+        console.error('❌ خطأ في حفظ الستوري محلياً:', error);
     }
 };
 
-const saveChannelToSheets = async (channel) => {
+const saveChannelToLocal = async (channel) => {
     try {
-        const values = [
-            [
-                channel._id.toString(),
-                channel.name,
-                channel.type,
-                channel.creatorId.toString(),
-                channel.members.length,
-                channel.isPublic ? 'عام' : 'خاص',
-                new Date(channel.createdAt).toLocaleString('ar-EG'),
-                'نشط'
-            ]
-        ];
+        const data = localStorageService.loadData();
+        data.channels.push({
+            _id: channel._id.toString(),
+            name: channel.name,
+            type: channel.type,
+            creatorId: channel.creatorId.toString(),
+            members: channel.members.length,
+            isPublic: channel.isPublic,
+            createdAt: channel.createdAt
+        });
 
-        await googleSheetsService.appendData(SPREADSHEET_ID, 'القنوات!A:H', values);
-        console.log('✅ تم حفظ القناة في Google Sheets');
+        localStorageService.saveData(data);
+        localStorageService.updateStats();
+        console.log('✅ تم حفظ القناة في التخزين المحلي');
     } catch (error) {
-        console.error('❌ خطأ في حفظ القناة في Sheets:', error);
+        console.error('❌ خطأ في حفظ القناة محلياً:', error);
     }
 };
 
-// middleware المصادقة المتقدم
+// middleware المصادقة
 const authenticateToken = async (req, res, next) => {
     try {
         const authHeader = req.headers['authorization'];
@@ -576,7 +828,6 @@ const authenticateToken = async (req, res, next) => {
     }
 };
 
-// middleware للتحقق من صلاحيات المدير
 const requireAdmin = (req, res, next) => {
     if (req.user.role !== 'admin') {
         return res.status(403).json({ 
@@ -588,7 +839,6 @@ const requireAdmin = (req, res, next) => {
     next();
 };
 
-// middleware للتحقق من صلاحيات المشرف
 const requireModerator = (req, res, next) => {
     if (!['admin', 'moderator'].includes(req.user.role)) {
         return res.status(403).json({ 
@@ -600,7 +850,7 @@ const requireModerator = (req, res, next) => {
     next();
 };
 
-// دوال مساعدة متقدمة
+// دوال مساعدة
 const generateToken = (userId) => {
     return jwt.sign({ userId }, JWT_SECRET, { expiresIn: '30d' });
 };
@@ -641,12 +891,11 @@ const sendNotification = async (userId, type, title, message, data = null, actio
             message,
             data,
             actionUrl,
-            expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 يوم
+            expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
         });
         
         await notification.save();
         
-        // إرسال إشعار في الوقت الحقيقي
         const userSocket = connectedUsers.get(userId.toString());
         if (userSocket) {
             io.to(userSocket).emit('new_notification', {
@@ -671,6 +920,21 @@ const sendNotification = async (userId, type, title, message, data = null, actio
 const auditLog = async (action, userId, targetType, targetId, details = {}) => {
     try {
         console.log(`📋 Audit Log: ${action} by ${userId} on ${targetType} ${targetId}`, details);
+        
+        // حفظ في التخزين المحلي
+        const data = localStorageService.loadData();
+        if (!data.auditLogs) data.auditLogs = [];
+        
+        data.auditLogs.push({
+            action,
+            userId,
+            targetType,
+            targetId,
+            details,
+            timestamp: new Date().toISOString()
+        });
+        
+        localStorageService.saveData(data);
     } catch (error) {
         console.error('خطأ في تسجيل التدقيق:', error);
     }
@@ -683,8 +947,6 @@ mongoose.connect(MONGODB_URI, {
 })
 .then(() => {
     console.log('✅ تم الاتصال بقاعدة البيانات بنجاح');
-    
-    // إنشاء مدير افتراضي إذا لم يكن موجوداً
     createDefaultAdmin();
 })
 .catch((error) => {
@@ -694,434 +956,120 @@ mongoose.connect(MONGODB_URI, {
 
 async function createDefaultAdmin() {
     try {
-        const adminExists = await User.findOne({ role: 'admin' });
+        const adminExists = await User.findOne({ phone: '500000000' });
         if (!adminExists) {
-            const hashedPassword = await bcrypt.hash('admin123', 12);
+            const hashedPassword = await bcrypt.hash('77007700', 12);
             const admin = new User({
                 fullName: 'مدير النظام',
-                phone: '0512345678',
+                phone: '500000000',
                 university: 'المنصة التعليمية',
                 major: 'إدارة النظام',
                 batch: '2024',
                 password: hashedPassword,
                 role: 'admin',
-                email: 'admin@eduplatform.com'
+                email: 'admin@platform.edu',
+                studentId: 'ADMIN001',
+                badges: ['👑 مدير النظام'],
+                stats: {
+                    messagesSent: 0,
+                    storiesPosted: 0,
+                    channelsJoined: 0,
+                    totalLikes: 0
+                }
             });
+            
             await admin.save();
+            await saveUserToLocal(admin);
             
-            // حفظ المدير في Google Sheets
-            await saveUserToSheets(admin);
-            
-            console.log('👑 تم إنشاء حساب المدير الافتراضي');
+            console.log('✅ تم إنشاء حساب المدير الافتراضي بنجاح');
+            console.log('📱 رقم الهاتف: 500000000');
+            console.log('🔐 كلمة المرور: 77007700');
+        } else {
+            console.log('✅ حساب المدير موجود بالفعل');
         }
     } catch (error) {
-        console.error('خطأ في إنشاء المدير الافتراضي:', error);
+        console.error('❌ خطأ في إنشاء حساب المدير:', error);
     }
 }
 
-// تخزين للمستخدمين المتصلين وإدارة الغرف
+// تخزين المستخدمين المتصلين
 const connectedUsers = new Map();
-const userSessions = new Map();
+const userSockets = new Map();
 
-// إعداد Socket.IO المتقدم
-io.on('connection', (socket) => {
-    console.log('👤 مستخدم متصل:', socket.id);
-
-    socket.on('user_connected', async (data) => {
-        try {
-            const { userId, userAgent, platform } = data;
-            const user = await User.findById(userId);
-            
-            if (user) {
-                // تحديث حالة الاتصال
-                connectedUsers.set(userId, socket.id);
-                userSessions.set(socket.id, {
-                    userId,
-                    connectedAt: new Date(),
-                    userAgent,
-                    platform
-                });
-                
-                socket.userId = userId;
-                
-                // تحديث حالة المستخدم
-                await User.findByIdAndUpdate(userId, { 
-                    isOnline: true,
-                    lastSeen: new Date() 
-                });
-                
-                // إعلام المستخدمين الآخرين
-                socket.broadcast.emit('user_online', {
-                    userId,
-                    user: formatUserResponse(user)
-                });
-                
-                // إرسال الإشعارات غير المقروءة
-                const unreadNotifications = await Notification.find({
-                    userId,
-                    isRead: false
-                }).sort({ createdAt: -1 }).limit(10);
-                
-                socket.emit('notifications_sync', {
-                    notifications: unreadNotifications
-                });
-                
-                console.log(`✅ المستخدم ${user.fullName} متصل الآن`);
-                
-                // تسجيل التدقيق
-                await auditLog('USER_CONNECTED', userId, 'user', userId, {
-                    socketId: socket.id,
-                    userAgent,
-                    platform
-                });
-            }
-        } catch (error) {
-            console.error('خطأ في اتصال المستخدم:', error);
-        }
-    });
-
-    // انضمام للغرف
-    socket.on('join_conversation', (conversationId) => {
-        socket.join(`conversation_${conversationId}`);
-        console.log(`💬 المستخدم انضم للمحادثة: ${conversationId}`);
-    });
-
-    socket.on('leave_conversation', (conversationId) => {
-        socket.leave(`conversation_${conversationId}`);
-        console.log(`💬 المستخدم غادر المحادثة: ${conversationId}`);
-    });
-
-    socket.on('join_channel', (channelId) => {
-        socket.join(`channel_${channelId}`);
-        console.log(`📢 المستخدم انضم للقناة: ${channelId}`);
-    });
-
-    // إرسال الرسائل
-    socket.on('send_message', async (data) => {
-        try {
-            const { conversationId, content, messageType = 'text', fileUrl = null, replyTo = null } = data;
-
-            // التحقق من أن المستخدم مشارك في المحادثة
-            const conversation = await Conversation.findOne({
-                _id: conversationId,
-                participants: socket.userId
-            });
-
-            if (!conversation) {
-                socket.emit('error', { 
-                    message: 'غير مصرح لك بإرسال رسالة في هذه المحادثة',
-                    code: 'UNAUTHORIZED_CONVERSATION'
-                });
-                return;
-            }
-
-            // إنشاء الرسالة
-            const message = new Message({
-                conversationId,
-                senderId: socket.userId,
-                content,
-                messageType,
-                fileUrl,
-                replyTo
-            });
-
-            await message.save();
-
-            // حفظ في Google Sheets
-            await saveMessageToSheets(message);
-
-            // تحديث المحادثة
-            conversation.lastMessage = message._id;
-            conversation.updatedAt = new Date();
-            
-            // تحديث عدد الرسائل غير المقروءة للمشاركين الآخرين
-            conversation.participants.forEach(participantId => {
-                if (participantId.toString() !== socket.userId) {
-                    const currentCount = conversation.unreadCount.get(participantId.toString()) || 0;
-                    conversation.unreadCount.set(participantId.toString(), currentCount + 1);
-                }
-            });
-
-            await conversation.save();
-
-            // تحديث إحصائيات المستخدم
-            await User.findByIdAndUpdate(socket.userId, {
-                $inc: { 'stats.messagesSent': 1 }
-            });
-
-            // إرسال الرسالة للمشاركين
-            const populatedMessage = await message.populate('senderId', 'fullName avatar');
-            const messageData = {
-                message: populatedMessage.toObject(),
-                conversationId
-            };
-            
-            io.to(`conversation_${conversationId}`).emit('new_message', messageData);
-
-            // إرسال إشعارات للمستخدمين غير المتصلين
-            for (const participantId of conversation.participants) {
-                if (participantId.toString() !== socket.userId) {
-                    const isOnline = connectedUsers.has(participantId.toString());
-                    if (!isOnline) {
-                        await sendNotification(
-                            participantId,
-                            'message',
-                            'رسالة جديدة',
-                            `${populatedMessage.senderId.fullName}: ${content.substring(0, 100)}...`,
-                            { conversationId, messageId: message._id },
-                            `/chat/${conversationId}`
-                        );
-                    }
-                }
-            }
-
-            // تسجيل التدقيق
-            await auditLog('MESSAGE_SENT', socket.userId, 'message', message._id, {
-                conversationId,
-                messageType,
-                length: content.length
-            });
-
-        } catch (error) {
-            console.error('خطأ في إرسال الرسالة:', error);
-            socket.emit('error', { 
-                message: 'حدث خطأ في إرسال الرسالة',
-                code: 'MESSAGE_SEND_ERROR'
-            });
-        }
-    });
-
-    // تفاعلات الرسائل
-    socket.on('message_reaction', async (data) => {
-        try {
-            const { messageId, emoji } = data;
-            
-            const message = await Message.findById(messageId);
-            if (!message) {
-                socket.emit('error', { message: 'الرسالة غير موجودة' });
-                return;
-            }
-
-            // إزالة التفاعل السابق إذا وجد
-            message.reactions = message.reactions.filter(
-                reaction => reaction.userId.toString() !== socket.userId
-            );
-
-            // إضافة التفاعل الجديد
-            message.reactions.push({
-                userId: socket.userId,
-                emoji,
-                reactedAt: new Date()
-            });
-
-            await message.save();
-
-            // بث تحديث التفاعل
-            const conversation = await Conversation.findById(message.conversationId);
-            if (conversation) {
-                io.to(`conversation_${message.conversationId}`).emit('message_reaction_updated', {
-                    messageId,
-                    reactions: message.reactions
-                });
-            }
-
-        } catch (error) {
-            console.error('خطأ في تفاعل الرسالة:', error);
-        }
-    });
-
-    // تحديث حالة القراءة
-    socket.on('message_read', async (data) => {
-        try {
-            const { conversationId, messageId } = data;
-
-            const conversation = await Conversation.findOne({
-                _id: conversationId,
-                participants: socket.userId
-            });
-
-            if (conversation) {
-                // تحديث الرسالة
-                await Message.findByIdAndUpdate(messageId, {
-                    $addToSet: { 
-                        readBy: { 
-                            userId: socket.userId,
-                            readAt: new Date()
-                        }
-                    }
-                });
-
-                // تحديث عدد الرسائل غير المقروءة
-                conversation.unreadCount.set(socket.userId.toString(), 0);
-                await conversation.save();
-
-                // إعلام المشاركين الآخرين
-                socket.to(`conversation_${conversationId}`).emit('message_read_update', {
-                    messageId,
-                    readBy: socket.userId
-                });
-            }
-
-        } catch (error) {
-            console.error('خطأ في تحديث حالة القراءة:', error);
-        }
-    });
-
-    // مؤشر الكتابة
-    socket.on('typing_start', (data) => {
-        const { conversationId } = data;
-        socket.to(`conversation_${conversationId}`).emit('user_typing', {
-            userId: socket.userId,
-            conversationId,
-            user: userSessions.get(socket.id)?.user
-        });
-    });
-
-    socket.on('typing_stop', (data) => {
-        const { conversationId } = data;
-        socket.to(`conversation_${conversationId}`).emit('user_stop_typing', {
-            userId: socket.userId,
-            conversationId
-        });
-    });
-
-    // إدارة الاتصال
-    socket.on('disconnect', async () => {
-        try {
-            const session = userSessions.get(socket.id);
-            if (session && session.userId) {
-                const userId = session.userId;
-                
-                // تحديث حالة المستخدم
-                await User.findByIdAndUpdate(userId, { 
-                    isOnline: false,
-                    lastSeen: new Date() 
-                });
-                
-                connectedUsers.delete(userId);
-                userSessions.delete(socket.id);
-                
-                // إعلام المستخدمين الآخرين
-                socket.broadcast.emit('user_offline', userId);
-                
-                console.log(`❌ المستخدم ${userId} انقطع عن الاتصال`);
-                
-                // تسجيل التدقيق
-                await auditLog('USER_DISCONNECTED', userId, 'user', userId, {
-                    socketId: socket.id,
-                    sessionDuration: Date.now() - session.connectedAt
-                });
-            }
-        } catch (error) {
-            console.error('خطأ في فصل الاتصال:', error);
-        }
-    });
-
-    // معالجة الأخطاء
-    socket.on('error', (error) => {
-        console.error('خطأ في السوكيت:', error);
-    });
-});
-
-// المسارات الأساسية
+// مسارات API
 app.get('/', (req, res) => {
-    res.json({ 
-        success: true, 
-        message: 'مرحباً بك في المنصة التعليمية المتطورة',
-        version: '4.2.0',
+    res.json({
+        success: true,
+        message: 'مرحباً بك في منصتنا التعليمية! 🎓',
+        version: '2.0.0',
         environment: NODE_ENV,
-        timestamp: new Date().toISOString(),
         features: [
-            'دردشة فورية',
-            'قصص تفاعلية',
-            'قنوات متخصصة',
-            'إدارة متقدمة',
-            'نظام إشعارات',
-            'تحليلات متقدمة',
-            'تخزين في Google Sheets'
-        ]
+            'التخزين المحلي المحسن',
+            'نظام النسخ الاحتياطي',
+            'استيراد/تصدير البيانات',
+            'إدارة متقدمة للمستخدمين',
+            'نظام الإشعارات',
+            'التدوين والقصص',
+            'المحادثات الفورية',
+            'القنوات والمجموعات'
+        ],
+        endpoints: {
+            auth: '/api/auth/*',
+            users: '/api/users/*',
+            stories: '/api/stories/*',
+            messages: '/api/messages/*',
+            channels: '/api/channels/*',
+            admin: '/api/admin/*',
+            backup: '/api/backup/*'
+        }
     });
 });
 
-app.get('/api/health', (req, res) => {
-    res.json({ 
-        success: true, 
-        status: 'running',
-        environment: NODE_ENV,
-        timestamp: new Date().toISOString(),
-        connectedUsers: connectedUsers.size,
-        memoryUsage: process.memoryUsage(),
-        uptime: process.uptime()
-    });
-});
-
-// مسارات المصادقة المتقدمة
-app.post('/api/auth/register', async (req, res) => {
+// مسارات المصادقة
+app.post('/api/auth/register', upload.single('avatar'), async (req, res) => {
     try {
-        const { fullName, phone, university, major, batch, password, email, studentId } = req.body;
+        const { fullName, phone, university, major, batch, password, bio, email, studentId } = req.body;
 
-        // التحقق من البيانات
         if (!fullName || !phone || !university || !major || !batch || !password) {
-            return res.status(400).json({ 
-                success: false, 
-                message: 'جميع الحقول المطلوبة',
+            return res.status(400).json({
+                success: false,
+                message: 'جميع الحقول الإلزامية مطلوبة',
                 code: 'MISSING_FIELDS'
             });
         }
 
-        if (password.length < 6) {
-            return res.status(400).json({ 
-                success: false, 
-                message: 'كلمة المرور يجب أن تكون على الأقل 6 أحرف',
-                code: 'WEAK_PASSWORD'
-            });
-        }
-
-        // التحقق من وجود المستخدم
-        const existingUser = await User.findOne({ 
-            $or: [
-                { phone },
-                ...(email ? [{ email }] : []),
-                ...(studentId ? [{ studentId }] : [])
-            ]
-        });
-
+        const existingUser = await User.findOne({ phone });
         if (existingUser) {
-            const field = existingUser.phone === phone ? 'رقم الهاتف' : 
-                         existingUser.email === email ? 'البريد الإلكتروني' : 'رقم الطالب';
-            return res.status(400).json({ 
-                success: false, 
-                message: `${field} مسجل مسبقاً`,
-                code: 'DUPLICATE_ENTRY'
+            return res.status(400).json({
+                success: false,
+                message: 'رقم الهاتف مسجل بالفعل',
+                code: 'PHONE_EXISTS'
             });
         }
 
-        // تشفير كلمة المرور
         const hashedPassword = await bcrypt.hash(password, 12);
+        const avatar = req.file ? `/uploads/profiles/${req.file.filename}` : null;
 
-        // إنشاء المستخدم
         const user = new User({
-            fullName: fullName.trim(),
+            fullName,
             phone,
             university,
             major,
             batch,
             password: hashedPassword,
+            avatar,
+            bio,
             email,
             studentId
         });
 
         await user.save();
+        await saveUserToLocal(user);
 
-        // حفظ في Google Sheets
-        await saveUserToSheets(user);
-
-        // إنشاء tokens
         const token = generateToken(user._id);
         const refreshToken = generateRefreshToken(user._id);
 
-        // تسجيل التدقيق
-        await auditLog('USER_REGISTERED', user._id, 'user', user._id, {
+        await auditLog('REGISTER', user._id, 'user', user._id, {
             university,
             major,
             batch
@@ -1130,16 +1078,16 @@ app.post('/api/auth/register', async (req, res) => {
         res.status(201).json({
             success: true,
             message: 'تم إنشاء الحساب بنجاح',
+            user: formatUserResponse(user),
             token,
-            refreshToken,
-            user: formatUserResponse(user)
+            refreshToken
         });
 
     } catch (error) {
-        console.error('خطأ في إنشاء الحساب:', error);
-        res.status(500).json({ 
-            success: false, 
-            message: 'حدث خطأ في الخادم',
+        console.error('خطأ في التسجيل:', error);
+        res.status(500).json({
+            success: false,
+            message: 'حدث خطأ أثناء التسجيل',
             code: 'REGISTRATION_ERROR'
         });
     }
@@ -1147,92 +1095,79 @@ app.post('/api/auth/register', async (req, res) => {
 
 app.post('/api/auth/login', async (req, res) => {
     try {
-        const { phone, password, rememberMe = false } = req.body;
+        const { phone, password } = req.body;
 
         if (!phone || !password) {
-            return res.status(400).json({ 
-                success: false, 
+            return res.status(400).json({
+                success: false,
                 message: 'رقم الهاتف وكلمة المرور مطلوبان',
                 code: 'MISSING_CREDENTIALS'
             });
         }
 
-        // البحث عن المستخدم
         const user = await User.findOne({ phone });
         if (!user) {
-            return res.status(400).json({ 
-                success: false, 
+            return res.status(401).json({
+                success: false,
                 message: 'رقم الهاتف أو كلمة المرور غير صحيحة',
                 code: 'INVALID_CREDENTIALS'
             });
         }
 
-        // التحقق من حالة الحساب
         if (!user.isActive) {
-            return res.status(400).json({ 
-                success: false, 
+            return res.status(401).json({
+                success: false,
                 message: 'الحساب موقوف. يرجى التواصل مع الإدارة',
                 code: 'ACCOUNT_SUSPENDED'
             });
         }
 
         if (user.isLocked) {
-            return res.status(400).json({ 
-                success: false, 
+            return res.status(401).json({
+                success: false,
                 message: 'الحساب مؤقتاً مغلق due to multiple failed login attempts',
                 code: 'ACCOUNT_LOCKED'
             });
         }
 
-        // التحقق من كلمة المرور
         const isPasswordValid = await bcrypt.compare(password, user.password);
         if (!isPasswordValid) {
-            // زيادة عدد محاولات الدخول الفاشلة
             await user.incrementLoginAttempts();
-            
-            return res.status(400).json({ 
-                success: false, 
+            return res.status(401).json({
+                success: false,
                 message: 'رقم الهاتف أو كلمة المرور غير صحيحة',
                 code: 'INVALID_CREDENTIALS'
             });
         }
 
-        // إعادة تعيين محاولات الدخول الفاشلة
-        await User.findByIdAndUpdate(user._id, {
-            $set: { 
+        // إعادة تعيين محاولات تسجيل الدخول
+        await user.updateOne({
+            $set: {
                 'security.loginAttempts': 0,
-                'security.lockUntil': null
+                'security.lockUntil': null,
+                isOnline: true,
+                lastSeen: new Date()
             }
         });
 
-        // تحديث آخر ظهور
-        user.lastSeen = new Date();
-        await user.save();
-
-        // إنشاء tokens
-        const tokenExpiry = rememberMe ? '90d' : '30d';
-        const token = jwt.sign({ userId: user._id }, JWT_SECRET, { expiresIn: tokenExpiry });
+        const token = generateToken(user._id);
         const refreshToken = generateRefreshToken(user._id);
 
-        // تسجيل التدقيق
-        await auditLog('USER_LOGGED_IN', user._id, 'user', user._id, {
-            rememberMe,
-            userAgent: req.get('User-Agent')
-        });
+        await auditLog('LOGIN', user._id, 'user', user._id);
 
         res.json({
             success: true,
             message: 'تم تسجيل الدخول بنجاح',
+            user: formatUserResponse(user),
             token,
-            refreshToken,
-            user: formatUserResponse(user)
+            refreshToken
         });
 
     } catch (error) {
         console.error('خطأ في تسجيل الدخول:', error);
-        res.status(500).json({ 
-            success: false, 
-            message: 'حدث خطأ في الخادم',
+        res.status(500).json({
+            success: false,
+            message: 'حدث خطأ أثناء تسجيل الدخول',
             code: 'LOGIN_ERROR'
         });
     }
@@ -1243,27 +1178,27 @@ app.post('/api/auth/refresh', async (req, res) => {
         const { refreshToken } = req.body;
 
         if (!refreshToken) {
-            return res.status(401).json({ 
-                success: false, 
-                message: 'Refresh token مطلوب',
+            return res.status(401).json({
+                success: false,
+                message: 'رمز التحديث مطلوب',
                 code: 'REFRESH_TOKEN_REQUIRED'
             });
         }
 
         const decoded = jwt.verify(refreshToken, JWT_SECRET);
         if (decoded.type !== 'refresh') {
-            return res.status(401).json({ 
-                success: false, 
-                message: 'نوع token غير صالح',
-                code: 'INVALID_TOKEN_TYPE'
+            return res.status(401).json({
+                success: false,
+                message: 'رمز تحديث غير صالح',
+                code: 'INVALID_REFRESH_TOKEN'
             });
         }
 
         const user = await User.findById(decoded.userId);
         if (!user || !user.isActive) {
-            return res.status(401).json({ 
-                success: false, 
-                message: 'المستخدم غير موجود أو غير نشط',
+            return res.status(401).json({
+                success: false,
+                message: 'المستخدم غير موجود أو الحساب موقوف',
                 code: 'USER_NOT_FOUND'
             });
         }
@@ -1278,528 +1213,510 @@ app.post('/api/auth/refresh', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('خطأ في تجديد الرمز:', error);
-        res.status(401).json({ 
-            success: false, 
-            message: 'Refresh token غير صالح',
+        console.error('خطأ في تحديث الرمز:', error);
+        res.status(401).json({
+            success: false,
+            message: 'رمز تحديث غير صالح',
             code: 'INVALID_REFRESH_TOKEN'
         });
     }
 });
 
-// مسارات Google Sheets
-app.get('/api/sheets/stats', authenticateToken, async (req, res) => {
+app.post('/api/auth/logout', authenticateToken, async (req, res) => {
     try {
-        const [usersData, messagesData, storiesData] = await Promise.all([
-            googleSheetsService.readData(SPREADSHEET_ID, 'المستخدمين!A:K'),
-            googleSheetsService.readData(SPREADSHEET_ID, 'الرسائل!A:H'),
-            googleSheetsService.readData(SPREADSHEET_ID, 'الستوريات!A:I')
-        ]);
-
-        // إزالة العناوين
-        const usersCount = Math.max(0, (usersData?.length || 1) - 1);
-        const messagesCount = Math.max(0, (messagesData?.length || 1) - 1);
-        const storiesCount = Math.max(0, (storiesData?.length || 1) - 1);
-
-        res.json({
-            success: true,
-            stats: {
-                totalUsers: usersCount,
-                totalMessages: messagesCount,
-                totalStories: storiesCount,
-                lastUpdate: new Date().toLocaleString('ar-EG')
+        await User.findByIdAndUpdate(req.user._id, {
+            $set: {
+                isOnline: false,
+                lastSeen: new Date()
             }
         });
 
+        await auditLog('LOGOUT', req.user._id, 'user', req.user._id);
+
+        res.json({
+            success: true,
+            message: 'تم تسجيل الخروج بنجاح'
+        });
+
     } catch (error) {
-        console.error('خطأ في جلب إحصائيات الـ Sheets:', error);
+        console.error('خطأ في تسجيل الخروج:', error);
         res.status(500).json({
             success: false,
-            message: 'حدث خطأ في جلب الإحصائيات'
+            message: 'حدث خطأ أثناء تسجيل الخروج',
+            code: 'LOGOUT_ERROR'
         });
     }
 });
 
-app.post('/api/export/all-data', authenticateToken, requireAdmin, async (req, res) => {
+// مسارات النسخ الاحتياطي والاستيراد/التصدير
+app.get('/api/backup/create', authenticateToken, requireAdmin, async (req, res) => {
     try {
-        const users = await User.find().select('-password -security');
-        const messages = await Message.find().limit(1000).populate('senderId', 'fullName');
-        const stories = await Story.find().limit(1000).populate('userId', 'fullName');
-        const channels = await Channel.find().limit(500).populate('creatorId', 'fullName');
+        const result = await localStorageService.createBackup();
+        
+        if (result.success) {
+            await auditLog('BACKUP_CREATED', req.user._id, 'system', 'backup', {
+                filename: result.filename
+            });
+            
+            res.json({
+                success: true,
+                message: 'تم إنشاء النسخة الاحتياطية بنجاح',
+                filename: result.filename
+            });
+        } else {
+            res.status(500).json({
+                success: false,
+                message: 'فشل في إنشاء النسخة الاحتياطية',
+                error: result.error
+            });
+        }
+    } catch (error) {
+        console.error('خطأ في إنشاء النسخة الاحتياطية:', error);
+        res.status(500).json({
+            success: false,
+            message: 'حدث خطأ أثناء إنشاء النسخة الاحتياطية',
+            error: error.message
+        });
+    }
+});
 
-        // تصدير المستخدمين
-        const userValues = users.map(user => [
-            user._id.toString(),
-            user.fullName,
-            user.phone,
-            user.university,
-            user.major,
-            user.batch,
-            user.role,
-            user.isOnline ? 'نعم' : 'لا',
-            user.isActive ? 'نشط' : 'موقوف',
-            new Date(user.createdAt).toLocaleDateString('ar-EG')
-        ]);
-
-        // إضافة عناوين الأعمدة
-        userValues.unshift([
-            'ID', 'الاسم', 'الهاتف', 'الجامعة', 'التخصص', 'الدفعة', 
-            'الدور', 'متصل', 'الحالة', 'تاريخ التسجيل'
-        ]);
-
-        await googleSheetsService.updateData(SPREADSHEET_ID, 'تصدير_المستخدمين!A:J', userValues);
-
+app.get('/api/backup/list', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const data = localStorageService.loadData();
         res.json({
             success: true,
-            message: 'تم تصدير جميع البيانات بنجاح',
-            sheetUrl: `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/edit`
+            backups: data.backups || []
         });
+    } catch (error) {
+        console.error('خطأ في جلب قائمة النسخ الاحتياطية:', error);
+        res.status(500).json({
+            success: false,
+            message: 'حدث خطأ أثناء جلب قائمة النسخ الاحتياطية',
+            error: error.message
+        });
+    }
+});
 
+app.post('/api/backup/restore/:filename', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const { filename } = req.params;
+        const result = await localStorageService.restoreBackup(filename);
+        
+        if (result.success) {
+            await auditLog('BACKUP_RESTORED', req.user._id, 'system', 'backup', {
+                filename: filename
+            });
+            
+            res.json({
+                success: true,
+                message: result.message
+            });
+        } else {
+            res.status(400).json({
+                success: false,
+                message: 'فشل في استعادة النسخة الاحتياطية',
+                error: result.error
+            });
+        }
+    } catch (error) {
+        console.error('خطأ في استعادة النسخة الاحتياطية:', error);
+        res.status(500).json({
+            success: false,
+            message: 'حدث خطأ أثناء استعادة النسخة الاحتياطية',
+            error: error.message
+        });
+    }
+});
+
+app.get('/api/export/:format?', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const format = req.params.format || 'json';
+        const result = await localStorageService.exportData(format);
+        
+        if (result.success) {
+            await auditLog('DATA_EXPORTED', req.user._id, 'system', 'export', {
+                format: format,
+                filename: result.filename
+            });
+            
+            res.json({
+                success: true,
+                message: 'تم تصدير البيانات بنجاح',
+                filename: result.filename,
+                downloadUrl: `/exports/${result.filename}`
+            });
+        } else {
+            res.status(500).json({
+                success: false,
+                message: 'فشل في تصدير البيانات',
+                error: result.error
+            });
+        }
     } catch (error) {
         console.error('خطأ في تصدير البيانات:', error);
         res.status(500).json({
             success: false,
-            message: 'حدث خطأ أثناء التصدير'
+            message: 'حدث خطأ أثناء تصدير البيانات',
+            error: error.message
         });
     }
 });
 
-// مسارات المستخدم المتقدمة
-app.get('/api/user/profile', authenticateToken, async (req, res) => {
+app.post('/api/import', authenticateToken, requireAdmin, upload.single('file'), async (req, res) => {
     try {
-        const userWithStats = await User.findById(req.user._id)
-            .select('-password -security');
+        if (!req.file) {
+            return res.status(400).json({
+                success: false,
+                message: 'الملف مطلوب للاستيراد'
+            });
+        }
+
+        const result = await localStorageService.importData(req.file.path);
+        
+        if (result.success) {
+            await auditLog('DATA_IMPORTED', req.user._id, 'system', 'import', {
+                filename: req.file.filename
+            });
             
+            // حذف الملف المؤقت
+            fs.unlinkSync(req.file.path);
+            
+            res.json({
+                success: true,
+                message: result.message
+            });
+        } else {
+            res.status(400).json({
+                success: false,
+                message: 'فشل في استيراد البيانات',
+                error: result.error
+            });
+        }
+    } catch (error) {
+        console.error('خطأ في استيراد البيانات:', error);
+        res.status(500).json({
+            success: false,
+            message: 'حدث خطأ أثناء استيراد البيانات',
+            error: error.message
+        });
+    }
+});
+
+app.get('/api/stats', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const userCount = await User.countDocuments();
+        const storyCount = await Story.countDocuments();
+        const messageCount = await Message.countDocuments();
+        const channelCount = await Channel.countDocuments();
+        
+        const localStats = localStorageService.updateStats();
+        const backupStats = localStorageService.loadData().backups || [];
+        
+        const onlineUsers = Array.from(connectedUsers.keys()).length;
+        
         res.json({
             success: true,
-            user: formatUserResponse(userWithStats)
+            stats: {
+                database: {
+                    users: userCount,
+                    stories: storyCount,
+                    messages: messageCount,
+                    channels: channelCount
+                },
+                local: localStats,
+                system: {
+                    onlineUsers,
+                    uptime: process.uptime(),
+                    memory: process.memoryUsage(),
+                    backups: backupStats.length,
+                    lastBackup: localStorageService.loadData().lastBackup
+                }
+            }
         });
     } catch (error) {
-        console.error('خطأ في جلب الملف الشخصي:', error);
-        res.status(500).json({ 
-            success: false, 
-            message: 'حدث خطأ في الخادم',
-            code: 'PROFILE_FETCH_ERROR'
+        console.error('خطأ في جلب الإحصائيات:', error);
+        res.status(500).json({
+            success: false,
+            message: 'حدث خطأ أثناء جلب الإحصائيات',
+            error: error.message
         });
     }
 });
 
-app.put('/api/user/profile', authenticateToken, async (req, res) => {
+// مسارات المستخدمين
+app.get('/api/users/me', authenticateToken, async (req, res) => {
     try {
-        const { fullName, university, major, batch, bio, email, studentId } = req.body;
-
-        const updateData = {};
-        if (fullName) updateData.fullName = fullName.trim();
-        if (university) updateData.university = university;
-        if (major) updateData.major = major;
-        if (batch) updateData.batch = batch;
-        if (bio !== undefined) updateData.bio = bio;
-        if (email) updateData.email = email;
-        if (studentId) updateData.studentId = studentId;
-
-        const updatedUser = await User.findByIdAndUpdate(
-            req.user._id,
-            updateData,
-            { new: true, runValidators: true }
-        ).select('-password -security');
-
-        // تسجيل التدقيق
-        await auditLog('PROFILE_UPDATED', req.user._id, 'user', req.user._id, {
-            updatedFields: Object.keys(updateData)
+        const user = await User.findById(req.user._id);
+        res.json({
+            success: true,
+            user: formatUserResponse(user)
         });
+    } catch (error) {
+        console.error('خطأ في جلب بيانات المستخدم:', error);
+        res.status(500).json({
+            success: false,
+            message: 'حدث خطأ أثناء جلب بيانات المستخدم',
+            code: 'USER_FETCH_ERROR'
+        });
+    }
+});
 
+app.put('/api/users/me', authenticateToken, upload.single('avatar'), async (req, res) => {
+    try {
+        const { fullName, bio, email, studentId } = req.body;
+        const updateData = { fullName, bio, email, studentId };
+        
+        if (req.file) {
+            updateData.avatar = `/uploads/profiles/${req.file.filename}`;
+        }
+        
+        const user = await User.findByIdAndUpdate(
+            req.user._id,
+            { $set: updateData },
+            { new: true, runValidators: true }
+        );
+        
+        await saveUserToLocal(user);
+        await auditLog('PROFILE_UPDATE', req.user._id, 'user', req.user._id, updateData);
+        
         res.json({
             success: true,
             message: 'تم تحديث الملف الشخصي بنجاح',
-            user: formatUserResponse(updatedUser)
+            user: formatUserResponse(user)
         });
-
     } catch (error) {
         console.error('خطأ في تحديث الملف الشخصي:', error);
-        if (error.code === 11000) {
-            const field = Object.keys(error.keyPattern)[0];
-            const fieldName = field === 'email' ? 'البريد الإلكتروني' : 'رقم الطالب';
-            return res.status(400).json({ 
-                success: false, 
-                message: `${fieldName} مسجل مسبقاً`,
-                code: 'DUPLICATE_ENTRY'
-            });
-        }
-        res.status(500).json({ 
-            success: false, 
-            message: 'حدث خطأ في الخادم',
+        res.status(500).json({
+            success: false,
+            message: 'حدث خطأ أثناء تحديث الملف الشخصي',
             code: 'PROFILE_UPDATE_ERROR'
         });
     }
 });
 
-app.put('/api/user/settings', authenticateToken, async (req, res) => {
+app.put('/api/users/settings', authenticateToken, async (req, res) => {
     try {
         const { privacy, notificationSettings, appearance } = req.body;
-
-        const updateData = {};
-        if (privacy) updateData['settings.privacy'] = privacy;
-        if (notificationSettings) updateData['settings.notificationSettings'] = notificationSettings;
-        if (appearance) updateData['settings.appearance'] = appearance;
-
-        const updatedUser = await User.findByIdAndUpdate(
+        
+        const user = await User.findByIdAndUpdate(
             req.user._id,
-            { $set: updateData },
+            { 
+                $set: { 
+                    'settings.privacy': privacy,
+                    'settings.notificationSettings': notificationSettings,
+                    'settings.appearance': appearance
+                } 
+            },
             { new: true }
-        ).select('-password -security');
-
+        );
+        
+        await auditLog('SETTINGS_UPDATE', req.user._id, 'user', req.user._id, {
+            privacy: Object.keys(privacy || {}),
+            notifications: Object.keys(notificationSettings || {}),
+            appearance: Object.keys(appearance || {})
+        });
+        
         res.json({
             success: true,
             message: 'تم تحديث الإعدادات بنجاح',
-            user: formatUserResponse(updatedUser)
+            settings: user.settings
         });
-
     } catch (error) {
         console.error('خطأ في تحديث الإعدادات:', error);
-        res.status(500).json({ 
-            success: false, 
-            message: 'حدث خطأ في الخادم',
+        res.status(500).json({
+            success: false,
+            message: 'حدث خطأ أثناء تحديث الإعدادات',
             code: 'SETTINGS_UPDATE_ERROR'
         });
     }
 });
 
-app.get('/api/user/stats', authenticateToken, async (req, res) => {
+// مسارات الإدارة
+app.get('/api/admin/users', authenticateToken, requireAdmin, async (req, res) => {
     try {
-        const userId = req.user._id;
-
-        // إحصائيات متقدمة
-        const storiesCount = await Story.countDocuments({ userId });
-        const activeStoriesCount = await Story.countDocuments({ 
-            userId, 
-            expiresAt: { $gt: new Date() } 
-        });
-        const messagesCount = await Message.countDocuments({ senderId: userId });
-        const joinedChannels = await Channel.countDocuments({ members: userId });
+        const { page = 1, limit = 20, search, role, isActive } = req.query;
+        const query = {};
         
-        // تفاعلات القصص
-        const storyInteractions = await Story.aggregate([
-            { $match: { userId: mongoose.Types.ObjectId(userId) } },
-            {
-                $project: {
-                    totalViews: { $size: '$views' },
-                    totalReactions: { $size: '$reactions' },
-                    totalReplies: { $size: '$replies' }
-                }
-            },
-            {
-                $group: {
-                    _id: null,
-                    totalViews: { $sum: '$totalViews' },
-                    totalReactions: { $sum: '$totalReactions' },
-                    totalReplies: { $sum: '$totalReplies' }
-                }
-            }
-        ]);
-
-        const interactions = storyInteractions[0] || { totalViews: 0, totalReactions: 0, totalReplies: 0 };
-
-        // حساب رتبة المستخدم
-        const activityScore = (storiesCount * 2) + (messagesCount * 1) + (joinedChannels * 3) + 
-                            (interactions.totalViews * 0.1) + (interactions.totalReactions * 0.5) + 
-                            (interactions.totalReplies * 1);
-
-        let rank = 'مبتدئ';
-        let level = 1;
-        if (activityScore > 100) { rank = 'نشط'; level = 2; }
-        if (activityScore > 300) { rank = 'متميز'; level = 3; }
-        if (activityScore > 500) { rank = 'خبير'; level = 4; }
-        if (activityScore > 1000) { rank = 'أسطورة'; level = 5; }
-
-        res.json({
-            success: true,
-            stats: {
-                overview: {
-                    rank,
-                    level,
-                    score: Math.round(activityScore),
-                    nextLevelScore: level * 200,
-                    progress: Math.min(100, (activityScore / (level * 200)) * 100)
-                },
-                messages: { 
-                    total: messagesCount,
-                    today: await Message.countDocuments({
-                        senderId: userId,
-                        createdAt: { $gte: new Date(new Date().setHours(0, 0, 0, 0)) }
-                    })
-                },
-                stories: { 
-                    total: storiesCount, 
-                    active: activeStoriesCount 
-                },
-                channels: { joined: joinedChannels },
-                interactions: {
-                    views: interactions.totalViews,
-                    reactions: interactions.totalReactions,
-                    replies: interactions.totalReplies
-                },
-                badges: req.user.badges || []
-            }
-        });
-
-    } catch (error) {
-        console.error('خطأ في جلب إحصائيات المستخدم:', error);
-        res.status(500).json({ 
-            success: false, 
-            message: 'حدث خطأ في الخادم',
-            code: 'STATS_FETCH_ERROR'
-        });
-    }
-});
-
-// تحميل الصورة الرمزية
-app.post('/api/user/avatar', authenticateToken, upload.single('avatar'), async (req, res) => {
-    try {
-        if (!req.file) {
-            return res.status(400).json({ 
-                success: false, 
-                message: 'لم يتم تحميل أي ملف',
-                code: 'NO_FILE_UPLOADED'
-            });
-        }
-
-        const avatarUrl = `/uploads/profiles/${req.file.filename}`;
-        
-        // حذف الصورة القديمة إذا وجدت
-        const oldUser = await User.findById(req.user._id);
-        if (oldUser.avatar && oldUser.avatar.startsWith('/uploads/profiles/')) {
-            const oldPath = path.join(__dirname, oldUser.avatar);
-            if (fs.existsSync(oldPath)) {
-                fs.unlinkSync(oldPath);
-            }
-        }
-
-        const updatedUser = await User.findByIdAndUpdate(
-            req.user._id,
-            { avatar: avatarUrl },
-            { new: true }
-        ).select('-password -security');
-
-        // تسجيل التدقيق
-        await auditLog('AVATAR_UPDATED', req.user._id, 'user', req.user._id, {
-            newAvatar: avatarUrl
-        });
-
-        res.json({
-            success: true,
-            message: 'تم تحديث الصورة الرمزية بنجاح',
-            user: formatUserResponse(updatedUser)
-        });
-
-    } catch (error) {
-        console.error('خطأ في تحميل الصورة الرمزية:', error);
-        res.status(500).json({ 
-            success: false, 
-            message: 'حدث خطأ في الخادم',
-            code: 'AVATAR_UPLOAD_ERROR'
-        });
-    }
-});
-
-// مسارات المستخدمين النشطين
-app.get('/api/users/active', authenticateToken, async (req, res) => {
-    try {
-        const { limit = 20, search = '' } = req.query;
-
-        const query = {
-            isActive: true,
-            _id: { $ne: req.user._id }
-        };
-
         if (search) {
             query.$or = [
                 { fullName: { $regex: search, $options: 'i' } },
-                { university: { $regex: search, $options: 'i' } },
-                { major: { $regex: search, $options: 'i' } }
+                { phone: { $regex: search, $options: 'i' } },
+                { university: { $regex: search, $options: 'i' } }
             ];
         }
-
-        const activeUsers = await User.find(query)
-            .select('fullName avatar role lastSeen university major isOnline')
-            .limit(parseInt(limit))
-            .sort({ isOnline: -1, lastSeen: -1 });
-
-        const usersWithStatus = activeUsers.map(user => ({
-            ...formatUserResponse(user),
-            isOnline: connectedUsers.has(user._id.toString())
-        }));
-
-        res.json({
-            success: true,
-            users: usersWithStatus,
-            total: activeUsers.length
-        });
-
-    } catch (error) {
-        console.error('خطأ في جلب المستخدمين النشطين:', error);
-        res.status(500).json({ 
-            success: false, 
-            message: 'حدث خطأ في الخادم',
-            code: 'ACTIVE_USERS_FETCH_ERROR'
-        });
-    }
-});
-
-// مسارات الـ Stories المتقدمة
-app.get('/api/stories', authenticateToken, async (req, res) => {
-    try {
-        const { limit = 50, type = 'all' } = req.query;
-
-        let query = { expiresAt: { $gt: new Date() } };
         
-        if (type === 'following') {
-            // يمكن إضافة منطق المتابعة هنا
-        } else if (type === 'popular') {
-            query['metrics.viewCount'] = { $gte: 10 };
-        }
-
-        const stories = await Story.find(query)
-            .populate('userId', 'fullName avatar university')
+        if (role) query.role = role;
+        if (isActive !== undefined) query.isActive = isActive === 'true';
+        
+        const users = await User.find(query)
+            .select('-password')
             .sort({ createdAt: -1 })
-            .limit(parseInt(limit));
-
-        // تجميع القصص حسب المستخدم
-        const storiesByUser = {};
-        stories.forEach(story => {
-            const userId = story.userId._id.toString();
-            if (!storiesByUser[userId]) {
-                storiesByUser[userId] = {
-                    user: story.userId,
-                    stories: []
-                };
-            }
-            storiesByUser[userId].stories.push(story);
-        });
-
-        const result = Object.values(storiesByUser);
-
+            .limit(limit * 1)
+            .skip((page - 1) * limit);
+            
+        const total = await User.countDocuments(query);
+        
         res.json({
             success: true,
-            stories: result,
-            total: stories.length
+            users: users.map(user => formatUserResponse(user)),
+            pagination: {
+                page: parseInt(page),
+                limit: parseInt(limit),
+                total,
+                pages: Math.ceil(total / limit)
+            }
         });
-
     } catch (error) {
-        console.error('خطأ في جلب القصص:', error);
-        res.status(500).json({ 
-            success: false, 
-            message: 'حدث خطأ في الخادم',
-            code: 'STORIES_FETCH_ERROR'
+        console.error('خطأ في جلب المستخدمين:', error);
+        res.status(500).json({
+            success: false,
+            message: 'حدث خطأ أثناء جلب المستخدمين',
+            code: 'USERS_FETCH_ERROR'
         });
     }
 });
 
+app.put('/api/admin/users/:userId', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const { role, isActive } = req.body;
+        
+        const user = await User.findByIdAndUpdate(
+            userId,
+            { $set: { role, isActive } },
+            { new: true }
+        ).select('-password');
+        
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: 'المستخدم غير موجود',
+                code: 'USER_NOT_FOUND'
+            });
+        }
+        
+        await saveUserToLocal(user);
+        await auditLog('USER_UPDATED', req.user._id, 'user', userId, { role, isActive });
+        
+        res.json({
+            success: true,
+            message: 'تم تحديث المستخدم بنجاح',
+            user: formatUserResponse(user)
+        });
+    } catch (error) {
+        console.error('خطأ في تحديث المستخدم:', error);
+        res.status(500).json({
+            success: false,
+            message: 'حدث خطأ أثناء تحديث المستخدم',
+            code: 'USER_UPDATE_ERROR'
+        });
+    }
+});
+
+// مسارات الستوريات
 app.post('/api/stories', authenticateToken, upload.single('story'), async (req, res) => {
     try {
         if (!req.file) {
-            return res.status(400).json({ 
-                success: false, 
-                message: 'لم يتم تحميل أي ملف',
-                code: 'NO_FILE_UPLOADED'
+            return res.status(400).json({
+                success: false,
+                message: 'الملف مطلوب',
+                code: 'FILE_REQUIRED'
             });
         }
 
-        const { caption, allowReplies = true, allowSharing = true, tags = [] } = req.body;
-
-        // تحديد نوع الوسائط
-        const isVideo = req.file.mimetype.startsWith('video/');
-        const mediaType = isVideo ? 'video' : 'image';
-
-        // حساب وقت الانتهاء (24 ساعة)
-        const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
-
+        const { caption, allowReplies = true, allowSharing = true, location } = req.body;
+        const mediaType = req.file.mimetype.startsWith('video/') ? 'video' : 'image';
+        
         const story = new Story({
             userId: req.user._id,
             mediaUrl: `/uploads/stories/${req.file.filename}`,
             mediaType,
             caption,
-            allowReplies: allowReplies === 'true',
-            allowSharing: allowSharing === 'true',
-            tags: Array.isArray(tags) ? tags : tags.split(',').map(tag => tag.trim()),
-            expiresAt
+            allowReplies,
+            allowSharing,
+            location: location ? JSON.parse(location) : null,
+            expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000)
         });
 
         await story.save();
-
-        // حفظ في Google Sheets
-        await saveStoryToSheets(story);
-
-        // تحديث إحصائيات المستخدم
+        await saveStoryToLocal(story);
+        
         await User.findByIdAndUpdate(req.user._id, {
             $inc: { 'stats.storiesPosted': 1 }
         });
 
-        // إشعار المستخدمين المتصلين
-        const populatedStory = await story.populate('userId', 'fullName avatar');
-        io.emit('new_story', {
-            story: populatedStory
-        });
-
-        // تسجيل التدقيق
         await auditLog('STORY_CREATED', req.user._id, 'story', story._id, {
             mediaType,
-            hasCaption: !!caption,
-            tagsCount: story.tags.length
+            hasCaption: !!caption
         });
 
-        res.json({
+        res.status(201).json({
             success: true,
-            message: 'تم نشر القصة بنجاح',
-            story: populatedStory
+            message: 'تم نشر الستوري بنجاح',
+            story
         });
 
     } catch (error) {
-        console.error('خطأ في نشر القصة:', error);
-        res.status(500).json({ 
-            success: false, 
-            message: 'حدث خطأ في الخادم',
-            code: 'STORY_CREATION_ERROR'
+        console.error('خطأ في نشر الستوري:', error);
+        res.status(500).json({
+            success: false,
+            message: 'حدث خطأ أثناء نشر الستوري',
+            code: 'STORY_CREATE_ERROR'
+        });
+    }
+});
+
+app.get('/api/stories', authenticateToken, async (req, res) => {
+    try {
+        const stories = await Story.find({
+            expiresAt: { $gt: new Date() }
+        })
+        .populate('userId', 'fullName avatar university major')
+        .sort({ createdAt: -1 })
+        .limit(50);
+
+        res.json({
+            success: true,
+            stories
+        });
+    } catch (error) {
+        console.error('خطأ في جلب الستوريات:', error);
+        res.status(500).json({
+            success: false,
+            message: 'حدث خطأ أثناء جلب الستوريات',
+            code: 'STORIES_FETCH_ERROR'
         });
     }
 });
 
 // مسارات القنوات
-app.post('/api/channels', authenticateToken, upload.single('channelAvatar'), async (req, res) => {
+app.post('/api/channels', authenticateToken, upload.single('avatar'), async (req, res) => {
     try {
-        const { name, description, type, isPublic = true, topics = [] } = req.body;
-
-        if (!name || !type) {
-            return res.status(400).json({ 
-                success: false, 
-                message: 'الاسم والنوع مطلوبان',
-                code: 'MISSING_FIELDS'
-            });
-        }
-
+        const { name, description, type, isPublic = true, topics, rules } = req.body;
+        
         const channel = new Channel({
             name,
             description,
             type,
-            isPublic: isPublic === 'true',
+            isPublic,
             creatorId: req.user._id,
             members: [req.user._id],
             admins: [req.user._id],
-            topics: Array.isArray(topics) ? topics : topics.split(',').map(topic => topic.trim())
+            topics: topics ? JSON.parse(topics) : [],
+            rules: rules ? JSON.parse(rules) : [],
+            avatar: req.file ? `/uploads/channels/${req.file.filename}` : null
         });
 
-        if (req.file) {
-            channel.avatar = `/uploads/channels/${req.file.filename}`;
-        }
-
         await channel.save();
+        await saveChannelToLocal(channel);
+        
+        await User.findByIdAndUpdate(req.user._id, {
+            $inc: { 'stats.channelsJoined': 1 }
+        });
 
-        // حفظ في Google Sheets
-        await saveChannelToSheets(channel);
-
-        // تسجيل التدقيق
         await auditLog('CHANNEL_CREATED', req.user._id, 'channel', channel._id, {
             type,
-            isPublic: channel.isPublic
+            isPublic
         });
 
         res.status(201).json({
@@ -1810,222 +1727,327 @@ app.post('/api/channels', authenticateToken, upload.single('channelAvatar'), asy
 
     } catch (error) {
         console.error('خطأ في إنشاء القناة:', error);
-        res.status(500).json({ 
-            success: false, 
-            message: 'حدث خطأ في الخادم',
-            code: 'CHANNEL_CREATION_ERROR'
+        res.status(500).json({
+            success: false,
+            message: 'حدث خطأ أثناء إنشاء القناة',
+            code: 'CHANNEL_CREATE_ERROR'
         });
     }
 });
 
 app.get('/api/channels', authenticateToken, async (req, res) => {
     try {
-        const { limit = 20, type, search = '' } = req.query;
-
+        const { page = 1, limit = 20, type, search } = req.query;
         const query = { isActive: true };
         
-        if (type) {
-            query.type = type;
-        }
-
+        if (type) query.type = type;
         if (search) {
             query.$or = [
                 { name: { $regex: search, $options: 'i' } },
                 { description: { $regex: search, $options: 'i' } }
             ];
         }
-
+        
         const channels = await Channel.find(query)
             .populate('creatorId', 'fullName avatar')
-            .limit(parseInt(limit))
-            .sort({ createdAt: -1 });
-
+            .sort({ createdAt: -1 })
+            .limit(limit * 1)
+            .skip((page - 1) * limit);
+            
+        const total = await Channel.countDocuments(query);
+        
         res.json({
             success: true,
             channels,
-            total: channels.length
+            pagination: {
+                page: parseInt(page),
+                limit: parseInt(limit),
+                total,
+                pages: Math.ceil(total / limit)
+            }
         });
-
     } catch (error) {
         console.error('خطأ في جلب القنوات:', error);
-        res.status(500).json({ 
-            success: false, 
-            message: 'حدث خطأ في الخادم',
+        res.status(500).json({
+            success: false,
+            message: 'حدث خطأ أثناء جلب القنوات',
             code: 'CHANNELS_FETCH_ERROR'
         });
     }
 });
 
-// مسارات الإدارة المتقدمة
-app.get('/api/admin/stats', authenticateToken, requireAdmin, async (req, res) => {
+// مسارات الرسائل
+app.post('/api/messages', authenticateToken, async (req, res) => {
     try {
-        const totalUsers = await User.countDocuments();
-        const activeUsers = await User.countDocuments({ isOnline: true });
-        const todayMessages = await Message.countDocuments({
-            createdAt: { 
-                $gte: new Date(new Date().setHours(0, 0, 0, 0)) 
-            }
-        });
-        const activeStories = await Story.countDocuments({ 
-            expiresAt: { $gt: new Date() } 
-        });
-        const totalChannels = await Channel.countDocuments();
+        const { conversationId, content, messageType = 'text', replyTo } = req.body;
         
-        // إحصائيات النمو
-        const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-        const newUsersThisWeek = await User.countDocuments({
-            createdAt: { $gte: weekAgo }
+        let conversation;
+        if (conversationId) {
+            conversation = await Conversation.findById(conversationId);
+        } else {
+            // إنشاء محادثة جديدة
+            const { participants, isGroup, groupName } = req.body;
+            conversation = new Conversation({
+                participants: participants || [req.user._id],
+                isGroup: isGroup || false,
+                groupName,
+                groupAdmins: isGroup ? [req.user._id] : []
+            });
+            await conversation.save();
+        }
+        
+        if (!conversation) {
+            return res.status(404).json({
+                success: false,
+                message: 'المحادثة غير موجودة',
+                code: 'CONVERSATION_NOT_FOUND'
+            });
+        }
+        
+        const message = new Message({
+            conversationId: conversation._id,
+            senderId: req.user._id,
+            content,
+            messageType,
+            replyTo
         });
-        const newChannelsThisWeek = await Channel.countDocuments({
-            createdAt: { $gte: weekAgo }
+        
+        await message.save();
+        await saveMessageToLocal(message);
+        
+        conversation.lastMessage = message._id;
+        await conversation.save();
+        
+        await User.findByIdAndUpdate(req.user._id, {
+            $inc: { 'stats.messagesSent': 1 }
         });
 
-        res.json({
-            success: true,
-            stats: {
-                users: { 
-                    total: totalUsers, 
-                    active: activeUsers,
-                    newThisWeek: newUsersThisWeek
-                },
-                messages: { 
-                    today: todayMessages, 
-                    total: await Message.countDocuments() 
-                },
-                stories: { 
-                    active: activeStories, 
-                    total: await Story.countDocuments() 
-                },
-                channels: { 
-                    total: totalChannels,
-                    newThisWeek: newChannelsThisWeek
-                },
-                system: {
-                    connectedUsers: connectedUsers.size,
-                    memoryUsage: process.memoryUsage(),
-                    uptime: process.uptime()
+        await auditLog('MESSAGE_SENT', req.user._id, 'message', message._id, {
+            conversationId: conversation._id,
+            messageType
+        });
+
+        // إرسال الرسالة عبر WebSocket
+        io.to(conversation._id.toString()).emit('new_message', {
+            message: {
+                ...message.toObject(),
+                senderId: {
+                    _id: req.user._id,
+                    fullName: req.user.fullName,
+                    avatar: req.user.avatar
                 }
             }
         });
 
+        res.status(201).json({
+            success: true,
+            message: 'تم إرسال الرسالة بنجاح',
+            message: {
+                ...message.toObject(),
+                senderId: {
+                    _id: req.user._id,
+                    fullName: req.user.fullName,
+                    avatar: req.user.avatar
+                }
+            },
+            conversationId: conversation._id
+        });
+
     } catch (error) {
-        console.error('خطأ في جلب إحصائيات الإدارة:', error);
-        res.status(500).json({ 
-            success: false, 
-            message: 'حدث خطأ في الخادم',
-            code: 'ADMIN_STATS_ERROR'
+        console.error('خطأ في إرسال الرسالة:', error);
+        res.status(500).json({
+            success: false,
+            message: 'حدث خطأ أثناء إرسال الرسالة',
+            code: 'MESSAGE_SEND_ERROR'
         });
     }
 });
 
-// معالجة أخطاء multer
+app.get('/api/messages/:conversationId', authenticateToken, async (req, res) => {
+    try {
+        const { conversationId } = req.params;
+        const { page = 1, limit = 50 } = req.query;
+        
+        const messages = await Message.find({ conversationId })
+            .populate('senderId', 'fullName avatar')
+            .sort({ createdAt: -1 })
+            .limit(limit * 1)
+            .skip((page - 1) * limit);
+            
+        const total = await Message.countDocuments({ conversationId });
+        
+        res.json({
+            success: true,
+            messages: messages.reverse(),
+            pagination: {
+                page: parseInt(page),
+                limit: parseInt(limit),
+                total,
+                pages: Math.ceil(total / limit)
+            }
+        });
+    } catch (error) {
+        console.error('خطأ في جلب الرسائل:', error);
+        res.status(500).json({
+            success: false,
+            message: 'حدث خطأ أثناء جلب الرسائل',
+            code: 'MESSAGES_FETCH_ERROR'
+        });
+    }
+});
+
+// WebSocket Handling
+io.on('connection', (socket) => {
+    console.log('👤 مستخدم متصل:', socket.id);
+
+    socket.on('user_connected', async (userId) => {
+        try {
+            connectedUsers.set(userId.toString(), socket.id);
+            userSockets.set(socket.id, userId.toString());
+            
+            await User.findByIdAndUpdate(userId, {
+                $set: { isOnline: true }
+            });
+            
+            socket.broadcast.emit('user_online', { userId });
+            console.log(`✅ المستخدم ${userId} متصل الآن`);
+        } catch (error) {
+            console.error('خطأ في اتصال المستخدم:', error);
+        }
+    });
+
+    socket.on('join_conversation', (conversationId) => {
+        socket.join(conversationId);
+        console.log(`💬 المستخدم انضم للمحادثة: ${conversationId}`);
+    });
+
+    socket.on('leave_conversation', (conversationId) => {
+        socket.leave(conversationId);
+        console.log(`🚪 المستخدم غادر المحادثة: ${conversationId}`);
+    });
+
+    socket.on('join_channel', (channelId) => {
+        socket.join(channelId);
+        console.log(`📢 المستخدم انضم للقناة: ${channelId}`);
+    });
+
+    socket.on('typing_start', (data) => {
+        socket.to(data.conversationId).emit('user_typing', {
+            userId: data.userId,
+            userName: data.userName,
+            isTyping: true
+        });
+    });
+
+    socket.on('typing_stop', (data) => {
+        socket.to(data.conversationId).emit('user_typing', {
+            userId: data.userId,
+            userName: data.userName,
+            isTyping: false
+        });
+    });
+
+    socket.on('message_read', async (data) => {
+        try {
+            const { messageId, conversationId, userId } = data;
+            
+            await Message.findByIdAndUpdate(messageId, {
+                $addToSet: { readBy: { userId, readAt: new Date() } }
+            });
+            
+            socket.to(conversationId).emit('message_read_receipt', {
+                messageId,
+                userId,
+                readAt: new Date()
+            });
+        } catch (error) {
+            console.error('خطأ في تسجيل قراءة الرسالة:', error);
+        }
+    });
+
+    socket.on('disconnect', async () => {
+        try {
+            const userId = userSockets.get(socket.id);
+            if (userId) {
+                connectedUsers.delete(userId);
+                userSockets.delete(socket.id);
+                
+                await User.findByIdAndUpdate(userId, {
+                    $set: { isOnline: false, lastSeen: new Date() }
+                });
+                
+                socket.broadcast.emit('user_offline', { userId });
+                console.log(`❌ المستخدم ${userId} انقطع عن الاتصال`);
+            }
+        } catch (error) {
+            console.error('خطأ في فصل المستخدم:', error);
+        }
+    });
+});
+
+// معالجة الأخطاء
 app.use((error, req, res, next) => {
+    console.error('❌ خطأ غير معالج:', error);
+    
     if (error instanceof multer.MulterError) {
         if (error.code === 'LIMIT_FILE_SIZE') {
-            return res.status(400).json({ 
-                success: false, 
+            return res.status(400).json({
+                success: false,
                 message: 'حجم الملف كبير جداً',
                 code: 'FILE_TOO_LARGE'
             });
         }
-        if (error.code === 'LIMIT_UNEXPECTED_FILE') {
-            return res.status(400).json({ 
-                success: false, 
-                message: 'حقل ملف غير متوقع',
-                code: 'UNEXPECTED_FIELD'
-            });
-        }
     }
     
-    if (error.message.includes('نوع الملف غير مدعوم')) {
-        return res.status(400).json({ 
-            success: false, 
-            message: error.message,
-            code: 'UNSUPPORTED_FILE_TYPE'
-        });
-    }
-    
-    next(error);
-});
-
-// معالجة الأخطاء العامة
-app.use((error, req, res, next) => {
-    console.error('خطأ غير متوقع:', error);
-    
-    if (error.name === 'ValidationError') {
-        const errors = Object.values(error.errors).map(err => err.message);
-        return res.status(400).json({ 
-            success: false, 
-            message: 'بيانات غير صالحة',
-            errors,
-            code: 'VALIDATION_ERROR'
-        });
-    }
-    
-    if (error.name === 'CastError') {
-        return res.status(400).json({ 
-            success: false, 
-            message: 'معرف غير صالح',
-            code: 'INVALID_ID'
-        });
-    }
-    
-    res.status(500).json({ 
-        success: false, 
-        message: NODE_ENV === 'production' ? 'حدث خطأ في الخادم' : error.message,
-        code: 'INTERNAL_SERVER_ERROR',
-        ...(NODE_ENV === 'development' && { stack: error.stack })
+    res.status(500).json({
+        success: false,
+        message: 'حدث خطأ غير متوقع في الخادم',
+        code: 'INTERNAL_SERVER_ERROR'
     });
 });
 
-// مسارات غير موجودة
+// معالجة المسارات غير الموجودة
 app.use('*', (req, res) => {
-    res.status(404).json({ 
-        success: false, 
+    res.status(404).json({
+        success: false,
         message: 'المسار غير موجود',
         code: 'ROUTE_NOT_FOUND',
         path: req.originalUrl
     });
 });
 
-// تشغيل السيرفر
+// بدء الخادم
 server.listen(PORT, () => {
-    console.log(`🚀 السيرفر يعمل على المنفذ ${PORT}`);
-    console.log(`📧 بيئة: ${NODE_ENV}`);
-    console.log(`🔗 الرابط: http://localhost:${PORT}`);
-    console.log(`👥 مستخدمين متصلين: ${connectedUsers.size}`);
-    console.log(`📊 Google Sheets ID: ${SPREADSHEET_ID}`);
+    console.log(`🚀 الخادم يعمل على المنفذ ${PORT}`);
+    console.log(`🌐 البيئة: ${NODE_ENV}`);
+    console.log(`📊 قاعدة البيانات: ${MONGODB_URI}`);
+    console.log(`💾 التخزين المحلي: ${__dirname}`);
+    console.log(`🔐 بيانات المدير: 500000000 / 77007700`);
+    console.log('='.repeat(50));
 });
 
-// تنظيف القصص المنتهية كل ساعة
-setInterval(async () => {
+// إغلاق نظيف للخادم
+process.on('SIGINT', async () => {
+    console.log('\n🛑 إيقاف الخادم...');
+    
     try {
-        const result = await Story.deleteMany({
-            expiresAt: { $lt: new Date() }
-        });
+        // تحديث حالة جميع المستخدمين المتصلين إلى غير متصل
+        await User.updateMany(
+            { isOnline: true },
+            { $set: { isOnline: false, lastSeen: new Date() } }
+        );
         
-        if (result.deletedCount > 0) {
-            console.log(`🧹 تم تنظيف ${result.deletedCount} قصة منتهية`);
-        }
-    } catch (error) {
-        console.error('خطأ في تنظيف القصص المنتهية:', error);
-    }
-}, 60 * 60 * 1000);
-
-// تنظيف الإشعارات القديمة يومياً
-setInterval(async () => {
-    try {
-        const result = await Notification.deleteMany({
-            expiresAt: { $lt: new Date() }
-        });
+        // إنشاء نسخة احتياطية نهائية
+        await localStorageService.createBackup();
         
-        if (result.deletedCount > 0) {
-            console.log(`🧹 تم تنظيف ${result.deletedCount} إشعار منتهي`);
-        }
+        console.log('✅ تم إنشاء النسخة الاحتياطية النهائية');
+        console.log('✅ تم تحديث حالة المستخدمين');
+        console.log('👋 تم إيقاف الخادم بنجاح');
+        process.exit(0);
     } catch (error) {
-        console.error('خطأ في تنظيف الإشعارات:', error);
+        console.error('❌ خطأ في الإيقاف النظيف:', error);
+        process.exit(1);
     }
-}, 24 * 60 * 60 * 1000);
+});
 
-// تصدير للتستينغ
-export { app, server, io, connectedUsers };
+export default app;
