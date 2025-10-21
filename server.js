@@ -205,7 +205,34 @@ class LocalStorageService {
             updatedAt: new Date().toISOString(),
             isOnline: false,
             lastSeen: new Date().toISOString(),
-            isActive: true
+            isActive: true,
+            stats: userData.stats || {
+                messagesSent: 0,
+                storiesPosted: 0,
+                channelsJoined: 0,
+                totalLikes: 0
+            },
+            settings: userData.settings || {
+                privacy: {
+                    hideOnlineStatus: false,
+                    hideLastSeen: false,
+                    hideStoryViews: false,
+                    profileVisibility: 'public'
+                },
+                notificationSettings: {
+                    messages: true,
+                    stories: true,
+                    channels: true,
+                    system: true,
+                    emailNotifications: false
+                },
+                appearance: {
+                    theme: 'auto',
+                    fontSize: 'medium',
+                    background: 'default',
+                    language: 'ar'
+                }
+            }
         };
         
         data.users.push(user);
@@ -851,6 +878,8 @@ app.post('/api/auth/login', async (req, res) => {
         }
 
         const user = await localStorageService.findUserByPhone(phone);
+        console.log('🔍 البحث عن المستخدم:', phone, 'وجد:', !!user);
+        
         if (!user) {
             return res.status(401).json({
                 success: false,
@@ -867,7 +896,15 @@ app.post('/api/auth/login', async (req, res) => {
             });
         }
 
+        console.log('🔐 مقارنة كلمات المرور:', {
+            providedPassword: password,
+            storedPassword: user.password ? '****' : 'غير موجود',
+            passwordLength: user.password ? user.password.length : 0
+        });
+
         const isPasswordValid = await bcrypt.compare(password, user.password);
+        console.log('✅ نتيجة المقارنة:', isPasswordValid);
+
         if (!isPasswordValid) {
             return res.status(401).json({
                 success: false,
@@ -877,7 +914,7 @@ app.post('/api/auth/login', async (req, res) => {
         }
 
         // تحديث حالة الاتصال
-        await localStorageService.updateUser(user._id, {
+        const updatedUser = await localStorageService.updateUser(user._id, {
             isOnline: true,
             lastSeen: new Date().toISOString()
         });
@@ -887,11 +924,13 @@ app.post('/api/auth/login', async (req, res) => {
 
         await auditLog('LOGIN', user._id, 'user', user._id, { phone });
 
+        console.log('✅ تسجيل الدخول ناجح للمستخدم:', user.fullName);
+
         res.json({
             success: true,
             message: 'تم تسجيل الدخول بنجاح',
             data: {
-                user: formatUserResponse(user),
+                user: formatUserResponse(updatedUser || user),
                 token,
                 refreshToken
             }
@@ -901,8 +940,9 @@ app.post('/api/auth/login', async (req, res) => {
         console.error('❌ خطأ في تسجيل الدخول:', error);
         res.status(500).json({
             success: false,
-            message: 'حدث خطأ في الخادم',
-            code: 'SERVER_ERROR'
+            message: 'حدث خطأ أثناء تسجيل الدخول',
+            code: 'LOGIN_ERROR',
+            error: error.message
         });
     }
 });
