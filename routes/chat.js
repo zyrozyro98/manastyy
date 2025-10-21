@@ -518,4 +518,225 @@ router.delete('/messages/:messageId', authenticateToken, async (req, res) => {
                          (conversation.isGroup && conversation.groupAdmins.includes(req.user._id));
         
         if (!canDelete) {
-            return res.status(403
+            return res.status(403).json({
+                success: false,
+                message: 'غير مصرح لك بحذف هذه الرسالة',
+                code: 'DELETE_DENIED'
+            });
+        }
+        
+        await message.softDelete(req.user._id);
+        
+        res.json({
+            success: true,
+            message: 'تم حذف الرسالة بنجاح'
+        });
+        
+    } catch (error) {
+        console.error('خطأ في حذف الرسالة:', error);
+        res.status(500).json({
+            success: false,
+            message: 'حدث خطأ في حذف الرسالة',
+            code: 'MESSAGE_DELETE_ERROR'
+        });
+    }
+});
+
+// الحصول على القنوات
+router.get('/channels', authenticateToken, async (req, res) => {
+    try {
+        const { page = 1, limit = 20, type, search, category } = req.query;
+        
+        let query = { isActive: true };
+        
+        if (type) {
+            query.type = type;
+        }
+        
+        if (category) {
+            query['metadata.category'] = category;
+        }
+        
+        if (search) {
+            query.$text = { $search: search };
+        }
+        
+        const channels = await Channel.find(query)
+            .populate('creatorId', 'fullName avatar')
+            .populate('lastMessage')
+            .populate('lastMessage.senderId', 'fullName avatar')
+            .sort({ 'stats.memberCount': -1, lastActivity: -1 })
+            .limit(limit * 1)
+            .skip((page - 1) * limit)
+            .lean();
+        
+        const total = await Channel.countDocuments(query);
+        
+        res.json({
+            success: true,
+            channels,
+            pagination: {
+                page: parseInt(page),
+                limit: parseInt(limit),
+                total,
+                pages: Math.ceil(total / limit)
+            }
+        });
+        
+    } catch (error) {
+        console.error('خطأ في جلب القنوات:', error);
+        res.status(500).json({
+            success: false,
+            message: 'حدث خطأ في جلب القنوات',
+            code: 'CHANNELS_FETCH_ERROR'
+        });
+    }
+});
+
+// إنشاء قناة جديدة
+router.post('/channels', authenticateToken, upload.single('avatar'), async (req, res) => {
+    try {
+        const { 
+            name, 
+            description, 
+            type, 
+            isPublic = true, 
+            topics, 
+            rules,
+            category,
+            level 
+        } = req.body;
+        
+        if (!name || !type) {
+            return res.status(400).json({
+                success: false,
+                message: 'الاسم والنوع مطلوبان',
+                code: 'NAME_TYPE_REQUIRED'
+            });
+        }
+        
+        // التحقق من عدم وجود قناة بنفس الاسم
+        const existingChannel = await Channel.findOne({ 
+            name: { $regex: new RegExp(`^${name}$`, 'i') } 
+        });
+        
+        if (existingChannel) {
+            return res.status(400).json({
+                success: false,
+                message: 'هناك قناة أخرى بنفس الاسم',
+                code: 'CHANNEL_NAME_EXISTS'
+            });
+        }
+        
+        const channelData = {
+            name,
+            description,
+            type,
+            isPublic,
+            creatorId: req.user._id,
+            metadata: {
+                category,
+                level,
+                tags: topics ? JSON.parse(topics) : []
+            },
+            settings: {
+                allowMessages: true,
+                allowFiles: true,
+                membersCanInvite: true
+            }
+        };
+        
+        if (rules) {
+            channelData.rules = JSON.parse(rules);
+        }
+        
+        if (req.file) {
+            channelData.avatar = `/uploads/channels/${req.file.filename}`;
+        }
+        
+        const channel = new Channel(channelData);
+        
+        // إضافة المنشئ كعضو ومشرف
+        await channel.addMember(req.user._id, 'admin');
+        await channel.promoteToAdmin(req.user._id);
+        
+        await channel.save();
+        
+        await channel.populate('creatorId', 'fullName avatar');
+        
+        res.status(201).json({
+            success: true,
+            message: 'تم إنشاء القناة بنجاح',
+            channel
+        });
+        
+    } catch (error) {
+        console.error('خطأ في إنشاء القناة:', error);
+        res.status(500).json({
+            success: false,
+            message: 'حدث خطأ في إنشاء القناة',
+            code: 'CHANNEL_CREATE_ERROR'
+        });
+    }
+});
+
+// الانضمام إلى قناة
+router.post('/channels/:channelId/join', authenticateToken, async (req, res) => {
+    try {
+        const { channelId } = req.params;
+        
+        const channel = await Channel.findById(channelId);
+        
+        if (!channel) {
+            return res.status(404).json({
+                success: false,
+                message: 'القناة غير موجودة',
+                code: 'CHANNEL_NOT_FOUND'
+            });
+        }
+        
+        if (!channel.isActive) {
+            return res.status(400).json({
+                success: false,
+                message: 'القناة غير نشطة',
+                code: 'CHANNEL_INACTIVE'
+            });
+        }
+        
+        if (channel.isMember(req.user._id)) {
+            return res.status(400).json({
+                success: false,
+                message: 'أنت بالفعل عضو في هذه القناة',
+                code: 'ALREADY_MEMBER'
+            });
+        }
+        
+        // التحقق من إذا كانت القناة عامة أو تحتاج موافقة
+        if (!channel.isPublic && channel.settings.approvalRequired) {
+            // إنشاء طلب انضمام
+            // (يمكن إضافة نظام طلبات الانضمام هنا)
+            return res.status(400).json({
+                success: false,
+                message: 'هذه القناة خاصة وتحتاج موافقة للإنضمام',
+                code: 'APPROVAL_REQUIRED'
+            });
+        }
+        
+        await channel.addMember(req.user._id);
+        
+        res.json({
+            success: true,
+            message: 'تم الانضمام إلى القناة بنجاح'
+        });
+        
+    } catch (error) {
+        console.error('خطأ في الانضمام إلى القناة:', error);
+        res.status(500).json({
+            success: false,
+            message: 'حدث خطأ في الانضمام إلى القناة',
+            code: 'CHANNEL_JOIN_ERROR'
+        });
+    }
+});
+
+export default router;
