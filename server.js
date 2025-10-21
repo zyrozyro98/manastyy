@@ -2234,5 +2234,11 @@ process.on('SIGINT', async () => {
         process.exit(1);
     }
 });
+// خدمة ملفات الـ Static (Frontend)
+app.use(express.static(path.join(__dirname, 'public')));
 
+// توجيه جميع الطلبات إلى index.html لـ Single Page Application
+app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
 export default app;
