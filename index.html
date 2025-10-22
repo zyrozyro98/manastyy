@@ -486,7 +486,7 @@
             color: var(--dark);
         }
         
-        .form-group input {
+        .form-group input, .form-group select {
             width: 100%;
             padding: 0.75rem 1rem;
             border: 2px solid var(--border);
@@ -495,7 +495,7 @@
             transition: var(--transition);
         }
         
-        .form-group input:focus {
+        .form-group input:focus, .form-group select:focus {
             border-color: var(--primary);
             outline: none;
             box-shadow: 0 0 0 3px rgba(44, 90, 160, 0.1);
@@ -2072,6 +2072,101 @@
             gap: 0.5rem;
         }
 
+        /* تحسينات لوحة إدارة المستخدمين */
+        .admin-container {
+            background: white;
+            border-radius: var(--border-radius-lg);
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+        
+        .admin-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .admin-tabs {
+            display: flex;
+            border-bottom: 1px solid var(--border);
+            background: var(--gray-100);
+        }
+        
+        .admin-tab-btn {
+            padding: 1rem 2rem;
+            background: none;
+            border: none;
+            border-bottom: 3px solid transparent;
+            cursor: pointer;
+            transition: var(--transition);
+            font-weight: 600;
+        }
+        
+        .admin-tab-btn.active {
+            border-bottom-color: var(--primary);
+            color: var(--primary);
+            background: white;
+        }
+        
+        .admin-panels {
+            padding: 2rem;
+        }
+        
+        .admin-tab-panel {
+            display: none;
+        }
+        
+        .admin-tab-panel.active {
+            display: block;
+        }
+        
+        .admin-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+        
+        .admin-table th,
+        .admin-table td {
+            padding: 1rem;
+            text-align: right;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .admin-table th {
+            background: var(--gray-100);
+            font-weight: 600;
+            color: var(--dark);
+        }
+        
+        .user-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+        
+        .action-btn {
+            padding: 0.5rem;
+            border: none;
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            transition: var(--transition);
+            font-size: 0.8rem;
+        }
+        
+        .action-btn.edit {
+            background: var(--info);
+            color: white;
+        }
+        
+        .action-btn.ban {
+            background: var(--warning);
+            color: white;
+        }
+        
+        .action-btn.delete {
+            background: var(--danger);
+            color: white;
+        }
+
         /* تحسينات الاستجابة للشاشات المختلفة */
         @media (max-width: 1200px) {
             .content-grid {
@@ -2536,45 +2631,51 @@
             </a>
             
             <nav class="nav">
-                <a href="#" class="nav-item" data-page="dashboard">
+                <a href="#" class="nav-item hidden" data-page="dashboard">
                     <i class="fas fa-home"></i> الرئيسية
                 </a>
-                <a href="#" class="nav-item" data-page="chat">
+                <a href="#" class="nav-item hidden" data-page="chat">
                     <i class="fas fa-comments"></i> الدردشة
                     <span class="nav-item-badge">3</span>
                 </a>
-                <a href="#" class="nav-item" data-page="stories">
+                <a href="#" class="nav-item hidden" data-page="stories">
                     <i class="fas fa-history"></i> القصص
                 </a>
-                <a href="#" class="nav-item" data-page="groups">
+                <a href="#" class="nav-item hidden" data-page="groups">
                     <i class="fas fa-users"></i> المجموعات
                 </a>
-                <a href="#" class="nav-item" data-page="channels">
+                <a href="#" class="nav-item hidden" data-page="channels">
                     <i class="fas fa-broadcast-tower"></i> القنوات
                 </a>
-                <a href="#" class="nav-item" data-page="courses">
+                <a href="#" class="nav-item hidden" data-page="courses">
                     <i class="fas fa-book"></i> الدورات التعليمية
                 </a>
-                <a href="#" class="nav-item" data-page="calendar">
+                <a href="#" class="nav-item hidden" data-page="calendar">
                     <i class="fas fa-calendar-alt"></i> التقويم
                 </a>
-                <a href="#" class="nav-item" data-page="games">
+                <a href="#" class="nav-item hidden" data-page="games">
                     <i class="fas fa-gamepad"></i> الألعاب
                 </a>
-                <a href="#" class="nav-item" data-page="tasks">
+                <a href="#" class="nav-item hidden" data-page="tasks">
                     <i class="fas fa-tasks"></i> المهام
                 </a>
-                <a href="#" class="nav-item" data-page="files">
+                <a href="#" class="nav-item hidden" data-page="files">
                     <i class="fas fa-folder"></i> الملفات
                 </a>
-                <a href="#" class="nav-item" data-page="photos">
+                <a href="#" class="nav-item hidden" data-page="photos">
                     <i class="fas fa-images"></i> الصور المرسلة
                 </a>
-                <a href="#" class="nav-item" data-page="settings">
+                <a href="#" class="nav-item hidden" data-page="settings">
                     <i class="fas fa-cog"></i> الإعدادات
                 </a>
-                <a href="#" class="nav-item hidden" id="loginLink">
+                <a href="#" class="nav-item hidden" data-page="admin" id="adminLink">
+                    <i class="fas fa-user-shield"></i> الإدارة
+                </a>
+                <a href="#" class="nav-item" id="loginLink" data-page="login">
                     <i class="fas fa-sign-in-alt"></i> تسجيل الدخول
+                </a>
+                <a href="#" class="nav-item" id="registerLink" data-page="register">
+                    <i class="fas fa-user-plus"></i> إنشاء حساب
                 </a>
                 <a href="#" class="nav-item hidden" id="logoutLink">
                     <i class="fas fa-sign-out-alt"></i> تسجيل الخروج
@@ -2606,14 +2707,14 @@
                     
                     <form id="loginForm">
                         <div class="form-group">
-                            <label for="phone">رقم الهاتف السعودي</label>
-                            <input type="tel" id="phone" name="phone" placeholder="5XXXXXXXX" pattern="5[0-9]{8}" required>
+                            <label for="loginPhone">رقم الهاتف السعودي</label>
+                            <input type="tel" id="loginPhone" name="phone" placeholder="5XXXXXXXX" pattern="5[0-9]{8}" required>
                             <small class="form-text">يجب أن يبدأ الرقم بـ 5 ويتكون من 9 أرقام</small>
                         </div>
                         
                         <div class="form-group">
-                            <label for="password">كلمة المرور</label>
-                            <input type="password" id="password" name="password" placeholder="أدخل كلمة المرور" required>
+                            <label for="loginPassword">كلمة المرور</label>
+                            <input type="password" id="loginPassword" name="password" placeholder="أدخل كلمة المرور" required>
                         </div>
                         
                         <button type="submit" class="btn btn-primary btn-block" id="loginBtn">
@@ -2622,7 +2723,83 @@
                     </form>
                     
                     <div class="auth-footer">
-                        <p>حساب الآدمن الافتراضي: <strong>500000000</strong> / <strong>77007700</strong></p>
+                        <p>ليس لديك حساب؟ <a href="#" id="goToRegister">إنشاء حساب جديد</a></p>
+                        <p class="mt-2">حساب الآدمن الافتراضي: <strong>500000000</strong> / <strong>77007700</strong></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- صفحة إنشاء حساب -->
+        <div id="registerPage" class="page">
+            <div class="auth-container">
+                <div class="auth-card">
+                    <div class="auth-header">
+                        <h2>إنشاء حساب جديد</h2>
+                        <p>املأ البيانات التالية لإنشاء حساب جديد</p>
+                    </div>
+                    
+                    <form id="registerForm">
+                        <div class="form-group">
+                            <label for="registerName">اسم المستخدم</label>
+                            <input type="text" id="registerName" name="name" placeholder="أدخل اسمك الكامل" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="registerPhone">رقم الهاتف السعودي</label>
+                            <input type="tel" id="registerPhone" name="phone" placeholder="5XXXXXXXX" pattern="5[0-9]{8}" required>
+                            <small class="form-text">يجب أن يبدأ الرقم بـ 5 ويتكون من 9 أرقام</small>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="registerUniversity">الجامعة</label>
+                            <select id="registerUniversity" name="university" required>
+                                <option value="">اختر الجامعة</option>
+                                <option value="فهد">فهد</option>
+                                <option value="الباحة">الباحة</option>
+                                <option value="مقرن">مقرن</option>
+                                <option value="نورة">نورة</option>
+                                <option value="أخرى">أخرى</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="registerMajor">التخصص</label>
+                            <select id="registerMajor" name="major" required>
+                                <option value="">اختر التخصص</option>
+                                <option value="حساب آلي">حساب آلي</option>
+                                <option value="أمن سيبراني">أمن سيبراني</option>
+                                <option value="إدارة أعمال">إدارة أعمال</option>
+                                <option value="إدارة مكتبية">إدارة مكتبية</option>
+                                <option value="إدارة مستشفيات">إدارة مستشفيات</option>
+                                <option value="إدارة تنفيذية">إدارة تنفيذية</option>
+                                <option value="سكرتارية">سكرتارية</option>
+                                <option value="موارد بشرية">موارد بشرية</option>
+                                <option value="الصحة والسلامة">الصحة والسلامة</option>
+                                <option value="التسويق">التسويق</option>
+                                <option value="البرمجة">البرمجة</option>
+                                <option value="المحاسبة">المحاسبة</option>
+                                <option value="أخرى">أخرى</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="registerPassword">كلمة المرور</label>
+                            <input type="password" id="registerPassword" name="password" placeholder="أدخل كلمة المرور" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="registerConfirmPassword">تأكيد كلمة المرور</label>
+                            <input type="password" id="registerConfirmPassword" name="confirmPassword" placeholder="أعد إدخال كلمة المرور" required>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary btn-block" id="registerBtn">
+                            <i class="fas fa-user-plus"></i> إنشاء حساب
+                        </button>
+                    </form>
+                    
+                    <div class="auth-footer">
+                        <p>لديك حساب بالفعل؟ <a href="#" id="goToLogin">تسجيل الدخول</a></p>
                     </div>
                 </div>
             </div>
@@ -3283,6 +3460,105 @@
                 </div>
             </div>
         </div>
+
+        <!-- صفحة إدارة المستخدمين -->
+        <div id="adminPage" class="page">
+            <div class="admin-container">
+                <div class="admin-header">
+                    <h3>لوحة إدارة المستخدمين</h3>
+                    <p>إدارة المستخدمين والإعدادات العامة للنظام</p>
+                </div>
+                
+                <div class="admin-tabs">
+                    <button class="admin-tab-btn active" data-tab="users">المستخدمين</button>
+                    <button class="admin-tab-btn" data-tab="reports">التقارير</button>
+                    <button class="admin-tab-btn" data-tab="system">إعدادات النظام</button>
+                </div>
+                
+                <div class="admin-panels">
+                    <div class="admin-tab-panel active" id="usersPanel">
+                        <div class="admin-toolbar">
+                            <div class="search-box">
+                                <input type="text" placeholder="بحث في المستخدمين...">
+                                <i class="fas fa-search"></i>
+                            </div>
+                            <button class="btn btn-primary">
+                                <i class="fas fa-plus"></i> إضافة مستخدم
+                            </button>
+                        </div>
+                        
+                        <table class="admin-table">
+                            <thead>
+                                <tr>
+                                    <th>اسم المستخدم</th>
+                                    <th>رقم الهاتف</th>
+                                    <th>الجامعة</th>
+                                    <th>التخصص</th>
+                                    <th>الدور</th>
+                                    <th>الحالة</th>
+                                    <th>الإجراءات</th>
+                                </tr>
+                            </thead>
+                            <tbody id="usersTableBody">
+                                <!-- سيتم ملء المستخدمين ديناميكياً -->
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="admin-tab-panel" id="reportsPanel">
+                        <div class="content-card">
+                            <h3>تقارير النظام</h3>
+                            <p>هنا يمكنك عرض التقارير والإحصائيات حول استخدام النظام.</p>
+                            <!-- سيتم إضافة التقارير لاحقاً -->
+                        </div>
+                    </div>
+                    
+                    <div class="admin-tab-panel" id="systemPanel">
+                        <div class="settings-form">
+                            <h3>إعدادات النظام العامة</h3>
+                            
+                            <div class="form-group">
+                                <label for="systemName">اسم النظام</label>
+                                <input type="text" id="systemName" value="المنصة التعليمية المتطورة">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="systemDescription">وصف النظام</label>
+                                <textarea id="systemDescription" rows="3">نظام إدارة متكامل للتعليم والتواصل</textarea>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="maxFileSize">الحد الأقصى لحجم الملف (MB)</label>
+                                <input type="number" id="maxFileSize" value="50" min="1" max="100">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="sessionTimeout">مهلة الجلسة (دقائق)</label>
+                                <input type="number" id="sessionTimeout" value="60" min="15" max="480">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label class="switch">
+                                    <input type="checkbox" id="allowRegistrations" checked>
+                                    <span class="slider"></span>
+                                    <span class="switch-label">السماح بالتسجيلات الجديدة</span>
+                                </label>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label class="switch">
+                                    <input type="checkbox" id="maintenanceMode">
+                                    <span class="slider"></span>
+                                    <span class="switch-label">وضع الصيانة</span>
+                                </label>
+                            </div>
+                            
+                            <button class="btn btn-primary">حفظ إعدادات النظام</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </main>
 
     <!-- شريط الأدوات السريع -->
@@ -3318,7 +3594,8 @@
             socket: null,
             currentPage: 'login',
             theme: 'light',
-            background: 'gradient'
+            background: 'gradient',
+            users: []
         };
 
         // تهيئة التطبيق عند تحميل الصفحة
@@ -3338,25 +3615,20 @@
             applyTheme(appData.theme);
             applyBackground(appData.background);
             
-            // إخفاء شاشة الترحيب بعد 3 ثوانٍ
-            setTimeout(() => {
-                document.getElementById('welcomeScreen').style.opacity = '0';
-                setTimeout(() => {
-                    document.getElementById('welcomeScreen').style.display = 'none';
-                }, 500);
-            }, 3000);
-            
             // إعداد مراقبة الاتصال بالإنترنت
             setupConnectionMonitoring();
             
             // إعداد تأثيرات التمرير على الهيدر
             setupScrollEffects();
+            
+            // تحميل بيانات المستخدمين (للعرض فقط)
+            loadSampleUsers();
         }
 
         // إعداد مستمعي الأحداث
         function setupEventListeners() {
             // أحداث التنقل بين الصفحات
-            document.querySelectorAll('.nav-item, .quick-action, .hero-actions button').forEach(item => {
+            document.querySelectorAll('.nav-item[data-page], .quick-action, .hero-actions button').forEach(item => {
                 item.addEventListener('click', function(e) {
                     e.preventDefault();
                     const page = this.getAttribute('data-page');
@@ -3369,19 +3641,22 @@
             // رابط الرئيسية
             document.getElementById('homeLink').addEventListener('click', function(e) {
                 e.preventDefault();
-                navigateToPage('dashboard');
+                if (appData.isLoggedIn) {
+                    navigateToPage('dashboard');
+                } else {
+                    navigateToPage('login');
+                }
             });
             
-            // رابط تسجيل الدخول
-            document.getElementById('loginLink').addEventListener('click', function(e) {
+            // روابط تسجيل الدخول وإنشاء حساب
+            document.getElementById('goToRegister').addEventListener('click', function(e) {
+                e.preventDefault();
+                navigateToPage('register');
+            });
+            
+            document.getElementById('goToLogin').addEventListener('click', function(e) {
                 e.preventDefault();
                 navigateToPage('login');
-            });
-            
-            // رابط تسجيل الخروج
-            document.getElementById('logoutLink').addEventListener('click', function(e) {
-                e.preventDefault();
-                logout();
             });
             
             // زر دخول التطبيق
@@ -3396,6 +3671,12 @@
             document.getElementById('loginForm').addEventListener('submit', function(e) {
                 e.preventDefault();
                 handleLogin();
+            });
+            
+            // نموذج إنشاء حساب
+            document.getElementById('registerForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                handleRegister();
             });
             
             // إرسال الرسائل في الدردشة
@@ -3414,6 +3695,14 @@
                 tab.addEventListener('click', function() {
                     const tabId = this.getAttribute('data-tab');
                     switchSettingsTab(tabId);
+                });
+            });
+            
+            // تبويبات الإدارة
+            document.querySelectorAll('.admin-tab-btn').forEach(tab => {
+                tab.addEventListener('click', function() {
+                    const tabId = this.getAttribute('data-tab');
+                    switchAdminTab(tabId);
                 });
             });
             
@@ -3464,13 +3753,19 @@
 
         // معالجة تسجيل الدخول
         function handleLogin() {
-            const phone = document.getElementById('phone').value;
-            const password = document.getElementById('password').value;
+            const phone = document.getElementById('loginPhone').value;
+            const password = document.getElementById('loginPassword').value;
             const loginBtn = document.getElementById('loginBtn');
             
             // التحقق من صحة رقم الهاتف
             if (!/^5[0-9]{8}$/.test(phone)) {
                 showMessage('يرجى إدخال رقم هاتف سعودي صحيح يبدأ بـ 5 ويتكون من 9 أرقام', 'error');
+                return;
+            }
+            
+            // التحقق من إدخال كلمة المرور
+            if (!password) {
+                showMessage('يرجى إدخال كلمة المرور', 'error');
                 return;
             }
             
@@ -3485,9 +3780,12 @@
                 if (phone === '500000000' && password === '77007700') {
                     // تسجيل الدخول كآدمن
                     const userData = {
+                        id: 1,
                         phone: phone,
                         name: 'مدير النظام',
                         role: 'admin',
+                        university: 'النظام',
+                        major: 'إدارة النظام',
                         avatar: null
                     };
                     
@@ -3495,9 +3793,12 @@
                 } else if (password === '123456') {
                     // تسجيل الدخول كمستخدم عادي (لأغراض العرض)
                     const userData = {
+                        id: Date.now(),
                         phone: phone,
                         name: `مستخدم ${phone}`,
                         role: 'user',
+                        university: 'فهد',
+                        major: 'البرمجة',
                         avatar: null
                     };
                     
@@ -3508,6 +3809,68 @@
                     loginBtn.classList.remove('loading');
                     showMessage('رقم الهاتف أو كلمة المرور غير صحيحة', 'error');
                 }
+            }, 1500);
+        }
+
+        // معالجة إنشاء حساب
+        function handleRegister() {
+            const name = document.getElementById('registerName').value;
+            const phone = document.getElementById('registerPhone').value;
+            const university = document.getElementById('registerUniversity').value;
+            const major = document.getElementById('registerMajor').value;
+            const password = document.getElementById('registerPassword').value;
+            const confirmPassword = document.getElementById('registerConfirmPassword').value;
+            const registerBtn = document.getElementById('registerBtn');
+            
+            // التحقق من البيانات
+            if (!name || !phone || !university || !major || !password || !confirmPassword) {
+                showMessage('يرجى ملء جميع الحقول', 'error');
+                return;
+            }
+            
+            // التحقق من صحة رقم الهاتف
+            if (!/^5[0-9]{8}$/.test(phone)) {
+                showMessage('يرجى إدخال رقم هاتف سعودي صحيح يبدأ بـ 5 ويتكون من 9 أرقام', 'error');
+                return;
+            }
+            
+            // التحقق من تطابق كلمات المرور
+            if (password !== confirmPassword) {
+                showMessage('كلمات المرور غير متطابقة', 'error');
+                return;
+            }
+            
+            // التحقق من قوة كلمة المرور
+            if (password.length < 6) {
+                showMessage('كلمة المرور يجب أن تكون 6 أحرف على الأقل', 'error');
+                return;
+            }
+            
+            // عرض حالة التحميل
+            registerBtn.innerHTML = '<div class="loading"></div>';
+            registerBtn.classList.add('loading');
+            
+            // محاكاة اتصال بالسيرفر
+            setTimeout(() => {
+                // في التطبيق الحقيقي، سيتم إرسال طلب إلى السيرفر
+                // هنا نقوم بمحاكاة الاستجابة
+                const userData = {
+                    id: Date.now(),
+                    phone: phone,
+                    name: name,
+                    role: 'user',
+                    university: university,
+                    major: major,
+                    avatar: null
+                };
+                
+                // إضافة المستخدم إلى القائمة المحلية
+                appData.users.push(userData);
+                
+                loginSuccess(userData);
+                
+                // إعادة تعيين النموذج
+                document.getElementById('registerForm').reset();
             }, 1500);
         }
 
@@ -3559,9 +3922,17 @@
 
         // عرض واجهة تسجيل الدخول
         function showLoginUI() {
+            // إخفاء عناصر المستخدم المصادق
+            document.querySelectorAll('.nav-item[data-page]').forEach(item => {
+                item.classList.add('hidden');
+            });
             document.getElementById('userInfo').classList.add('hidden');
             document.getElementById('logoutLink').classList.add('hidden');
+            document.getElementById('adminLink').classList.add('hidden');
+            
+            // إظهار عناصر الزائر
             document.getElementById('loginLink').classList.remove('hidden');
+            document.getElementById('registerLink').classList.remove('hidden');
             
             // إخفاء جميع الصفحات ما عدا صفحة تسجيل الدخول
             document.querySelectorAll('.page').forEach(page => {
@@ -3571,9 +3942,21 @@
 
         // عرض واجهة المستخدم بعد المصادقة
         function showAuthenticatedUI() {
+            // إخفاء عناصر الزائر
+            document.getElementById('loginLink').classList.add('hidden');
+            document.getElementById('registerLink').classList.add('hidden');
+            
+            // إظهار عناصر المستخدم المصادق
+            document.querySelectorAll('.nav-item[data-page]').forEach(item => {
+                item.classList.remove('hidden');
+            });
             document.getElementById('userInfo').classList.remove('hidden');
             document.getElementById('logoutLink').classList.remove('hidden');
-            document.getElementById('loginLink').classList.add('hidden');
+            
+            // إظهار رابط الإدارة فقط للمدير
+            if (appData.currentUser.role === 'admin') {
+                document.getElementById('adminLink').classList.remove('hidden');
+            }
             
             // تحديث معلومات المستخدم
             document.getElementById('userName').textContent = appData.currentUser.name;
@@ -3587,7 +3970,7 @@
         // التنقل بين الصفحات
         function navigateToPage(pageId) {
             // إذا لم يكن المستخدم مسجلاً الدخول، إعادة التوجيه إلى صفحة تسجيل الدخول
-            if (!appData.isLoggedIn && pageId !== 'login') {
+            if (!appData.isLoggedIn && pageId !== 'login' && pageId !== 'register') {
                 pageId = 'login';
             }
             
@@ -3658,6 +4041,9 @@
                     break;
                 case 'photos':
                     loadPhotosContent();
+                    break;
+                case 'admin':
+                    loadAdminContent();
                     break;
             }
         }
@@ -4188,6 +4574,44 @@
             });
         }
 
+        // تحميل محتوى لوحة الإدارة
+        function loadAdminContent() {
+            const usersTableBody = document.getElementById('usersTableBody');
+            
+            // عرض المستخدمين في الجدول
+            usersTableBody.innerHTML = '';
+            appData.users.forEach(user => {
+                const userRow = document.createElement('tr');
+                userRow.innerHTML = `
+                    <td>${user.name}</td>
+                    <td>${user.phone}</td>
+                    <td>${user.university}</td>
+                    <td>${user.major}</td>
+                    <td>${user.role === 'admin' ? 'مدير' : 'مستخدم'}</td>
+                    <td><span class="user-status"></span> نشط</td>
+                    <td>
+                        <div class="user-actions">
+                            <button class="action-btn edit"><i class="fas fa-edit"></i></button>
+                            <button class="action-btn ban"><i class="fas fa-ban"></i></button>
+                            <button class="action-btn delete"><i class="fas fa-trash"></i></button>
+                        </div>
+                    </td>
+                `;
+                usersTableBody.appendChild(userRow);
+            });
+        }
+
+        // تحميل بيانات المستخدمين (للعرض فقط)
+        function loadSampleUsers() {
+            appData.users = [
+                { id: 1, phone: '500000000', name: 'مدير النظام', role: 'admin', university: 'النظام', major: 'إدارة النظام', avatar: null },
+                { id: 2, phone: '511111111', name: 'أحمد محمد', role: 'user', university: 'فهد', major: 'البرمجة', avatar: null },
+                { id: 3, phone: '522222222', name: 'سارة عبدالله', role: 'user', university: 'نورة', major: 'إدارة الأعمال', avatar: null },
+                { id: 4, phone: '533333333', name: 'خالد سعيد', role: 'user', university: 'الباحة', major: 'أمن سيبراني', avatar: null },
+                { id: 5, phone: '544444444', name: 'فاطمة علي', role: 'user', university: 'مقرن', major: 'المحاسبة', avatar: null }
+            ];
+        }
+
         // تبديل تبويبات الإعدادات
         function switchSettingsTab(tabId) {
             // إزالة النشاط من جميع الأزرار
@@ -4202,6 +4626,25 @@
             
             // إضافة النشاط للزر المحدد
             document.querySelector(`.tab-btn[data-tab="${tabId}"]`).classList.add('active');
+            
+            // إظهار اللوحة المحددة
+            document.getElementById(`${tabId}Panel`).classList.add('active');
+        }
+
+        // تبديل تبويبات الإدارة
+        function switchAdminTab(tabId) {
+            // إزالة النشاط من جميع الأزرار
+            document.querySelectorAll('.admin-tab-btn').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // إخفاء جميع اللوحات
+            document.querySelectorAll('.admin-tab-panel').forEach(panel => {
+                panel.classList.remove('active');
+            });
+            
+            // إضافة النشاط للزر المحدد
+            document.querySelector(`.admin-tab-btn[data-tab="${tabId}"]`).classList.add('active');
             
             // إظهار اللوحة المحددة
             document.getElementById(`${tabId}Panel`).classList.add('active');
