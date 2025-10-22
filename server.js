@@ -1,1950 +1,4180 @@
-import express from 'express';
-import http from 'http';
-import { Server } from 'socket.io';
-import cors from 'cors';
-import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
-import multer from 'multer';
-import path from 'path';
-import fs from 'fs';
-import { fileURLToPath } from 'url';
-import { v4 as uuidv4 } from 'uuid';
-import rateLimit from 'express-rate-limit';
-import helmet from 'helmet';
-import compression from 'compression';
-import morgan from 'morgan';
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>المنصة التعليمية المتطورة - نظام الإدارة المتكامل</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/emoji-picker-element@1.14.0/index.min.css">
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/emoji-picker-element@1.14.0/index.min.js"></script>
+    <style>
+        :root {
+            --primary: #2c5aa0;
+            --primary-dark: #1e3d72;
+            --primary-light: #4a7bc8;
+            --secondary: #00b4d8;
+            --accent: #ff6b6b;
+            --success: #28a745;
+            --warning: #ffc107;
+            --danger: #dc3545;
+            --info: #17a2b8;
+            --dark: #2d3748;
+            --light: #f8f9fa;
+            --gray-100: #f8f9fa;
+            --gray-200: #e9ecef;
+            --gray-300: #dee2e6;
+            --gray-400: #ced4da;
+            --gray-500: #adb5bd;
+            --gray-600: #6c757d;
+            --gray-700: #495057;
+            --gray-800: #343a40;
+            --gray-900: #212529;
+            --border: #e2e8f0;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            --shadow-md: 0 6px 10px -1px rgba(0, 0, 0, 0.1), 0 4px 6px -1px rgba(0, 0, 0, 0.06);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            --gradient-primary: linear-gradient(135deg, var(--primary), var(--primary-light));
+            --gradient-secondary: linear-gradient(135deg, var(--secondary), #0099cc);
+            --gradient-accent: linear-gradient(135deg, var(--accent), #ff5252);
+            --gradient-success: linear-gradient(135deg, var(--success), #20c997);
+            --story-gradient: linear-gradient(45deg, #ff6b6b, #4ecdc4, #45b7d1, #96ceb4, #feca57);
+            --group-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --channel-gradient: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            --sidebar-width: 280px;
+            --header-height: 70px;
+            --border-radius: 12px;
+            --border-radius-lg: 16px;
+            --border-radius-xl: 20px;
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            --transition-fast: all 0.15s ease;
+            --backdrop-blur: blur(12px);
+            --whatsapp-green: #25D366;
+            --whatsapp-dark: #075E54;
+            --telegram-blue: #0088cc;
+            --android-green: #3DDC84;
+        }
 
-// حل مشكلة __dirname في ES modules
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-const app = express();
-const server = http.createServer(app);
-const io = new Server(server, {
-    cors: {
-        origin: "*",
-        methods: ["GET", "POST", "PUT", "DELETE"],
-        credentials: true
-    },
-    pingTimeout: 60000,
-    pingInterval: 25000
-});
+        html {
+            scroll-behavior: smooth;
+            font-size: 16px;
+        }
 
-// إعدادات البيئة
-const PORT = process.env.PORT || 3000;
-const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key-2024-change-in-production';
-const NODE_ENV = process.env.NODE_ENV || 'development';
-const BACKUP_DIR = path.join(__dirname, 'backups');
-const EXPORT_DIR = path.join(__dirname, 'exports');
-const UPLOAD_DIR = path.join(__dirname, 'uploads');
+        body {
+            font-family: 'Segoe UI', 'Tahoma', 'Geneva', 'Verdana', 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: var(--dark);
+            line-height: 1.6;
+            min-height: 100vh;
+            overflow-x: hidden;
+            font-weight: 400;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
 
-// إنشاء المجلدات اللازمة
-const requiredDirs = [
-    UPLOAD_DIR, 
-    path.join(UPLOAD_DIR, 'profiles'), 
-    path.join(UPLOAD_DIR, 'stories'), 
-    path.join(UPLOAD_DIR, 'channels'), 
-    path.join(UPLOAD_DIR, 'files'), 
-    path.join(UPLOAD_DIR, 'groups'),
-    BACKUP_DIR, 
-    EXPORT_DIR,
-    path.join(__dirname, 'public')
-];
+        /* تحسينات التمرير */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
 
-requiredDirs.forEach(dir => {
-    if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-        console.log(`📁 تم إنشاء المجلد: ${dir}`);
-    }
-});
+        ::-webkit-scrollbar-track {
+            background: var(--gray-100);
+            border-radius: 10px;
+        }
 
-// إعداد trust proxy لـ Render
-app.set('trust proxy', 1);
+        ::-webkit-scrollbar-thumb {
+            background: var(--primary);
+            border-radius: 10px;
+            transition: var(--transition);
+        }
 
-// وسائط الأمان والتحسين
-app.use(helmet({
-    crossOriginEmbedderPolicy: false,
-    contentSecurityPolicy: false
-}));
-app.use(compression());
-app.use(morgan(NODE_ENV === 'production' ? 'combined' : 'dev'));
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--primary-dark);
+        }
 
-// Rate Limiting
-const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 دقيقة
-    max: NODE_ENV === 'production' ? 100 : 1000,
-    message: {
-        success: false,
-        message: 'تم تجاوز عدد الطلبات المسموح بها، يرجى المحاولة لاحقاً'
-    }
-});
-app.use(limiter);
+        /* تحسينات التصميم العامة */
+        .app-container {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
 
-// وسائط middleware الأساسية
-app.use(cors({
-    origin: process.env.CLIENT_URL || "*",
-    credentials: true
-}));
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-app.use('/uploads', express.static(UPLOAD_DIR));
-app.use('/exports', express.static(EXPORT_DIR));
-app.use(express.static(path.join(__dirname, 'public')));
-
-// إعداد multer للتحميلات
-const storage = multer.diskStorage({
-    destination: function (req, file, cb) {
-        let uploadPath = UPLOAD_DIR;
-        if (file.fieldname === 'avatar') uploadPath = path.join(UPLOAD_DIR, 'profiles');
-        else if (file.fieldname === 'story') uploadPath = path.join(UPLOAD_DIR, 'stories');
-        else if (file.fieldname === 'channelAvatar') uploadPath = path.join(UPLOAD_DIR, 'channels');
-        else if (file.fieldname === 'groupAvatar') uploadPath = path.join(UPLOAD_DIR, 'groups');
-        else if (file.fieldname === 'file') uploadPath = path.join(UPLOAD_DIR, 'files');
-        else if (file.fieldname === 'backup') uploadPath = BACKUP_DIR;
+        .connection-status {
+            position: fixed;
+            top: 15px;
+            left: 15px;
+            background: var(--success);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 25px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            z-index: 10000;
+            display: none;
+            align-items: center;
+            gap: 8px;
+            box-shadow: var(--shadow-lg);
+            backdrop-filter: var(--backdrop-blur);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: var(--transition);
+        }
         
-        // التأكد من وجود المجلد
-        if (!fs.existsSync(uploadPath)) {
-            fs.mkdirSync(uploadPath, { recursive: true });
+        .connection-status.offline {
+            background: var(--danger);
+            animation: pulse 2s infinite;
         }
-        cb(null, uploadPath);
-    },
-    filename: function (req, file, cb) {
-        const fileExt = path.extname(file.originalname);
-        const fileName = `${Date.now()}-${Math.round(Math.random() * 1E9)}${fileExt}`;
-        cb(null, fileName);
-    }
-});
 
-const fileFilter = (req, file, cb) => {
-    const allowedTypes = {
-        'avatar': ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
-        'story': ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'video/mp4', 'video/quicktime', 'video/webm'],
-        'channelAvatar': ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
-        'groupAvatar': ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
-        'file': ['image/jpeg', 'image/png', 'image/gif', 'application/pdf', 'text/plain', 
-                'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.sheet',
-                'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                'application/zip', 'application/vnd.rar'],
-        'backup': ['application/json']
-    };
-    
-    if (allowedTypes[file.fieldname]?.includes(file.mimetype)) {
-        cb(null, true);
-    } else {
-        cb(new Error(`نوع الملف غير مدعوم للمجال: ${file.fieldname}`), false);
-    }
-};
-
-const upload = multer({
-    storage: storage,
-    limits: {
-        fileSize: 100 * 1024 * 1024 // 100MB
-    },
-    fileFilter: fileFilter
-});
-
-// نظام التخزين المحلي والنسخ الاحتياطي
-class LocalStorageService {
-    constructor() {
-        this.dataFile = path.join(__dirname, 'local_data.json');
-        this.init();
-    }
-
-    init() {
-        if (!fs.existsSync(this.dataFile)) {
-            const defaultData = this.getDefaultData();
-            this.saveData(defaultData);
-            console.log('✅ تم إنشاء ملف البيانات المحلي');
+        .connection-status.reconnecting {
+            background: var(--warning);
+            color: var(--dark);
         }
-    }
 
-    loadData() {
-        try {
-            const data = fs.readFileSync(this.dataFile, 'utf8');
-            return JSON.parse(data);
-        } catch (error) {
-            console.error('❌ خطأ في تحميل البيانات المحلية:', error);
-            return this.getDefaultData();
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
         }
-    }
 
-    saveData(data) {
-        try {
-            fs.writeFileSync(this.dataFile, JSON.stringify(data, null, 2));
-            return true;
-        } catch (error) {
-            console.error('❌ خطأ في حفظ البيانات المحلية:', error);
-            return false;
+        /* تحسينات الهيدر */
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: var(--backdrop-blur);
+            box-shadow: var(--shadow);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            border-bottom: 1px solid var(--border);
+            height: var(--header-height);
+            transition: var(--transition);
         }
-    }
 
-    getDefaultData() {
-        return {
-            users: [],
-            stories: [],
-            messages: [],
-            conversations: [],
-            channels: [],
-            groups: [],
-            groupMessages: [],
-            channelMessages: [],
-            notifications: [],
-            reports: [],
-            backups: [],
-            exports: [],
-            auditLogs: [],
-            lastBackup: null,
-            stats: {
-                totalUsers: 0,
-                totalMessages: 0,
-                totalStories: 0,
-                totalChannels: 0,
-                totalGroups: 0,
-                totalConversations: 0
+        .header.scrolled {
+            background: rgba(255, 255, 255, 0.98);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .header-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 100%;
+            gap: 1.5rem;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            flex-shrink: 0;
+            text-decoration: none;
+            transition: var(--transition);
+        }
+
+        .logo:hover {
+            transform: translateY(-1px);
+        }
+
+        .logo-icon {
+            width: 42px;
+            height: 42px;
+            background: var(--gradient-primary);
+            border-radius: var(--border-radius);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.3rem;
+            box-shadow: var(--shadow);
+            transition: var(--transition);
+        }
+
+        .logo:hover .logo-icon {
+            transform: scale(1.05);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .logo-text {
+            font-size: 1.4rem;
+            font-weight: 800;
+            color: var(--primary);
+            letter-spacing: -0.5px;
+        }
+
+        .logo-subtitle {
+            font-size: 0.75rem;
+            color: var(--gray-600);
+            font-weight: 500;
+            margin-top: -2px;
+        }
+
+        /* تحسينات التنقل */
+        .nav {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .nav-item {
+            color: var(--dark);
+            text-decoration: none;
+            font-weight: 600;
+            padding: 0.6rem 1.2rem;
+            border-radius: var(--border-radius);
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            white-space: nowrap;
+            font-size: 0.95rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .nav-item::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 0;
+            height: 100%;
+            background: var(--gradient-primary);
+            transition: var(--transition);
+            z-index: -1;
+        }
+
+        .nav-item:hover {
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: var(--shadow);
+        }
+
+        .nav-item:hover::before {
+            width: 100%;
+        }
+
+        .nav-item.active {
+            background: var(--gradient-primary);
+            color: white;
+            box-shadow: var(--shadow);
+        }
+
+        .nav-item.hidden {
+            display: none;
+        }
+
+        .nav-item-badge {
+            background: var(--accent);
+            color: white;
+            border-radius: 10px;
+            padding: 0.2rem 0.5rem;
+            font-size: 0.75rem;
+            font-weight: 700;
+            min-width: 20px;
+            text-align: center;
+        }
+
+        /* تحسينات معلومات المستخدم */
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 0.5rem 1rem;
+            background: var(--gray-100);
+            border-radius: var(--border-radius);
+            font-weight: 600;
+            transition: var(--transition);
+            border: 1px solid var(--border);
+        }
+
+        .user-info:hover {
+            background: var(--gray-200);
+            transform: translateY(-1px);
+            box-shadow: var(--shadow);
+        }
+
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: var(--gradient-primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 700;
+            font-size: 1.1rem;
+            border: 2px solid white;
+            box-shadow: var(--shadow);
+            transition: var(--transition);
+        }
+
+        .user-avatar img {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            object-fit: cover;
+        }
+
+        .user-details {
+            display: flex;
+            flex-direction: column;
+            gap: 0.1rem;
+        }
+
+        .user-name {
+            font-weight: 700;
+            color: var(--dark);
+        }
+
+        .user-role {
+            font-size: 0.8rem;
+            color: var(--gray-600);
+            font-weight: 500;
+        }
+
+        /* تحسينات المحتوى الرئيسي */
+        .main-content {
+            flex: 1;
+            padding: 2rem;
+            max-width: 1400px;
+            margin: 0 auto;
+            width: 100%;
+            animation: fadeInUp 0.6s ease-out;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
             }
-        };
-    }
-
-    // دوال المستخدمين
-    async createUser(userData) {
-        const data = this.loadData();
-        const userId = uuidv4();
-        const user = {
-            _id: userId,
-            ...userData,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            isOnline: false,
-            lastSeen: new Date().toISOString(),
-            isActive: true,
-            stats: userData.stats || {
-                messagesSent: 0,
-                storiesPosted: 0,
-                channelsJoined: 0,
-                groupsJoined: 0,
-                totalLikes: 0
-            },
-            settings: userData.settings || {
-                privacy: {
-                    hideOnlineStatus: false,
-                    hideLastSeen: false,
-                    hideStoryViews: false,
-                    profileVisibility: 'public'
-                },
-                notificationSettings: {
-                    messages: true,
-                    stories: true,
-                    channels: true,
-                    groups: true,
-                    system: true,
-                    emailNotifications: false
-                },
-                appearance: {
-                    theme: 'auto',
-                    fontSize: 'medium',
-                    background: 'default',
-                    language: 'ar'
-                }
+            to {
+                opacity: 1;
+                transform: translateY(0);
             }
-        };
+        }
+
+        .page {
+            display: none;
+            animation: fadeIn 0.5s ease-in;
+            min-height: 60vh;
+        }
+
+        .page.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { 
+                opacity: 0; 
+                transform: translateY(20px); 
+            }
+            to { 
+                opacity: 1; 
+                transform: translateY(0); 
+            }
+        }
+
+        /* تحسينات الصفحات */
+        .hero-section {
+            padding: 3rem 0;
+            text-align: center;
+        }
         
-        data.users.push(user);
-        this.updateStats(data);
-        this.saveData(data);
+        .hero-title {
+            font-size: 3rem;
+            font-weight: 800;
+            margin-bottom: 1rem;
+            background: var(--gradient-primary);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
         
-        console.log('✅ تم إنشاء المستخدم:', {
-            id: userId,
-            name: user.fullName,
-            email: user.email,
-            hasPassword: !!user.password,
-            passwordLength: user.password ? user.password.length : 0
+        .hero-description {
+            font-size: 1.2rem;
+            color: var(--gray-600);
+            margin-bottom: 2rem;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        
+        .hero-actions {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-bottom: 4rem;
+        }
+        
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 2rem;
+            margin-top: 3rem;
+        }
+        
+        .feature-card {
+            background: white;
+            padding: 2rem;
+            border-radius: var(--border-radius-lg);
+            box-shadow: var(--shadow);
+            text-align: center;
+            transition: var(--transition);
+        }
+        
+        .feature-card:hover {
+            transform: translateY(-5px);
+            box-shadow: var(--shadow-lg);
+        }
+        
+        .feature-icon {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 1.5rem;
+            background: var(--gradient-primary);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            color: white;
+        }
+        
+        /* تحسينات صفحات المصادقة */
+        .auth-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 70vh;
+            padding: 2rem;
+        }
+        
+        .auth-card {
+            background: white;
+            padding: 3rem;
+            border-radius: var(--border-radius-lg);
+            box-shadow: var(--shadow-xl);
+            width: 100%;
+            max-width: 450px;
+        }
+        
+        .auth-header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        
+        .auth-header h2 {
+            color: var(--primary);
+            margin-bottom: 0.5rem;
+        }
+        
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: var(--dark);
+        }
+        
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            border: 2px solid var(--border);
+            border-radius: var(--border-radius);
+            font-size: 1rem;
+            transition: var(--transition);
+        }
+        
+        .form-group input:focus, .form-group select:focus {
+            border-color: var(--primary);
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(44, 90, 160, 0.1);
+        }
+        
+        .auth-footer {
+            text-align: center;
+            margin-top: 2rem;
+            padding-top: 2rem;
+            border-top: 1px solid var(--border);
+        }
+        
+        /* تحسينات لوحة التحكم */
+        .dashboard-header {
+            margin-bottom: 2rem;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 3rem;
+        }
+        
+        .stat-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: var(--border-radius-lg);
+            box-shadow: var(--shadow);
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        
+        .stat-icon {
+            width: 60px;
+            height: 60px;
+            background: var(--gradient-primary);
+            border-radius: var(--border-radius);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.5rem;
+        }
+        
+        .stat-info h3 {
+            font-size: 2rem;
+            font-weight: 800;
+            color: var(--primary);
+            margin-bottom: 0.25rem;
+        }
+        
+        .content-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 2rem;
+        }
+        
+        .content-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: var(--border-radius-lg);
+            box-shadow: var(--shadow);
+        }
+        
+        /* تحسينات الأزرار */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: var(--border-radius);
+            font-weight: 600;
+            text-decoration: none;
+            cursor: pointer;
+            transition: var(--transition);
+            font-size: 0.95rem;
+        }
+        
+        .btn-primary {
+            background: var(--gradient-primary);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+        }
+        
+        .btn-outline {
+            background: transparent;
+            color: var(--primary);
+            border: 2px solid var(--primary);
+        }
+        
+        .btn-outline:hover {
+            background: var(--primary);
+            color: white;
+        }
+        
+        .btn-block {
+            width: 100%;
+            justify-content: center;
+        }
+        
+        .btn-lg {
+            padding: 1rem 2rem;
+            font-size: 1.1rem;
+        }
+        
+        .btn-sm {
+            padding: 0.5rem 1rem;
+            font-size: 0.85rem;
+        }
+
+        /* تحسينات شاشة الترحيب */
+        .welcome-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+        }
+
+        .welcome-content {
+            text-align: center;
+            max-width: 500px;
+            padding: 2rem;
+        }
+
+        .welcome-logo .logo-icon.large {
+            width: 100px;
+            height: 100px;
+            font-size: 3rem;
+            margin: 0 auto 1.5rem;
+        }
+
+        .welcome-logo h1 {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+            font-weight: 800;
+        }
+
+        .welcome-features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 1.5rem;
+            margin: 3rem 0;
+        }
+
+        .feature {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .feature i {
+            font-size: 2rem;
+            opacity: 0.9;
+        }
+
+        /* تحسينات شريط الأدوات السريع */
+        .quick-actions-bar {
+            position: fixed;
+            bottom: 80px;
+            left: 20px;
+            background: white;
+            border-radius: var(--border-radius-lg);
+            box-shadow: var(--shadow-xl);
+            padding: 1rem;
+            display: none;
+            flex-direction: column;
+            gap: 0.5rem;
+            z-index: 1000;
+            animation: slideInUp 0.3s ease-out;
+        }
+        
+        .quick-actions-bar.active {
+            display: flex;
+        }
+        
+        .quick-action {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem 1rem;
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            transition: var(--transition);
+            white-space: nowrap;
+        }
+        
+        .quick-action:hover {
+            background: var(--gray-100);
+        }
+        
+        .quick-action i {
+            width: 20px;
+            text-align: center;
+            color: var(--primary);
+        }
+
+        /* تحسينات الزر العائم */
+        .floating-action-btn {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            width: 60px;
+            height: 60px;
+            background: var(--gradient-primary);
+            border: none;
+            border-radius: 50%;
+            color: white;
+            font-size: 1.5rem;
+            cursor: pointer;
+            box-shadow: var(--shadow-xl);
+            z-index: 1000;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .floating-action-btn:hover {
+            transform: scale(1.1);
+            box-shadow: var(--shadow-2xl);
+        }
+
+        /* تحسينات إشعار التحديث */
+        .update-notification {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: white;
+            padding: 1rem 1.5rem;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow-xl);
+            z-index: 5000;
+            display: none;
+            align-items: center;
+            gap: 1rem;
+            border-right: 4px solid var(--info);
+            animation: slideInDown 0.3s ease-out;
+        }
+        
+        .update-notification.active {
+            display: flex;
+        }
+        
+        .update-content {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            flex: 1;
+        }
+        
+        .update-info {
+            flex: 1;
+        }
+        
+        .update-info strong {
+            display: block;
+            margin-bottom: 0.25rem;
+        }
+        
+        .update-info span {
+            font-size: 0.9rem;
+            color: var(--gray-600);
+        }
+
+        @keyframes slideInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        @keyframes slideInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-30px) translateX(-50%);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) translateX(-50%);
+            }
+        }
+
+        /* تحسينات قائمة النشاط */
+        .activity-list {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .activity-item {
+            padding: 1rem;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        
+        .activity-item:last-child {
+            border-bottom: none;
+        }
+        
+        .activity-icon {
+            width: 40px;
+            height: 40px;
+            background: var(--gray-100);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--primary);
+        }
+        
+        .activity-content {
+            flex: 1;
+        }
+        
+        .activity-content p {
+            margin: 0;
+            font-weight: 500;
+        }
+        
+        .activity-time {
+            font-size: 0.8rem;
+            color: var(--gray-600);
+        }
+
+        /* تحسينات قائمة المستخدمين */
+        .users-list {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .user-list-item {
+            padding: 1rem;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        
+        .user-list-item:last-child {
+            border-bottom: none;
+        }
+        
+        .user-status {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--success);
+        }
+        
+        .user-status.offline {
+            background: var(--gray-400);
+        }
+
+        /* ============ تحسينات نظام الدردشة (واتساب) ============ */
+        .chat-container {
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            height: 80vh;
+            background: white;
+            border-radius: var(--border-radius-lg);
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+        
+        .chat-sidebar {
+            border-left: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            background: var(--gray-100);
+        }
+        
+        .chat-header {
+            padding: 1rem;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--whatsapp-dark);
+            color: white;
+        }
+        
+        .chat-search {
+            padding: 1rem;
+            border-bottom: 1px solid var(--border);
+            background: white;
+        }
+        
+        .chat-search input {
+            width: 100%;
+            padding: 0.5rem 1rem;
+            border: 1px solid var(--border);
+            border-radius: 20px;
+        }
+        
+        .conversations-list {
+            flex: 1;
+            overflow-y: auto;
+        }
+        
+        .conversation-item {
+            display: flex;
+            align-items: center;
+            padding: 1rem;
+            border-bottom: 1px solid var(--border);
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        
+        .conversation-item:hover {
+            background: var(--gray-200);
+        }
+        
+        .conversation-item.active {
+            background: var(--whatsapp-green);
+            color: white;
+        }
+        
+        .conversation-avatar {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: var(--gradient-primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.2rem;
+            margin-left: 1rem;
+        }
+        
+        .conversation-info {
+            flex: 1;
+        }
+        
+        .conversation-name {
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+        
+        .conversation-last-message {
+            font-size: 0.85rem;
+            color: var(--gray-600);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .conversation-meta {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 0.25rem;
+        }
+        
+        .conversation-time {
+            font-size: 0.75rem;
+            color: var(--gray-500);
+        }
+        
+        .conversation-unread {
+            background: var(--whatsapp-green);
+            color: white;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+            font-weight: 600;
+        }
+        
+        .chat-main {
+            display: flex;
+            flex-direction: column;
+            background: #e5ddd5;
+            background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M11 18c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm48 25c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm-43-7c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm63 31c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM34 90c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm56-76c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM12 86c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm28-65c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm23-11c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-6 60c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm29 22c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zM32 63c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm57-13c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-9-21c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM60 91c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM35 41c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM12 60c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2z' fill='%239C92AC' fill-opacity='0.05' fill-rule='evenodd'/%3E%3C/svg%3E");
+        }
+        
+        .chat-messages {
+            flex: 1;
+            padding: 1rem;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        
+        .message {
+            max-width: 70%;
+            padding: 0.75rem 1rem;
+            border-radius: 7.5px;
+            position: relative;
+            animation: messageIn 0.3s ease-out;
+            word-wrap: break-word;
+        }
+        
+        @keyframes messageIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .message.sent {
+            background: var(--whatsapp-green);
+            color: white;
+            align-self: flex-end;
+            border-bottom-right-radius: 0;
+        }
+        
+        .message.received {
+            background: white;
+            color: var(--dark);
+            align-self: flex-start;
+            border-bottom-left-radius: 0;
+            box-shadow: 0 1px 0.5px rgba(0, 0, 0, 0.13);
+        }
+        
+        .message-time {
+            font-size: 0.7rem;
+            opacity: 0.7;
+            margin-top: 0.5rem;
+            text-align: right;
+        }
+        
+        .message.received .message-time {
+            text-align: left;
+        }
+        
+        .message-status {
+            position: absolute;
+            bottom: 5px;
+            left: 5px;
+            font-size: 0.7rem;
+            opacity: 0.7;
+        }
+        
+        .chat-input-container {
+            padding: 1rem;
+            background: white;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .chat-input-tools {
+            display: flex;
+            gap: 0.5rem;
+        }
+        
+        .chat-tool-btn {
+            background: none;
+            border: none;
+            padding: 0.5rem;
+            border-radius: var(--border-radius);
+            color: var(--gray-600);
+            cursor: pointer;
+            font-size: 1.2rem;
+        }
+        
+        .chat-input-wrapper {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 25px;
+            padding: 0.5rem 1rem;
+        }
+        
+        .chat-input-container input {
+            flex: 1;
+            border: none;
+            outline: none;
+            padding: 0.5rem;
+            font-size: 1rem;
+        }
+        
+        .emoji-picker-container {
+            position: absolute;
+            bottom: 70px;
+            left: 20px;
+            z-index: 1000;
+            display: none;
+        }
+        
+        .emoji-picker-container.active {
+            display: block;
+        }
+        
+        .emoji-btn {
+            background: none;
+            border: none;
+            font-size: 1.2rem;
+            cursor: pointer;
+            color: var(--gray-600);
+        }
+        
+        .send-btn {
+            background: var(--whatsapp-green);
+            color: white;
+            border: none;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        
+        .send-btn:hover {
+            transform: scale(1.05);
+        }
+
+        /* ============ تحسينات نظام القنوات (تليجرام) ============ */
+        .channels-container {
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            height: 80vh;
+            background: white;
+            border-radius: var(--border-radius-lg);
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+        
+        .channels-sidebar {
+            border-left: 1px solid var(--border);
+            background: var(--gray-100);
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .channels-header {
+            padding: 1rem;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--telegram-blue);
+            color: white;
+        }
+        
+        .channels-list {
+            flex: 1;
+            overflow-y: auto;
+        }
+        
+        .channel-item {
+            display: flex;
+            align-items: center;
+            padding: 1rem;
+            border-bottom: 1px solid var(--border);
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        
+        .channel-item:hover {
+            background: var(--gray-200);
+        }
+        
+        .channel-item.active {
+            background: var(--telegram-blue);
+            color: white;
+        }
+        
+        .channel-avatar {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: var(--channel-gradient);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.2rem;
+            margin-left: 1rem;
+        }
+        
+        .channel-info {
+            flex: 1;
+        }
+        
+        .channel-name {
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+        
+        .channel-last-message {
+            font-size: 0.85rem;
+            color: var(--gray-600);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .channel-meta {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 0.25rem;
+        }
+        
+        .channel-time {
+            font-size: 0.75rem;
+            color: var(--gray-500);
+        }
+        
+        .channel-unread {
+            background: var(--telegram-blue);
+            color: white;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+            font-weight: 600;
+        }
+        
+        .channel-main {
+            display: flex;
+            flex-direction: column;
+            background: white;
+        }
+        
+        .channel-messages {
+            flex: 1;
+            padding: 1rem;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+        
+        .channel-message {
+            padding: 1rem;
+            border-radius: var(--border-radius);
+            background: var(--gray-100);
+            max-width: 80%;
+            animation: messageIn 0.3s ease-out;
+        }
+        
+        .channel-message.admin {
+            background: var(--telegram-blue);
+            color: white;
+            align-self: flex-end;
+        }
+        
+        .channel-message-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+            font-size: 0.85rem;
+            opacity: 0.8;
+        }
+        
+        .channel-input-container {
+            padding: 1rem;
+            border-top: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .channel-input-wrapper {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            background: var(--gray-100);
+            border-radius: 25px;
+            padding: 0.5rem 1rem;
+        }
+        
+        .channel-input-container input {
+            flex: 1;
+            border: none;
+            outline: none;
+            background: transparent;
+            padding: 0.5rem;
+            font-size: 1rem;
+        }
+        
+        .channel-send-btn {
+            background: var(--telegram-blue);
+            color: white;
+            border: none;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        
+        .channel-send-btn:hover {
+            transform: scale(1.05);
+        }
+
+        /* ============ تحسينات نظام المجموعات (تليجرام) ============ */
+        .groups-container {
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            height: 80vh;
+            background: white;
+            border-radius: var(--border-radius-lg);
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+        
+        .groups-sidebar {
+            border-left: 1px solid var(--border);
+            background: var(--gray-100);
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .groups-header {
+            padding: 1rem;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--group-gradient);
+            color: white;
+        }
+        
+        .groups-list {
+            flex: 1;
+            overflow-y: auto;
+        }
+        
+        .group-item {
+            display: flex;
+            align-items: center;
+            padding: 1rem;
+            border-bottom: 1px solid var(--border);
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        
+        .group-item:hover {
+            background: var(--gray-200);
+        }
+        
+        .group-item.active {
+            background: var(--group-gradient);
+            color: white;
+        }
+        
+        .group-avatar {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: var(--group-gradient);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.2rem;
+            margin-left: 1rem;
+        }
+        
+        .group-info {
+            flex: 1;
+        }
+        
+        .group-name {
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+        
+        .group-last-message {
+            font-size: 0.85rem;
+            color: var(--gray-600);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .group-meta {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 0.25rem;
+        }
+        
+        .group-time {
+            font-size: 0.75rem;
+            color: var(--gray-500);
+        }
+        
+        .group-unread {
+            background: var(--group-gradient);
+            color: white;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+            font-weight: 600;
+        }
+        
+        .group-main {
+            display: flex;
+            flex-direction: column;
+            background: white;
+        }
+        
+        .group-messages {
+            flex: 1;
+            padding: 1rem;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+        
+        .group-message {
+            padding: 1rem;
+            border-radius: var(--border-radius);
+            background: var(--gray-100);
+            max-width: 80%;
+            animation: messageIn 0.3s ease-out;
+        }
+        
+        .group-message.self {
+            background: var(--group-gradient);
+            color: white;
+            align-self: flex-end;
+        }
+        
+        .group-message-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+            font-size: 0.85rem;
+            opacity: 0.8;
+        }
+        
+        .group-input-container {
+            padding: 1rem;
+            border-top: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .group-input-wrapper {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            background: var(--gray-100);
+            border-radius: 25px;
+            padding: 0.5rem 1rem;
+        }
+        
+        .group-input-container input {
+            flex: 1;
+            border: none;
+            outline: none;
+            background: transparent;
+            padding: 0.5rem;
+            font-size: 1rem;
+        }
+        
+        .group-send-btn {
+            background: var(--group-gradient);
+            color: white;
+            border: none;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        
+        .group-send-btn:hover {
+            transform: scale(1.05);
+        }
+
+        /* ============ تحسينات نظام الستوريات ============ */
+        .stories-container {
+            background: white;
+            border-radius: var(--border-radius-lg);
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+        
+        .stories-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .stories-feed {
+            padding: 1.5rem;
+        }
+        
+        .stories-carousel {
+            display: flex;
+            gap: 1rem;
+            overflow-x: auto;
+            padding: 1rem 0;
+            margin-bottom: 2rem;
+        }
+        
+        .story-user {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.5rem;
+            cursor: pointer;
+            min-width: 80px;
+        }
+        
+        .story-avatar {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            background: var(--gradient-primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.5rem;
+            border: 3px solid var(--primary);
+            position: relative;
+        }
+        
+        .story-avatar.has-story {
+            border-color: var(--accent);
+        }
+        
+        .story-avatar img {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            object-fit: cover;
+        }
+        
+        .story-username {
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-align: center;
+        }
+        
+        .stories-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 1.5rem;
+        }
+        
+        .story-card {
+            background: var(--gray-100);
+            border-radius: var(--border-radius-lg);
+            overflow: hidden;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        
+        .story-card:hover {
+            transform: translateY(-5px);
+            box-shadow: var(--shadow-lg);
+        }
+        
+        .story-media {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+        }
+        
+        .story-content {
+            padding: 1rem;
+        }
+        
+        .story-user-info {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .story-caption {
+            font-size: 0.9rem;
+            color: var(--gray-700);
+            line-height: 1.4;
+        }
+        
+        .story-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 1rem;
+            font-size: 0.8rem;
+            color: var(--gray-600);
+        }
+
+        /* تحسينات التصميم المتجاوب */
+        @media (max-width: 1200px) {
+            .content-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .chat-container, .channels-container, .groups-container {
+                grid-template-columns: 1fr;
+            }
+            
+            .chat-sidebar, .channels-sidebar, .groups-sidebar {
+                display: none;
+            }
+            
+            .chat-sidebar.active, .channels-sidebar.active, .groups-sidebar.active {
+                display: flex;
+                position: fixed;
+                top: 0;
+                right: 0;
+                width: 300px;
+                height: 100%;
+                z-index: 1000;
+                box-shadow: var(--shadow-xl);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .header-content {
+                padding: 0 1rem;
+            }
+            
+            .nav {
+                gap: 0.25rem;
+            }
+            
+            .nav-item {
+                padding: 0.5rem 0.75rem;
+                font-size: 0.9rem;
+            }
+            
+            .user-info {
+                padding: 0.5rem;
+            }
+            
+            .user-details {
+                display: none;
+            }
+            
+            .main-content {
+                padding: 1rem;
+            }
+            
+            .hero-title {
+                font-size: 2rem;
+            }
+            
+            .hero-description {
+                font-size: 1rem;
+            }
+            
+            .hero-actions {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .feature-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .floating-action-btn {
+                width: 50px;
+                height: 50px;
+                font-size: 1.2rem;
+            }
+            
+            .quick-actions-bar {
+                left: 10px;
+                bottom: 70px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .logo-text {
+                display: none;
+            }
+            
+            .nav-item span:not(.nav-item-badge) {
+                display: none;
+            }
+            
+            .nav-item {
+                padding: 0.5rem;
+            }
+            
+            .auth-card {
+                padding: 2rem 1.5rem;
+            }
+            
+            .message {
+                max-width: 90%;
+            }
+        }
+
+        /* تحسينات إضافية للتصميم */
+        .section-title {
+            font-size: 1.75rem;
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+            color: var(--dark);
+            position: relative;
+            padding-bottom: 0.75rem;
+        }
+        
+        .section-title::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            width: 60px;
+            height: 4px;
+            background: var(--gradient-primary);
+            border-radius: 2px;
+        }
+        
+        .card {
+            background: white;
+            border-radius: var(--border-radius-lg);
+            box-shadow: var(--shadow);
+            overflow: hidden;
+            transition: var(--transition);
+        }
+        
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: var(--shadow-lg);
+        }
+        
+        .card-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .card-body {
+            padding: 1.5rem;
+        }
+        
+        .card-footer {
+            padding: 1.5rem;
+            border-top: 1px solid var(--border);
+            background: var(--gray-100);
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            border-radius: 6px;
+            text-transform: uppercase;
+        }
+        
+        .badge-primary {
+            background: var(--primary);
+            color: white;
+        }
+        
+        .badge-success {
+            background: var(--success);
+            color: white;
+        }
+        
+        .badge-warning {
+            background: var(--warning);
+            color: var(--dark);
+        }
+        
+        .badge-danger {
+            background: var(--danger);
+            color: white;
+        }
+        
+        .badge-info {
+            background: var(--info);
+            color: white;
+        }
+        
+        .divider {
+            height: 1px;
+            background: var(--border);
+            margin: 1.5rem 0;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 3rem 2rem;
+            color: var(--gray-600);
+        }
+        
+        .empty-state i {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+        
+        .empty-state h3 {
+            margin-bottom: 0.5rem;
+            color: var(--gray-700);
+        }
+        
+        .empty-state p {
+            margin-bottom: 1.5rem;
+        }
+        
+        .loading {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 2rem;
+        }
+        
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid var(--gray-300);
+            border-left: 4px solid var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .fade-in {
+            animation: fadeIn 0.5s ease-in;
+        }
+        
+        .slide-in-right {
+            animation: slideInRight 0.3s ease-out;
+        }
+        
+        @keyframes slideInRight {
+            from {
+                opacity: 0;
+                transform: translateX(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+        
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+        
+        .bounce {
+            animation: bounce 2s infinite;
+        }
+        
+        @keyframes bounce {
+            0%, 20%, 50%, 80%, 100% {
+                transform: translateY(0);
+            }
+            40% {
+                transform: translateY(-10px);
+            }
+            60% {
+                transform: translateY(-5px);
+            }
+        }
+        
+        .shake {
+            animation: shake 0.5s;
+        }
+        
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+            20%, 40%, 60%, 80% { transform: translateX(5px); }
+        }
+        
+        .zoom-in {
+            animation: zoomIn 0.3s ease-out;
+        }
+        
+        @keyframes zoomIn {
+            from {
+                opacity: 0;
+                transform: scale(0.9);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+        
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--dark);
+            color: white;
+            padding: 1rem 1.5rem;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow-xl);
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            max-width: 90%;
+            animation: slideInUp 0.3s ease-out;
+        }
+        
+        .toast.success {
+            background: var(--success);
+        }
+        
+        .toast.error {
+            background: var(--danger);
+        }
+        
+        .toast.warning {
+            background: var(--warning);
+            color: var(--dark);
+        }
+        
+        .toast.info {
+            background: var(--info);
+        }
+        
+        .tooltip {
+            position: relative;
+            display: inline-block;
+        }
+        
+        .tooltip .tooltip-text {
+            visibility: hidden;
+            background: var(--dark);
+            color: white;
+            text-align: center;
+            border-radius: var(--border-radius);
+            padding: 0.5rem 1rem;
+            position: absolute;
+            z-index: 1;
+            bottom: 125%;
+            left: 50%;
+            transform: translateX(-50%);
+            opacity: 0;
+            transition: opacity 0.3s;
+            font-size: 0.85rem;
+            white-space: nowrap;
+        }
+        
+        .tooltip .tooltip-text::after {
+            content: "";
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            margin-left: -5px;
+            border-width: 5px;
+            border-style: solid;
+            border-color: var(--dark) transparent transparent transparent;
+        }
+        
+        .tooltip:hover .tooltip-text {
+            visibility: visible;
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+    <!-- شاشة الترحيب -->
+    <div class="welcome-screen" id="welcomeScreen">
+        <div class="welcome-content">
+            <div class="welcome-logo">
+                <div class="logo-icon large">
+                    <i class="fas fa-graduation-cap"></i>
+                </div>
+                <h1>المنصة التعليمية المتطورة</h1>
+                <p>نظام الإدارة التعليمي المتكامل</p>
+            </div>
+            
+            <div class="welcome-features">
+                <div class="feature">
+                    <i class="fas fa-comments"></i>
+                    <span>دردشة فورية</span>
+                </div>
+                <div class="feature">
+                    <i class="fas fa-broadcast-tower"></i>
+                    <span>قنوات بث</span>
+                </div>
+                <div class="feature">
+                    <i class="fas fa-users"></i>
+                    <span>مجموعات تعليمية</span>
+                </div>
+                <div class="feature">
+                    <i class="fas fa-mobile-alt"></i>
+                    <span>تصميم متجاوب</span>
+                </div>
+            </div>
+            
+            <div class="loading">
+                <div class="loading-spinner"></div>
+            </div>
+            
+            <p>جاري تحميل المنصة...</p>
+        </div>
+    </div>
+
+    <!-- حالة الاتصال -->
+    <div class="connection-status" id="connectionStatus">
+        <i class="fas fa-wifi"></i>
+        <span>متصل بالخادم</span>
+    </div>
+
+    <!-- إشعار التحديث -->
+    <div class="update-notification" id="updateNotification">
+        <div class="update-content">
+            <i class="fas fa-sync-alt fa-spin"></i>
+            <div class="update-info">
+                <strong>تحديث جديد متاح</strong>
+                <span>جاري تحميل التحديثات تلقائياً...</span>
+            </div>
+        </div>
+        <button class="btn btn-sm btn-outline" id="dismissUpdate">تجاهل</button>
+    </div>
+
+    <!-- الهيدر -->
+    <header class="header" id="header">
+        <div class="header-content">
+            <a href="#" class="logo" onclick="showPage('home'); return false;">
+                <div class="logo-icon">
+                    <i class="fas fa-graduation-cap"></i>
+                </div>
+                <div>
+                    <div class="logo-text">المنصة التعليمية</div>
+                    <div class="logo-subtitle">نظام الإدارة المتكامل</div>
+                </div>
+            </a>
+
+            <nav class="nav">
+                <a href="#" class="nav-item" onclick="showPage('home'); return false;">
+                    <i class="fas fa-home"></i>
+                    <span>الرئيسية</span>
+                </a>
+                <a href="#" class="nav-item" onclick="showPage('dashboard'); return false;">
+                    <i class="fas fa-tachometer-alt"></i>
+                    <span>لوحة التحكم</span>
+                </a>
+                <a href="#" class="nav-item" onclick="showPage('chat'); return false;">
+                    <i class="fas fa-comments"></i>
+                    <span>الدردشة</span>
+                    <span class="nav-item-badge" id="chatBadge">0</span>
+                </a>
+                <a href="#" class="nav-item" onclick="showPage('channels'); return false;">
+                    <i class="fas fa-broadcast-tower"></i>
+                    <span>القنوات</span>
+                </a>
+                <a href="#" class="nav-item" onclick="showPage('groups'); return false;">
+                    <i class="fas fa-users"></i>
+                    <span>المجموعات</span>
+                    <span class="nav-item-badge" id="groupsBadge">0</span>
+                </a>
+                <a href="#" class="nav-item" onclick="showPage('stories'); return false;">
+                    <i class="fas fa-history"></i>
+                    <span>الستوريات</span>
+                </a>
+                <a href="#" class="nav-item hidden" id="loginNav" onclick="showPage('login'); return false;">
+                    <i class="fas fa-sign-in-alt"></i>
+                    <span>تسجيل الدخول</span>
+                </a>
+                <a href="#" class="nav-item hidden" id="registerNav" onclick="showPage('register'); return false;">
+                    <i class="fas fa-user-plus"></i>
+                    <span>إنشاء حساب</span>
+                </a>
+                <a href="#" class="nav-item hidden" id="logoutNav" onclick="logout(); return false;">
+                    <i class="fas fa-sign-out-alt"></i>
+                    <span>تسجيل الخروج</span>
+                </a>
+            </nav>
+
+            <div class="user-info hidden" id="userInfo">
+                <div class="user-avatar">
+                    <i class="fas fa-user"></i>
+                </div>
+                <div class="user-details">
+                    <div class="user-name" id="userName">محمد أحمد</div>
+                    <div class="user-role" id="userRole">مدرس</div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- المحتوى الرئيسي -->
+    <main class="main-content">
+        <!-- الصفحة الرئيسية -->
+        <section class="page active" id="home">
+            <div class="hero-section">
+                <h1 class="hero-title">المنصة التعليمية المتطورة</h1>
+                <p class="hero-description">نظام إدارة تعليمي متكامل يوفر أدوات متقدمة للتواصل والتعلم عن بعد مع واجهة مستخدم بديهية ومميزات متطورة</p>
+                
+                <div class="hero-actions">
+                    <button class="btn btn-primary btn-lg" onclick="showPage('register')">
+                        <i class="fas fa-user-plus"></i>
+                        إنشاء حساب جديد
+                    </button>
+                    <button class="btn btn-outline btn-lg" onclick="showPage('login')">
+                        <i class="fas fa-sign-in-alt"></i>
+                        تسجيل الدخول
+                    </button>
+                </div>
+                
+                <div class="feature-grid">
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="fas fa-comments"></i>
+                        </div>
+                        <h3>دردشة فورية</h3>
+                        <p>نظام دردشة متطور يشبه واتساب مع دعم الإيموجي والمرفقات</p>
+                    </div>
+                    
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="fas fa-broadcast-tower"></i>
+                        </div>
+                        <h3>قنوات البث</h3>
+                        <p>أنشئ قنوات بث للتواصل مع جمهورك كما في تليجرام</p>
+                    </div>
+                    
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="fas fa-users"></i>
+                        </div>
+                        <h3>مجموعات تعليمية</h3>
+                        <p>مجموعات تفاعلية للتعلم المشترك مع إدارة متقدمة</p>
+                    </div>
+                    
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="fas fa-history"></i>
+                        </div>
+                        <h3>الستوريات</h3>
+                        <p>شارك لحظاتك التعليمية مع الستوريات المؤقتة</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- صفحة تسجيل الدخول -->
+        <section class="page" id="login">
+            <div class="auth-container">
+                <div class="auth-card">
+                    <div class="auth-header">
+                        <h2>تسجيل الدخول</h2>
+                        <p>أدخل بياناتك للوصول إلى حسابك</p>
+                    </div>
+                    
+                    <form id="loginForm">
+                        <div class="form-group">
+                            <label for="loginEmail">البريد الإلكتروني</label>
+                            <input type="email" id="loginEmail" required placeholder="example@email.com">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="loginPassword">كلمة المرور</label>
+                            <input type="password" id="loginPassword" required placeholder="أدخل كلمة المرور">
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary btn-block">
+                            <i class="fas fa-sign-in-alt"></i>
+                            تسجيل الدخول
+                        </button>
+                    </form>
+                    
+                    <div class="auth-footer">
+                        <p>ليس لديك حساب؟ <a href="#" onclick="showPage('register'); return false;">إنشاء حساب جديد</a></p>
+                        <p class="mt-2">حساب الآدمن الافتراضي: <strong>admin@platform.edu</strong> / <strong>77007700</strong></p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- صفحة إنشاء حساب -->
+        <section class="page" id="register">
+            <div class="auth-container">
+                <div class="auth-card">
+                    <div class="auth-header">
+                        <h2>إنشاء حساب جديد</h2>
+                        <p>املأ البيانات التالية لإنشاء حساب جديد</p>
+                    </div>
+                    
+                    <form id="registerForm">
+                        <div class="form-group">
+                            <label for="registerName">الاسم الكامل</label>
+                            <input type="text" id="registerName" required placeholder="أدخل اسمك الكامل">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="registerEmail">البريد الإلكتروني</label>
+                            <input type="email" id="registerEmail" required placeholder="example@email.com">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="registerRole">الدور</label>
+                            <select id="registerRole" required>
+                                <option value="">اختر دورك</option>
+                                <option value="teacher">مدرس</option>
+                                <option value="student">طالب</option>
+                                <option value="admin">مدير</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="registerPassword">كلمة المرور</label>
+                            <input type="password" id="registerPassword" required placeholder="أدخل كلمة المرور">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="registerConfirmPassword">تأكيد كلمة المرور</label>
+                            <input type="password" id="registerConfirmPassword" required placeholder="أعد إدخال كلمة المرور">
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary btn-block">
+                            <i class="fas fa-user-plus"></i>
+                            إنشاء حساب
+                        </button>
+                    </form>
+                    
+                    <div class="auth-footer">
+                        <p>لديك حساب بالفعل؟ <a href="#" onclick="showPage('login'); return false;">تسجيل الدخول</a></p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- صفحة لوحة التحكم -->
+        <section class="page" id="dashboard">
+            <div class="dashboard-header">
+                <h1 class="section-title">لوحة التحكم</h1>
+                <p>نظرة عامة على نشاطك وإحصائيات المنصة</p>
+            </div>
+            
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-users"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3 id="totalUsers">0</h3>
+                        <p>إجمالي المستخدمين</p>
+                    </div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-comments"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3 id="totalMessages">0</h3>
+                        <p>رسائل الدردشة</p>
+                    </div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-broadcast-tower"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3 id="totalChannels">0</h3>
+                        <p>قنوات البث</p>
+                    </div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-user-graduate"></i>
+                    </div>
+                    <div class="stat-info">
+                        <h3 id="activeUsers">0</h3>
+                        <p>طلاب نشطين</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="content-grid">
+                <div class="content-card">
+                    <div class="card-header">
+                        <h3>آخر النشاطات</h3>
+                        <button class="btn btn-sm btn-outline">عرض الكل</button>
+                    </div>
+                    <div class="card-body">
+                        <div class="activity-list" id="recentActivities">
+                            <!-- سيتم ملء النشاطات ديناميكياً -->
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="content-card">
+                    <div class="card-header">
+                        <h3>المستخدمون النشطون</h3>
+                        <button class="btn btn-sm btn-outline">عرض الكل</button>
+                    </div>
+                    <div class="card-body">
+                        <div class="users-list" id="activeUsersList">
+                            <!-- سيتم ملء المستخدمين ديناميكياً -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- صفحة الدردشة -->
+        <section class="page" id="chat">
+            <div class="chat-header">
+                <h1 class="section-title">نظام الدردشة</h1>
+                <p>تواصل مع الآخرين عبر نظام دردشة متطور يشبه واتساب</p>
+            </div>
+            
+            <div class="chat-container">
+                <div class="chat-sidebar">
+                    <div class="chat-header">
+                        <h3>المحادثات</h3>
+                        <button class="btn btn-sm btn-outline" style="color: white; border-color: white;" onclick="createNewChat()">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                    </div>
+                    
+                    <div class="chat-search">
+                        <input type="text" placeholder="بحث في المحادثات...">
+                    </div>
+                    
+                    <div class="conversations-list" id="conversationsList">
+                        <!-- سيتم ملء المحادثات ديناميكياً -->
+                    </div>
+                </div>
+                
+                <div class="chat-main">
+                    <div class="chat-header" style="background: var(--whatsapp-dark); color: white; padding: 1rem;">
+                        <h3 id="currentChatName">اختر محادثة</h3>
+                        <div class="chat-actions">
+                            <button class="btn btn-sm btn-outline" style="color: white; border-color: white;">
+                                <i class="fas fa-phone"></i>
+                            </button>
+                            <button class="btn btn-sm btn-outline" style="color: white; border-color: white;">
+                                <i class="fas fa-video"></i>
+                            </button>
+                            <button class="btn btn-sm btn-outline" style="color: white; border-color: white;">
+                                <i class="fas fa-info-circle"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="chat-messages" id="chatMessages">
+                        <div class="empty-state">
+                            <i class="fas fa-comments"></i>
+                            <h3>لا توجد محادثة محددة</h3>
+                            <p>اختر محادثة من القائمة لبدء المحادثة</p>
+                        </div>
+                    </div>
+                    
+                    <div class="chat-input-container">
+                        <div class="chat-input-tools">
+                            <button class="chat-tool-btn">
+                                <i class="fas fa-paperclip"></i>
+                            </button>
+                            <button class="chat-tool-btn">
+                                <i class="fas fa-image"></i>
+                            </button>
+                        </div>
+                        
+                        <div class="chat-input-wrapper">
+                            <input type="text" placeholder="اكتب رسالة..." id="chatInput">
+                            <button class="emoji-btn" id="emojiBtn">
+                                <i class="fas fa-smile"></i>
+                            </button>
+                        </div>
+                        
+                        <button class="send-btn" onclick="sendChatMessage()">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="emoji-picker-container" id="emojiPickerContainer">
+                <emoji-picker></emoji-picker>
+            </div>
+        </section>
+
+        <!-- صفحة القنوات -->
+        <section class="page" id="channels">
+            <div class="channels-header">
+                <h1 class="section-title">قنوات البث</h1>
+                <p>أنشئ قنوات بث للتواصل مع جمهورك كما في تليجرام</p>
+            </div>
+            
+            <div class="channels-container">
+                <div class="channels-sidebar">
+                    <div class="channels-header">
+                        <h3>قنواتي</h3>
+                        <button class="btn btn-sm btn-outline" style="color: white; border-color: white;" onclick="createNewChannel()">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                    </div>
+                    
+                    <div class="channels-list" id="channelsList">
+                        <!-- سيتم ملء القنوات ديناميكياً -->
+                    </div>
+                </div>
+                
+                <div class="channel-main">
+                    <div class="channel-header" style="background: var(--telegram-blue); color: white; padding: 1rem;">
+                        <h3 id="currentChannelName">اختر قناة</h3>
+                        <div class="channel-actions">
+                            <button class="btn btn-sm btn-outline" style="color: white; border-color: white;" onclick="joinChannel()">
+                                <i class="fas fa-user-plus"></i> انضم
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="channel-messages" id="channelMessages">
+                        <div class="empty-state">
+                            <i class="fas fa-broadcast-tower"></i>
+                            <h3>لا توجد قناة محددة</h3>
+                            <p>اختر قناة من القائمة لعرض المحتوى</p>
+                        </div>
+                    </div>
+                    
+                    <div class="channel-input-container">
+                        <div class="channel-input-wrapper">
+                            <input type="text" placeholder="اكتب رسالة للقناة..." id="channelInput">
+                        </div>
+                        
+                        <button class="channel-send-btn" onclick="sendChannelMessage()">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- صفحة المجموعات -->
+        <section class="page" id="groups">
+            <div class="groups-header">
+                <h1 class="section-title">المجموعات التعليمية</h1>
+                <p>مجموعات تفاعلية للتعلم المشترك مع إدارة متقدمة</p>
+            </div>
+            
+            <div class="groups-container">
+                <div class="groups-sidebar">
+                    <div class="groups-header">
+                        <h3>مجموعاتي</h3>
+                        <button class="btn btn-sm btn-outline" style="color: white; border-color: white;" onclick="createNewGroup()">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                    </div>
+                    
+                    <div class="groups-list" id="groupsList">
+                        <!-- سيتم ملء المجموعات ديناميكياً -->
+                    </div>
+                </div>
+                
+                <div class="group-main">
+                    <div class="group-header" style="background: var(--group-gradient); color: white; padding: 1rem;">
+                        <h3 id="currentGroupName">اختر مجموعة</h3>
+                        <div class="group-actions">
+                            <button class="btn btn-sm btn-outline" style="color: white; border-color: white;" onclick="joinGroup()">
+                                <i class="fas fa-user-plus"></i> انضم
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="group-messages" id="groupMessages">
+                        <div class="empty-state">
+                            <i class="fas fa-users"></i>
+                            <h3>لا توجد مجموعة محددة</h3>
+                            <p>اختر مجموعة من القائمة لعرض المحادثات</p>
+                        </div>
+                    </div>
+                    
+                    <div class="group-input-container">
+                        <div class="group-input-wrapper">
+                            <input type="text" placeholder="اكتب رسالة للمجموعة..." id="groupInput">
+                        </div>
+                        
+                        <button class="group-send-btn" onclick="sendGroupMessage()">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- صفحة الستوريات -->
+        <section class="page" id="stories">
+            <div class="stories-header">
+                <h1 class="section-title">الستوريات</h1>
+                <p>شارك لحظاتك التعليمية مع الستوريات المؤقتة</p>
+            </div>
+            
+            <div class="stories-container">
+                <div class="stories-header">
+                    <h3>الستوريات النشطة</h3>
+                    <button class="btn btn-primary" onclick="createNewStory()">
+                        <i class="fas fa-plus"></i> إضافة قصة
+                    </button>
+                </div>
+                
+                <div class="stories-feed">
+                    <div class="stories-carousel" id="storiesCarousel">
+                        <!-- سيتم ملء الستوريات ديناميكياً -->
+                    </div>
+                    
+                    <div class="stories-grid" id="storiesGrid">
+                        <!-- سيتم ملء الستوريات ديناميكياً -->
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- شريط الأدوات السريع -->
+    <div class="quick-actions-bar" id="quickActionsBar">
+        <div class="quick-action" onclick="showPage('chat')">
+            <i class="fas fa-comments"></i>
+            <span>الدردشة</span>
+        </div>
+        <div class="quick-action" onclick="showPage('channels')">
+            <i class="fas fa-broadcast-tower"></i>
+            <span>القنوات</span>
+        </div>
+        <div class="quick-action" onclick="showPage('groups')">
+            <i class="fas fa-users"></i>
+            <span>المجموعات</span>
+        </div>
+        <div class="quick-action" onclick="showPage('dashboard')">
+            <i class="fas fa-tachometer-alt"></i>
+            <span>لوحة التحكم</span>
+        </div>
+    </div>
+
+    <!-- الزر العائم -->
+    <button class="floating-action-btn" id="floatingActionBtn">
+        <i class="fas fa-plus"></i>
+    </button>
+
+    <!-- الرسائل العائمة -->
+    <div id="toastContainer"></div>
+
+    <script>
+        // تهيئة المتغيرات العامة
+        let currentUser = null;
+        let socket = null;
+        let isOnline = false;
+        let emojiPicker = null;
+        let currentConversation = null;
+        let currentChannel = null;
+        let currentGroup = null;
+
+        // تهيئة التطبيق عند تحميل الصفحة
+        document.addEventListener('DOMContentLoaded', function() {
+            // إخفاء شاشة الترحيب بعد 2 ثواني
+            setTimeout(() => {
+                document.getElementById('welcomeScreen').style.opacity = '0';
+                setTimeout(() => {
+                    document.getElementById('welcomeScreen').style.display = 'none';
+                    initializeApp();
+                }, 500);
+            }, 2000);
+            
+            // إعداد معالج الأحداث
+            setupEventListeners();
         });
-        
-        return user;
-    }
 
-    async findUserByEmail(email) {
-        const data = this.loadData();
-        const user = data.users.find(user => user.email === email && user.isActive);
-        
-        if (user) {
-            console.log('🔍 تم العثور على المستخدم:', {
-                email: user.email,
-                name: user.fullName,
-                hasPassword: !!user.password
-            });
-        } else {
-            console.log('❌ لم يتم العثور على مستخدم بالبريد:', email);
-        }
-        
-        return user;
-    }
-
-    async findUserById(userId) {
-        const data = this.loadData();
-        return data.users.find(user => user._id === userId && user.isActive);
-    }
-
-    async updateUser(userId, updates) {
-        const data = this.loadData();
-        const userIndex = data.users.findIndex(user => user._id === userId);
-        
-        if (userIndex !== -1) {
-            data.users[userIndex] = {
-                ...data.users[userIndex],
-                ...updates,
-                updatedAt: new Date().toISOString()
-            };
-            this.saveData(data);
-            return data.users[userIndex];
-        }
-        return null;
-    }
-
-    async getAllUsers() {
-        const data = this.loadData();
-        return data.users.filter(user => user.isActive);
-    }
-
-    // دوال المحادثات
-    async createConversation(participants, name = null) {
-        const data = this.loadData();
-        const conversationId = uuidv4();
-        const conversation = {
-            _id: conversationId,
-            participants,
-            name: name || `محادثة ${participants.length} أشخاص`,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            lastMessage: null,
-            unreadCount: {},
-            isGroup: participants.length > 2
-        };
-        
-        data.conversations.push(conversation);
-        this.updateStats(data);
-        this.saveData(data);
-        return conversation;
-    }
-
-    async getConversationsByUserId(userId) {
-        const data = this.loadData();
-        return data.conversations.filter(conv => 
-            conv.participants.includes(userId)
-        );
-    }
-
-    async getConversationById(conversationId) {
-        const data = this.loadData();
-        return data.conversations.find(conv => conv._id === conversationId);
-    }
-
-    async getOrCreateConversation(user1, user2) {
-        const data = this.loadData();
-        const existingConversation = data.conversations.find(conv => 
-            conv.participants.includes(user1) && 
-            conv.participants.includes(user2) &&
-            conv.participants.length === 2
-        );
-        
-        if (existingConversation) {
-            return existingConversation;
-        }
-        
-        return await this.createConversation([user1, user2]);
-    }
-
-    // دوال الرسائل
-    async createMessage(messageData) {
-        const data = this.loadData();
-        const messageId = uuidv4();
-        const message = {
-            _id: messageId,
-            ...messageData,
-            createdAt: new Date().toISOString(),
-            readBy: [messageData.senderId], // المرسل يقرأ الرسالة تلقائياً
-            reactions: [],
-            edited: { isEdited: false },
-            deleted: { isDeleted: false }
-        };
-        
-        data.messages.push(message);
-        
-        // تحديث المحادثة الأخيرة
-        const convIndex = data.conversations.findIndex(conv => conv._id === messageData.conversationId);
-        if (convIndex !== -1) {
-            data.conversations[convIndex].lastMessage = messageId;
-            data.conversations[convIndex].updatedAt = new Date().toISOString();
+        // تهيئة التطبيق
+        function initializeApp() {
+            // الاتصال بالسوكت
+            connectToSocket();
             
-            // زيادة عدد الرسائل غير المقروءة للمشاركين الآخرين
-            data.conversations[convIndex].participants.forEach(participantId => {
-                if (participantId !== messageData.senderId) {
-                    data.conversations[convIndex].unreadCount[participantId] = 
-                        (data.conversations[convIndex].unreadCount[participantId] || 0) + 1;
+            // التحقق من حالة تسجيل الدخول
+            checkLoginStatus();
+            
+            // إعداد تأثيرات التمرير
+            setupScrollEffects();
+            
+            // إعداد تحديثات الواجهة
+            setupUIUpdates();
+            
+            // إظهار إشعار التحديث
+            showUpdateNotification();
+        }
+
+        // الاتصال بالسوكت
+        function connectToSocket() {
+            socket = io();
+            
+            socket.on('connect', () => {
+                console.log('✅ متصل بالخادم');
+                updateConnectionStatus(true);
+                
+                // إعادة المصادقة إذا كان المستخدم مسجلاً دخوله
+                const token = localStorage.getItem('authToken');
+                if (token && currentUser) {
+                    socket.emit('authenticate', { token });
+                }
+            });
+            
+            socket.on('disconnect', () => {
+                console.log('❌ انقطع الاتصال بالخادم');
+                updateConnectionStatus(false);
+            });
+            
+            socket.on('authenticated', (data) => {
+                console.log('✅ تمت المصادقة عبر السوكت:', data.user.fullName);
+                currentUser = data.user;
+                updateUIForLoggedInUser();
+                loadInitialData();
+            });
+            
+            socket.on('authentication_failed', (data) => {
+                console.log('❌ فشل المصادقة عبر السوكت:', data.message);
+                logout();
+            });
+            
+            // استقبال الرسائل الجديدة
+            socket.on('new_message', (data) => {
+                handleNewMessage(data);
+            });
+            
+            socket.on('new_channel_message', (data) => {
+                handleNewChannelMessage(data);
+            });
+            
+            socket.on('new_group_message', (data) => {
+                handleNewGroupMessage(data);
+            });
+            
+            socket.on('user_status_changed', (data) => {
+                updateUserStatus(data);
+            });
+            
+            socket.on('user_typing', (data) => {
+                handleUserTyping(data);
+            });
+        }
+
+        // إعداد معالج الأحداث
+        function setupEventListeners() {
+            // نماذج تسجيل الدخول والتسجيل
+            document.getElementById('loginForm').addEventListener('submit', handleLogin);
+            document.getElementById('registerForm').addEventListener('submit', handleRegister);
+            
+            // الزر العائم
+            document.getElementById('floatingActionBtn').addEventListener('click', toggleQuickActions);
+            
+            // إغلاق إشعار التحديث
+            document.getElementById('dismissUpdate').addEventListener('click', dismissUpdateNotification);
+            
+            // زر الإيموجي في الدردشة
+            document.getElementById('emojiBtn').addEventListener('click', toggleEmojiPicker);
+            
+            // إغلاق منتقي الإيموجي عند النقر خارجها
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest('#emojiPickerContainer') && !e.target.closest('#emojiBtn')) {
+                    document.getElementById('emojiPickerContainer').classList.remove('active');
+                }
+            });
+            
+            // إرسال الرسائل بالضغط على Enter
+            document.getElementById('chatInput').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    sendChatMessage();
+                }
+            });
+            
+            document.getElementById('channelInput').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    sendChannelMessage();
+                }
+            });
+            
+            document.getElementById('groupInput').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    sendGroupMessage();
                 }
             });
         }
-        
-        this.updateStats(data);
-        this.saveData(data);
-        return message;
-    }
 
-    async getMessagesByConversation(conversationId) {
-        const data = this.loadData();
-        return data.messages
-            .filter(msg => msg.conversationId === conversationId && !msg.deleted.isDeleted)
-            .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
-    }
-
-    async markMessagesAsRead(conversationId, userId) {
-        const data = this.loadData();
-        const convIndex = data.conversations.findIndex(conv => conv._id === conversationId);
-        
-        if (convIndex !== -1) {
-            data.conversations[convIndex].unreadCount[userId] = 0;
-            this.saveData(data);
-        }
-        
-        return true;
-    }
-
-    // دوال القنوات
-    async createChannel(channelData) {
-        const data = this.loadData();
-        const channelId = uuidv4();
-        const channel = {
-            _id: channelId,
-            ...channelData,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            isActive: true,
-            members: channelData.members || [],
-            admins: channelData.admins || [channelData.creatorId],
-            stats: {
-                memberCount: channelData.members?.length || 1,
-                messageCount: 0,
-                dailyActiveUsers: 0
-            }
-        };
-        
-        data.channels.push(channel);
-        this.updateStats(data);
-        this.saveData(data);
-        return channel;
-    }
-
-    async getAllChannels() {
-        const data = this.loadData();
-        return data.channels.filter(channel => channel.isActive);
-    }
-
-    async getChannelById(channelId) {
-        const data = this.loadData();
-        return data.channels.find(channel => channel._id === channelId && channel.isActive);
-    }
-
-    async getUserChannels(userId) {
-        const data = this.loadData();
-        return data.channels.filter(channel => 
-            channel.isActive && 
-            (channel.members.includes(userId) || channel.admins.includes(userId))
-        );
-    }
-
-    async createChannelMessage(messageData) {
-        const data = this.loadData();
-        const messageId = uuidv4();
-        const message = {
-            _id: messageId,
-            ...messageData,
-            createdAt: new Date().toISOString(),
-            readBy: [],
-            reactions: [],
-            edited: { isEdited: false },
-            deleted: { isDeleted: false }
-        };
-        
-        data.channelMessages.push(message);
-        
-        // تحديث إحصائيات القناة
-        const channelIndex = data.channels.findIndex(channel => channel._id === messageData.channelId);
-        if (channelIndex !== -1) {
-            data.channels[channelIndex].stats.messageCount += 1;
-            data.channels[channelIndex].updatedAt = new Date().toISOString();
-        }
-        
-        this.updateStats(data);
-        this.saveData(data);
-        return message;
-    }
-
-    async getChannelMessages(channelId) {
-        const data = this.loadData();
-        return data.channelMessages
-            .filter(msg => msg.channelId === channelId && !msg.deleted.isDeleted)
-            .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
-    }
-
-    async addMemberToChannel(channelId, userId) {
-        const data = this.loadData();
-        const channelIndex = data.channels.findIndex(channel => channel._id === channelId);
-        
-        if (channelIndex !== -1 && !data.channels[channelIndex].members.includes(userId)) {
-            data.channels[channelIndex].members.push(userId);
-            data.channels[channelIndex].stats.memberCount += 1;
-            data.channels[channelIndex].updatedAt = new Date().toISOString();
-            this.saveData(data);
-            return true;
-        }
-        return false;
-    }
-
-    // دوال المجموعات
-    async createGroup(groupData) {
-        const data = this.loadData();
-        const groupId = uuidv4();
-        const group = {
-            _id: groupId,
-            ...groupData,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            isActive: true,
-            members: groupData.members || [groupData.creatorId],
-            admins: groupData.admins || [groupData.creatorId],
-            stats: {
-                memberCount: groupData.members?.length || 1,
-                messageCount: 0,
-                dailyActiveUsers: 0
-            }
-        };
-        
-        data.groups.push(group);
-        this.updateStats(data);
-        this.saveData(data);
-        return group;
-    }
-
-    async getAllGroups() {
-        const data = this.loadData();
-        return data.groups.filter(group => group.isActive);
-    }
-
-    async getGroupById(groupId) {
-        const data = this.loadData();
-        return data.groups.find(group => group._id === groupId && group.isActive);
-    }
-
-    async getUserGroups(userId) {
-        const data = this.loadData();
-        return data.groups.filter(group => 
-            group.isActive && group.members.includes(userId)
-        );
-    }
-
-    async createGroupMessage(messageData) {
-        const data = this.loadData();
-        const messageId = uuidv4();
-        const message = {
-            _id: messageId,
-            ...messageData,
-            createdAt: new Date().toISOString(),
-            readBy: [messageData.senderId],
-            reactions: [],
-            edited: { isEdited: false },
-            deleted: { isDeleted: false }
-        };
-        
-        data.groupMessages.push(message);
-        
-        // تحديث إحصائيات المجموعة
-        const groupIndex = data.groups.findIndex(group => group._id === messageData.groupId);
-        if (groupIndex !== -1) {
-            data.groups[groupIndex].stats.messageCount += 1;
-            data.groups[groupIndex].updatedAt = new Date().toISOString();
-        }
-        
-        this.updateStats(data);
-        this.saveData(data);
-        return message;
-    }
-
-    async getGroupMessages(groupId) {
-        const data = this.loadData();
-        return data.groupMessages
-            .filter(msg => msg.groupId === groupId && !msg.deleted.isDeleted)
-            .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
-    }
-
-    async addMemberToGroup(groupId, userId) {
-        const data = this.loadData();
-        const groupIndex = data.groups.findIndex(group => group._id === groupId);
-        
-        if (groupIndex !== -1 && !data.groups[groupIndex].members.includes(userId)) {
-            data.groups[groupIndex].members.push(userId);
-            data.groups[groupIndex].stats.memberCount += 1;
-            data.groups[groupIndex].updatedAt = new Date().toISOString();
-            this.saveData(data);
-            return true;
-        }
-        return false;
-    }
-
-    // دوال الستوريات
-    async createStory(storyData) {
-        const data = this.loadData();
-        const storyId = uuidv4();
-        const story = {
-            _id: storyId,
-            ...storyData,
-            createdAt: new Date().toISOString(),
-            expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-            views: [],
-            reactions: [],
-            replies: [],
-            metrics: {
-                viewCount: 0,
-                replyCount: 0,
-                reactionCount: 0,
-                shareCount: 0
-            }
-        };
-        
-        data.stories.push(story);
-        this.updateStats(data);
-        this.saveData(data);
-        return story;
-    }
-
-    async getActiveStories() {
-        const data = this.loadData();
-        const now = new Date().toISOString();
-        return data.stories.filter(story => story.expiresAt > now);
-    }
-
-    async getUserStories(userId) {
-        const data = this.loadData();
-        const now = new Date().toISOString();
-        return data.stories.filter(story => 
-            story.userId === userId && story.expiresAt > now
-        );
-    }
-
-    async updateStory(storyId, updates) {
-        const data = this.loadData();
-        const storyIndex = data.stories.findIndex(story => story._id === storyId);
-        
-        if (storyIndex !== -1) {
-            data.stories[storyIndex] = {
-                ...data.stories[storyIndex],
-                ...updates
-            };
-            this.saveData(data);
-            return data.stories[storyIndex];
-        }
-        return null;
-    }
-
-    async addStoryView(storyId, userId) {
-        const data = this.loadData();
-        const storyIndex = data.stories.findIndex(story => story._id === storyId);
-        
-        if (storyIndex !== -1 && !data.stories[storyIndex].views.includes(userId)) {
-            data.stories[storyIndex].views.push(userId);
-            data.stories[storyIndex].metrics.viewCount += 1;
-            this.saveData(data);
-            return true;
-        }
-        return false;
-    }
-
-    // النسخ الاحتياطي
-    async createBackup() {
-        try {
-            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-            const backupFile = path.join(BACKUP_DIR, `backup-${timestamp}.json`);
+        // تحديث حالة الاتصال
+        function updateConnectionStatus(connected) {
+            const statusElement = document.getElementById('connectionStatus');
+            isOnline = connected;
             
-            const backupData = {
-                timestamp: new Date().toISOString(),
-                data: this.loadData(),
-                version: '2.0.0'
-            };
+            if (connected) {
+                statusElement.style.display = 'flex';
+                statusElement.classList.remove('offline', 'reconnecting');
+                statusElement.innerHTML = '<i class="fas fa-wifi"></i><span>متصل بالخادم</span>';
+            } else {
+                statusElement.classList.add('offline');
+                statusElement.innerHTML = '<i class="fas fa-wifi-slash"></i><span>غير متصل</span>';
+            }
+        }
 
-            fs.writeFileSync(backupFile, JSON.stringify(backupData, null, 2));
+        // التحقق من حالة تسجيل الدخول
+        function checkLoginStatus() {
+            const token = localStorage.getItem('authToken');
+            const userData = localStorage.getItem('userData');
             
-            // تحديث سجل النسخ الاحتياطية
-            const data = this.loadData();
-            data.backups.push({
-                filename: `backup-${timestamp}.json`,
-                timestamp: new Date().toISOString(),
-                size: JSON.stringify(backupData).length
-            });
-            
-            // الاحتفاظ بـ 10 نسخ احتياطية فقط
-            if (data.backups.length > 10) {
-                const oldBackup = data.backups.shift();
-                const oldBackupPath = path.join(BACKUP_DIR, oldBackup.filename);
-                if (fs.existsSync(oldBackupPath)) {
-                    fs.unlinkSync(oldBackupPath);
+            if (token && userData) {
+                try {
+                    currentUser = JSON.parse(userData);
+                    updateUIForLoggedInUser();
+                    
+                    // إعادة الاتصال بالسوكت إذا كان متصلاً
+                    if (socket && socket.connected) {
+                        socket.emit('authenticate', { token });
+                    }
+                    
+                    showPage('dashboard');
+                } catch (error) {
+                    console.error('❌ خطأ في تحميل بيانات المستخدم:', error);
+                    logout();
                 }
-            }
-            
-            data.lastBackup = new Date().toISOString();
-            this.saveData(data);
-            
-            return { success: true, filename: `backup-${timestamp}.json` };
-        } catch (error) {
-            console.error('❌ خطأ في إنشاء النسخة الاحتياطية:', error);
-            return { success: false, error: error.message };
-        }
-    }
-
-    updateStats(data) {
-        data.stats = {
-            totalUsers: data.users.length,
-            totalMessages: data.messages.length,
-            totalStories: data.stories.length,
-            totalChannels: data.channels.length,
-            totalGroups: data.groups.length,
-            totalConversations: data.conversations.length,
-            lastUpdate: new Date().toISOString()
-        };
-        return data.stats;
-    }
-
-    getStats() {
-        const data = this.loadData();
-        return this.updateStats(data);
-    }
-}
-
-const localStorageService = new LocalStorageService();
-
-// middleware المصادقة
-const authenticateToken = async (req, res, next) => {
-    try {
-        const authHeader = req.headers['authorization'];
-        const token = authHeader && authHeader.split(' ')[1];
-
-        if (!token) {
-            return res.status(401).json({ 
-                success: false, 
-                message: 'رمز الوصول مطلوب',
-                code: 'TOKEN_REQUIRED'
-            });
-        }
-
-        const decoded = jwt.verify(token, JWT_SECRET);
-        const user = await localStorageService.findUserById(decoded.userId);
-        
-        if (!user) {
-            return res.status(401).json({ 
-                success: false, 
-                message: 'المستخدم غير موجود',
-                code: 'USER_NOT_FOUND'
-            });
-        }
-
-        if (!user.isActive) {
-            return res.status(401).json({ 
-                success: false, 
-                message: 'الحساب موقوف. يرجى التواصل مع الإدارة',
-                code: 'ACCOUNT_SUSPENDED'
-            });
-        }
-
-        req.user = user;
-        next();
-    } catch (error) {
-        if (error.name === 'TokenExpiredError') {
-            return res.status(401).json({ 
-                success: false, 
-                message: 'انتهت صلاحية الرمز',
-                code: 'TOKEN_EXPIRED'
-            });
-        } else if (error.name === 'JsonWebTokenError') {
-            return res.status(401).json({ 
-                success: false, 
-                message: 'رمز وصول غير صالح',
-                code: 'INVALID_TOKEN'
-            });
-        } else {
-            console.error('❌ خطأ في المصادقة:', error);
-            return res.status(500).json({ 
-                success: false, 
-                message: 'خطأ في الخادم',
-                code: 'SERVER_ERROR'
-            });
-        }
-    }
-};
-
-const requireAdmin = (req, res, next) => {
-    if (req.user.role !== 'admin') {
-        return res.status(403).json({ 
-            success: false, 
-            message: 'صلاحيات مدير مطلوبة',
-            code: 'ADMIN_REQUIRED'
-        });
-    }
-    next();
-};
-
-// دوال مساعدة
-const generateToken = (userId) => {
-    return jwt.sign({ userId }, JWT_SECRET, { expiresIn: '30d' });
-};
-
-const generateRefreshToken = (userId) => {
-    return jwt.sign({ userId, type: 'refresh' }, JWT_SECRET, { expiresIn: '90d' });
-};
-
-const formatUserResponse = (user) => {
-    const { password, ...userWithoutPassword } = user;
-    return userWithoutPassword;
-};
-
-const auditLog = async (action, userId, targetType, targetId, details = {}) => {
-    try {
-        console.log(`📋 Audit Log: ${action} by ${userId} on ${targetType} ${targetId}`, details);
-        
-        const data = localStorageService.loadData();
-        if (!data.auditLogs) data.auditLogs = [];
-        
-        data.auditLogs.push({
-            action,
-            userId,
-            targetType,
-            targetId,
-            details,
-            timestamp: new Date().toISOString()
-        });
-        
-        localStorageService.saveData(data);
-    } catch (error) {
-        console.error('❌ خطأ في تسجيل التدقيق:', error);
-    }
-};
-
-// إنشاء حساب المدير الافتراضي
-async function createDefaultAdmin() {
-    try {
-        const adminExists = await localStorageService.findUserByEmail('admin@platform.edu');
-        if (!adminExists) {
-            const hashedPassword = await bcrypt.hash('77007700', 12);
-            const admin = await localStorageService.createUser({
-                fullName: 'مدير النظام',
-                email: 'admin@platform.edu',
-                password: hashedPassword,
-                role: 'admin'
-            });
-            
-            console.log('✅ تم إنشاء حساب المدير الافتراضي');
-            console.log('📧 البريد الإلكتروني: admin@platform.edu');
-            console.log('🔑 كلمة المرور: 77007700');
-        } else {
-            console.log('✅ حساب المدير موجود بالفعل');
-        }
-    } catch (error) {
-        console.error('❌ خطأ في إنشاء حساب المدير:', error);
-    }
-}
-
-// إنشاء بيانات تجريبية
-async function createSampleData() {
-    try {
-        // إنشاء مستخدمين تجريبيين
-        const users = [
-            {
-                fullName: 'أحمد محمد',
-                email: 'ahmed@example.com',
-                password: await bcrypt.hash('123456', 12),
-                role: 'teacher'
-            },
-            {
-                fullName: 'فاطمة علي',
-                email: 'fatima@example.com',
-                password: await bcrypt.hash('123456', 12),
-                role: 'student'
-            },
-            {
-                fullName: 'خالد إبراهيم',
-                email: 'khaled@example.com',
-                password: await bcrypt.hash('123456', 12),
-                role: 'student'
-            }
-        ];
-
-        for (const userData of users) {
-            const existingUser = await localStorageService.findUserByEmail(userData.email);
-            if (!existingUser) {
-                await localStorageService.createUser(userData);
-                console.log(`✅ تم إنشاء المستخدم: ${userData.fullName}`);
+            } else {
+                updateUIForLoggedOutUser();
+                showPage('home');
             }
         }
 
-        // إنشاء قنوات تجريبية
-        const allUsers = await localStorageService.getAllUsers();
-        const adminUser = allUsers.find(u => u.role === 'admin');
-        const teacherUser = allUsers.find(u => u.role === 'teacher');
+        // تحديث الواجهة للمستخدم المسجل دخوله
+        function updateUIForLoggedInUser() {
+            document.getElementById('userInfo').classList.remove('hidden');
+            document.getElementById('userName').textContent = currentUser.fullName;
+            document.getElementById('userRole').textContent = getRoleText(currentUser.role);
+            document.getElementById('loginNav').classList.add('hidden');
+            document.getElementById('registerNav').classList.add('hidden');
+            document.getElementById('logoutNav').classList.remove('hidden');
+        }
 
-        if (adminUser && teacherUser) {
-            const channels = [
+        // تحديث الواجهة للمستخدم غير المسجل دخوله
+        function updateUIForLoggedOutUser() {
+            document.getElementById('userInfo').classList.add('hidden');
+            document.getElementById('loginNav').classList.remove('hidden');
+            document.getElementById('registerNav').classList.remove('hidden');
+            document.getElementById('logoutNav').classList.add('hidden');
+        }
+
+        // الحصول على نص الدور
+        function getRoleText(role) {
+            const roles = {
+                'teacher': 'مدرس',
+                'student': 'طالب',
+                'admin': 'مدير'
+            };
+            return roles[role] || 'مستخدم';
+        }
+
+        // معالجة تسجيل الدخول
+        async function handleLogin(e) {
+            e.preventDefault();
+            
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+            
+            if (!email || !password) {
+                showToast('يرجى ملء جميع الحقول', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    // حفظ بيانات المستخدم
+                    localStorage.setItem('authToken', data.data.token);
+                    localStorage.setItem('userData', JSON.stringify(data.data.user));
+                    
+                    currentUser = data.data.user;
+                    updateUIForLoggedInUser();
+                    
+                    // المصادقة عبر السوكت
+                    if (socket) {
+                        socket.emit('authenticate', { token: data.data.token });
+                    }
+                    
+                    showPage('dashboard');
+                    showToast('تم تسجيل الدخول بنجاح!', 'success');
+                    
+                    // مسح النموذج
+                    document.getElementById('loginForm').reset();
+                } else {
+                    showToast(data.message, 'error');
+                }
+            } catch (error) {
+                console.error('❌ خطأ في تسجيل الدخول:', error);
+                showToast('حدث خطأ أثناء تسجيل الدخول', 'error');
+            }
+        }
+
+        // معالجة إنشاء حساب
+        async function handleRegister(e) {
+            e.preventDefault();
+            
+            const name = document.getElementById('registerName').value;
+            const email = document.getElementById('registerEmail').value;
+            const role = document.getElementById('registerRole').value;
+            const password = document.getElementById('registerPassword').value;
+            const confirmPassword = document.getElementById('registerConfirmPassword').value;
+            
+            if (!name || !email || !role || !password || !confirmPassword) {
+                showToast('يرجى ملء جميع الحقول', 'error');
+                return;
+            }
+            
+            if (password !== confirmPassword) {
+                showToast('كلمات المرور غير متطابقة', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/auth/register', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ 
+                        fullName: name, 
+                        email, 
+                        role, 
+                        password 
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    // حفظ بيانات المستخدم
+                    localStorage.setItem('authToken', data.data.token);
+                    localStorage.setItem('userData', JSON.stringify(data.data.user));
+                    
+                    currentUser = data.data.user;
+                    updateUIForLoggedInUser();
+                    
+                    // المصادقة عبر السوكت
+                    if (socket) {
+                        socket.emit('authenticate', { token: data.data.token });
+                    }
+                    
+                    showPage('dashboard');
+                    showToast('تم إنشاء الحساب بنجاح!', 'success');
+                    
+                    // مسح النموذج
+                    document.getElementById('registerForm').reset();
+                } else {
+                    showToast(data.message, 'error');
+                }
+            } catch (error) {
+                console.error('❌ خطأ في إنشاء الحساب:', error);
+                showToast('حدث خطأ أثناء إنشاء الحساب', 'error');
+            }
+        }
+
+        // تسجيل الخروج
+        function logout() {
+            localStorage.removeItem('authToken');
+            localStorage.removeItem('userData');
+            currentUser = null;
+            updateUIForLoggedOutUser();
+            showPage('home');
+            showToast('تم تسجيل الخروج بنجاح', 'info');
+            
+            // إغلاق الاتصال بالسوكت
+            if (socket) {
+                socket.disconnect();
+            }
+        }
+
+        // تحميل البيانات الأولية
+        async function loadInitialData() {
+            if (!currentUser) return;
+            
+            try {
+                // تحميل الإحصائيات
+                await loadDashboardStats();
+                
+                // تحميل المحادثات
+                await loadConversations();
+                
+                // تحميل القنوات
+                await loadChannels();
+                
+                // تحميل المجموعات
+                await loadGroups();
+                
+                // تحميل الستوريات
+                await loadStories();
+                
+            } catch (error) {
+                console.error('❌ خطأ في تحميل البيانات:', error);
+            }
+        }
+
+        // تحميل إحصائيات لوحة التحكم
+        async function loadDashboardStats() {
+            try {
+                // في التطبيق الحقيقي، سيتم جلب هذه البيانات من الخادم
+                // هنا نقوم بمحاكاة البيانات
+                document.getElementById('totalUsers').textContent = '1,254';
+                document.getElementById('totalMessages').textContent = '3,487';
+                document.getElementById('totalChannels').textContent = '42';
+                document.getElementById('activeUsers').textContent = '856';
+                
+                // تحميل النشاطات الحديثة
+                loadRecentActivities();
+                
+                // تحميل المستخدمين النشطين
+                loadActiveUsers();
+                
+            } catch (error) {
+                console.error('❌ خطأ في تحميل الإحصائيات:', error);
+            }
+        }
+
+        // تحميل النشاطات الحديثة
+        function loadRecentActivities() {
+            const activities = [
                 {
-                    name: 'قناة الرياضيات',
-                    description: 'قناة مخصصة لدروس الرياضيات والتمارين',
-                    creatorId: adminUser._id,
-                    members: allUsers.map(u => u._id)
+                    icon: 'fa-comment',
+                    text: 'أرسلت رسالة في مجموعة الرياضيات',
+                    time: 'منذ 5 دقائق'
                 },
                 {
-                    name: 'قناة العلوم',
-                    description: 'مناقشات وأخبار علمية',
-                    creatorId: teacherUser._id,
-                    members: allUsers.map(u => u._id)
+                    icon: 'fa-user-plus',
+                    text: 'انضم طالب جديد إلى المنصة',
+                    time: 'منذ ساعة'
+                },
+                {
+                    icon: 'fa-broadcast-tower',
+                    text: 'نشرت منشور جديد في قناة العلوم',
+                    time: 'منذ 3 ساعات'
+                },
+                {
+                    icon: 'fa-file-upload',
+                    text: 'رفعت ملف جديد في مجموعة اللغة العربية',
+                    time: 'منذ 5 ساعات'
                 }
             ];
+            
+            const activitiesList = document.getElementById('recentActivities');
+            activitiesList.innerHTML = '';
+            
+            activities.forEach(activity => {
+                const activityItem = document.createElement('div');
+                activityItem.className = 'activity-item';
+                activityItem.innerHTML = `
+                    <div class="activity-icon">
+                        <i class="fas ${activity.icon}"></i>
+                    </div>
+                    <div class="activity-content">
+                        <p>${activity.text}</p>
+                        <span class="activity-time">${activity.time}</span>
+                    </div>
+                `;
+                activitiesList.appendChild(activityItem);
+            });
+        }
 
-            for (const channelData of channels) {
-                const existingChannel = await localStorageService.getAllChannels();
-                if (!existingChannel.find(c => c.name === channelData.name)) {
-                    await localStorageService.createChannel(channelData);
-                    console.log(`✅ تم إنشاء القناة: ${channelData.name}`);
-                }
-            }
-
-            // إنشاء مجموعات تجريبية
-            const groups = [
+        // تحميل المستخدمين النشطين
+        function loadActiveUsers() {
+            const users = [
                 {
-                    name: 'مجموعة الرياضيات المتقدمة',
-                    description: 'مجموعة للمناقشات المتقدمة في الرياضيات',
-                    creatorId: teacherUser._id,
-                    members: allUsers.map(u => u._id)
+                    name: 'أحمد محمد',
+                    role: 'مدرس',
+                    online: true
                 },
                 {
-                    name: 'مجموعة مشاريع التخرج',
-                    description: 'لمناقشة مشاريع التخرج والتعاون',
-                    creatorId: adminUser._id,
-                    members: allUsers.map(u => u._id)
+                    name: 'فاطمة علي',
+                    role: 'طالبة',
+                    online: true
+                },
+                {
+                    name: 'خالد إبراهيم',
+                    role: 'طالب',
+                    online: false
+                },
+                {
+                    name: 'سارة عبدالله',
+                    role: 'مدرسة',
+                    online: true
                 }
             ];
-
-            for (const groupData of groups) {
-                const existingGroups = await localStorageService.getAllGroups();
-                if (!existingGroups.find(g => g.name === groupData.name)) {
-                    await localStorageService.createGroup(groupData);
-                    console.log(`✅ تم إنشاء المجموعة: ${groupData.name}`);
-                }
-            }
-        }
-
-        console.log('✅ تم إنشاء البيانات التجريبية بنجاح');
-    } catch (error) {
-        console.error('❌ خطأ في إنشاء البيانات التجريبية:', error);
-    }
-}
-
-// تهيئة البيانات
-createDefaultAdmin();
-setTimeout(createSampleData, 1000);
-
-// تخزين المستخدمين المتصلين
-const connectedUsers = new Map();
-const userSockets = new Map();
-
-// ==================== مسارات API ====================
-
-// مسار رئيسي
-app.get('/', (req, res) => {
-    res.json({
-        success: true,
-        message: '🚀 خادم المنصة التعليمية يعمل بنجاح! (الإصدار المحسن)',
-        version: '2.1.0',
-        timestamp: new Date().toISOString(),
-        environment: NODE_ENV,
-        storage: 'local',
-        features: {
-            realtime_chat: true,
-            channels: true,
-            groups: true,
-            stories: true,
-            file_upload: true,
-            emoji_support: true,
-            notifications: true
-        },
-        endpoints: {
-            auth: '/api/auth/*',
-            users: '/api/users/*',
-            chat: '/api/chat/*',
-            channels: '/api/channels/*',
-            groups: '/api/groups/*',
-            stories: '/api/stories/*',
-            admin: '/api/admin/*',
-            health: '/api/health'
-        }
-    });
-});
-
-// مسارات المصادقة
-app.post('/api/auth/register', async (req, res) => {
-    try {
-        const { fullName, email, role, password } = req.body;
-
-        if (!fullName || !email || !role || !password) {
-            return res.status(400).json({
-                success: false,
-                message: 'جميع الحقول مطلوبة',
-                code: 'MISSING_FIELDS'
-            });
-        }
-
-        const existingUser = await localStorageService.findUserByEmail(email);
-        if (existingUser) {
-            return res.status(400).json({
-                success: false,
-                message: 'البريد الإلكتروني مسجل مسبقاً',
-                code: 'EMAIL_EXISTS'
-            });
-        }
-
-        const hashedPassword = await bcrypt.hash(password, 12);
-        const user = await localStorageService.createUser({
-            fullName: fullName.trim(),
-            email,
-            password: hashedPassword,
-            role: role
-        });
-
-        await auditLog('REGISTER', user._id, 'user', user._id, { email, role });
-
-        const token = generateToken(user._id);
-        const refreshToken = generateRefreshToken(user._id);
-
-        res.status(201).json({
-            success: true,
-            message: 'تم إنشاء الحساب بنجاح',
-            data: {
-                user: formatUserResponse(user),
-                token,
-                refreshToken
-            }
-        });
-
-    } catch (error) {
-        console.error('❌ خطأ في التسجيل:', error);
-        res.status(500).json({
-            success: false,
-            message: 'حدث خطأ في الخادم',
-            code: 'SERVER_ERROR',
-            error: error.message
-        });
-    }
-});
-
-app.post('/api/auth/login', async (req, res) => {
-    try {
-        const { email, password } = req.body;
-
-        if (!email || !password) {
-            return res.status(400).json({
-                success: false,
-                message: 'البريد الإلكتروني وكلمة المرور مطلوبان',
-                code: 'MISSING_CREDENTIALS'
-            });
-        }
-
-        const user = await localStorageService.findUserByEmail(email);
-        
-        if (!user) {
-            return res.status(401).json({
-                success: false,
-                message: 'البريد الإلكتروني أو كلمة المرور غير صحيحة',
-                code: 'INVALID_CREDENTIALS'
-            });
-        }
-
-        if (!user.isActive) {
-            return res.status(401).json({
-                success: false,
-                message: 'الحساب موقوف. يرجى التواصل مع الإدارة',
-                code: 'ACCOUNT_SUSPENDED'
-            });
-        }
-
-        const isPasswordValid = await bcrypt.compare(password, user.password);
-
-        if (!isPasswordValid) {
-            return res.status(401).json({
-                success: false,
-                message: 'البريد الإلكتروني أو كلمة المرور غير صحيحة',
-                code: 'INVALID_CREDENTIALS'
-            });
-        }
-
-        const updatedUser = await localStorageService.updateUser(user._id, {
-            isOnline: true,
-            lastSeen: new Date().toISOString()
-        });
-
-        const token = generateToken(user._id);
-        const refreshToken = generateRefreshToken(user._id);
-
-        await auditLog('LOGIN', user._id, 'user', user._id, { email });
-
-        res.json({
-            success: true,
-            message: 'تم تسجيل الدخول بنجاح',
-            data: {
-                user: formatUserResponse(updatedUser || user),
-                token,
-                refreshToken
-            }
-        });
-
-    } catch (error) {
-        console.error('❌ خطأ في تسجيل الدخول:', error);
-        res.status(500).json({
-            success: false,
-            message: 'حدث خطأ أثناء تسجيل الدخول',
-            code: 'LOGIN_ERROR',
-            error: error.message
-        });
-    }
-});
-
-app.post('/api/auth/logout', authenticateToken, async (req, res) => {
-    try {
-        await localStorageService.updateUser(req.user._id, {
-            isOnline: false,
-            lastSeen: new Date().toISOString()
-        });
-
-        await auditLog('LOGOUT', req.user._id, 'user', req.user._id);
-
-        res.json({
-            success: true,
-            message: 'تم تسجيل الخروج بنجاح'
-        });
-
-    } catch (error) {
-        console.error('❌ خطأ في تسجيل الخروج:', error);
-        res.status(500).json({
-            success: false,
-            message: 'حدث خطأ في الخادم',
-            code: 'SERVER_ERROR'
-        });
-    }
-});
-
-// مسارات المستخدمين
-app.get('/api/users/me', authenticateToken, async (req, res) => {
-    try {
-        res.json({
-            success: true,
-            data: {
-                user: formatUserResponse(req.user)
-            }
-        });
-    } catch (error) {
-        console.error('❌ خطأ في جلب بيانات المستخدم:', error);
-        res.status(500).json({
-            success: false,
-            message: 'حدث خطأ في الخادم',
-            code: 'SERVER_ERROR'
-        });
-    }
-});
-
-app.get('/api/users', authenticateToken, async (req, res) => {
-    try {
-        const users = await localStorageService.getAllUsers();
-        res.json({
-            success: true,
-            data: {
-                users: users.map(user => formatUserResponse(user))
-            }
-        });
-    } catch (error) {
-        console.error('❌ خطأ في جلب المستخدمين:', error);
-        res.status(500).json({
-            success: false,
-            message: 'حدث خطأ في الخادم',
-            code: 'SERVER_ERROR'
-        });
-    }
-});
-
-// مسارات الدردشة
-app.get('/api/chat/conversations', authenticateToken, async (req, res) => {
-    try {
-        const conversations = await localStorageService.getConversationsByUserId(req.user._id);
-        
-        // جلب آخر رسالة لكل محادثة
-        const conversationsWithLastMessage = await Promise.all(
-            conversations.map(async (conv) => {
-                const messages = await localStorageService.getMessagesByConversation(conv._id);
-                const lastMessage = messages[messages.length - 1];
-                return {
-                    ...conv,
-                    lastMessage: lastMessage || null
-                };
-            })
-        );
-
-        res.json({
-            success: true,
-            data: {
-                conversations: conversationsWithLastMessage
-            }
-        });
-    } catch (error) {
-        console.error('❌ خطأ في جلب المحادثات:', error);
-        res.status(500).json({
-            success: false,
-            message: 'حدث خطأ في الخادم',
-            code: 'SERVER_ERROR'
-        });
-    }
-});
-
-app.post('/api/chat/conversations', authenticateToken, async (req, res) => {
-    try {
-        const { participantId } = req.body;
-        
-        if (!participantId) {
-            return res.status(400).json({
-                success: false,
-                message: 'معرف المشارك مطلوب',
-                code: 'MISSING_PARTICIPANT'
-            });
-        }
-
-        const participant = await localStorageService.findUserById(participantId);
-        if (!participant) {
-            return res.status(404).json({
-                success: false,
-                message: 'المستخدم غير موجود',
-                code: 'USER_NOT_FOUND'
-            });
-        }
-
-        const conversation = await localStorageService.getOrCreateConversation(
-            req.user._id,
-            participantId
-        );
-
-        res.json({
-            success: true,
-            data: {
-                conversation
-            }
-        });
-    } catch (error) {
-        console.error('❌ خطأ في إنشاء المحادثة:', error);
-        res.status(500).json({
-            success: false,
-            message: 'حدث خطأ في الخادم',
-            code: 'SERVER_ERROR'
-        });
-    }
-});
-
-app.get('/api/chat/conversations/:conversationId/messages', authenticateToken, async (req, res) => {
-    try {
-        const { conversationId } = req.params;
-        const messages = await localStorageService.getMessagesByConversation(conversationId);
-        
-        // تحديد الرسائل كمقروءة
-        await localStorageService.markMessagesAsRead(conversationId, req.user._id);
-
-        res.json({
-            success: true,
-            data: {
-                messages
-            }
-        });
-    } catch (error) {
-        console.error('❌ خطأ في جلب الرسائل:', error);
-        res.status(500).json({
-            success: false,
-            message: 'حدث خطأ في الخادم',
-            code: 'SERVER_ERROR'
-        });
-    }
-});
-
-// مسارات القنوات
-app.get('/api/channels', authenticateToken, async (req, res) => {
-    try {
-        const channels = await localStorageService.getUserChannels(req.user._id);
-        res.json({
-            success: true,
-            data: {
-                channels
-            }
-        });
-    } catch (error) {
-        console.error('❌ خطأ في جلب القنوات:', error);
-        res.status(500).json({
-            success: false,
-            message: 'حدث خطأ في الخادم',
-            code: 'SERVER_ERROR'
-        });
-    }
-});
-
-app.post('/api/channels', authenticateToken, async (req, res) => {
-    try {
-        const { name, description } = req.body;
-        
-        if (!name) {
-            return res.status(400).json({
-                success: false,
-                message: 'اسم القناة مطلوب',
-                code: 'MISSING_NAME'
-            });
-        }
-
-        const channel = await localStorageService.createChannel({
-            name,
-            description,
-            creatorId: req.user._id,
-            members: [req.user._id]
-        });
-
-        await auditLog('CREATE_CHANNEL', req.user._id, 'channel', channel._id, { name });
-
-        res.status(201).json({
-            success: true,
-            message: 'تم إنشاء القناة بنجاح',
-            data: {
-                channel
-            }
-        });
-    } catch (error) {
-        console.error('❌ خطأ في إنشاء القناة:', error);
-        res.status(500).json({
-            success: false,
-            message: 'حدث خطأ في الخادم',
-            code: 'SERVER_ERROR'
-        });
-    }
-});
-
-app.get('/api/channels/:channelId/messages', authenticateToken, async (req, res) => {
-    try {
-        const { channelId } = req.params;
-        const messages = await localStorageService.getChannelMessages(channelId);
-        res.json({
-            success: true,
-            data: {
-                messages
-            }
-        });
-    } catch (error) {
-        console.error('❌ خطأ في جلب رسائل القناة:', error);
-        res.status(500).json({
-            success: false,
-            message: 'حدث خطأ في الخادم',
-            code: 'SERVER_ERROR'
-        });
-    }
-});
-
-app.post('/api/channels/:channelId/join', authenticateToken, async (req, res) => {
-    try {
-        const { channelId } = req.params;
-        const success = await localStorageService.addMemberToChannel(channelId, req.user._id);
-        
-        if (success) {
-            res.json({
-                success: true,
-                message: 'تم الانضمام إلى القناة بنجاح'
-            });
-        } else {
-            res.status(400).json({
-                success: false,
-                message: 'لم يتمكن من الانضمام إلى القناة'
-            });
-        }
-    } catch (error) {
-        console.error('❌ خطأ في الانضمام إلى القناة:', error);
-        res.status(500).json({
-            success: false,
-            message: 'حدث خطأ في الخادم',
-            code: 'SERVER_ERROR'
-        });
-    }
-});
-
-// مسارات المجموعات
-app.get('/api/groups', authenticateToken, async (req, res) => {
-    try {
-        const groups = await localStorageService.getUserGroups(req.user._id);
-        res.json({
-            success: true,
-            data: {
-                groups
-            }
-        });
-    } catch (error) {
-        console.error('❌ خطأ في جلب المجموعات:', error);
-        res.status(500).json({
-            success: false,
-            message: 'حدث خطأ في الخادم',
-            code: 'SERVER_ERROR'
-        });
-    }
-});
-
-app.post('/api/groups', authenticateToken, async (req, res) => {
-    try {
-        const { name, description } = req.body;
-        
-        if (!name) {
-            return res.status(400).json({
-                success: false,
-                message: 'اسم المجموعة مطلوب',
-                code: 'MISSING_NAME'
-            });
-        }
-
-        const group = await localStorageService.createGroup({
-            name,
-            description,
-            creatorId: req.user._id,
-            members: [req.user._id]
-        });
-
-        await auditLog('CREATE_GROUP', req.user._id, 'group', group._id, { name });
-
-        res.status(201).json({
-            success: true,
-            message: 'تم إنشاء المجموعة بنجاح',
-            data: {
-                group
-            }
-        });
-    } catch (error) {
-        console.error('❌ خطأ في إنشاء المجموعة:', error);
-        res.status(500).json({
-            success: false,
-            message: 'حدث خطأ في الخادم',
-            code: 'SERVER_ERROR'
-        });
-    }
-});
-
-app.get('/api/groups/:groupId/messages', authenticateToken, async (req, res) => {
-    try {
-        const { groupId } = req.params;
-        const messages = await localStorageService.getGroupMessages(groupId);
-        res.json({
-            success: true,
-            data: {
-                messages
-            }
-        });
-    } catch (error) {
-        console.error('❌ خطأ في جلب رسائل المجموعة:', error);
-        res.status(500).json({
-            success: false,
-            message: 'حدث خطأ في الخادم',
-            code: 'SERVER_ERROR'
-        });
-    }
-});
-
-app.post('/api/groups/:groupId/join', authenticateToken, async (req, res) => {
-    try {
-        const { groupId } = req.params;
-        const success = await localStorageService.addMemberToGroup(groupId, req.user._id);
-        
-        if (success) {
-            res.json({
-                success: true,
-                message: 'تم الانضمام إلى المجموعة بنجاح'
-            });
-        } else {
-            res.status(400).json({
-                success: false,
-                message: 'لم يتمكن من الانضمام إلى المجموعة'
-            });
-        }
-    } catch (error) {
-        console.error('❌ خطأ في الانضمام إلى المجموعة:', error);
-        res.status(500).json({
-            success: false,
-            message: 'حدث خطأ في الخادم',
-            code: 'SERVER_ERROR'
-        });
-    }
-});
-
-// مسارات الستوريات
-app.get('/api/stories', authenticateToken, async (req, res) => {
-    try {
-        const stories = await localStorageService.getActiveStories();
-        res.json({
-            success: true,
-            data: {
-                stories
-            }
-        });
-    } catch (error) {
-        console.error('❌ خطأ في جلب الستوريات:', error);
-        res.status(500).json({
-            success: false,
-            message: 'حدث خطأ في الخادم',
-            code: 'SERVER_ERROR'
-        });
-    }
-});
-
-app.post('/api/stories', authenticateToken, upload.single('media'), async (req, res) => {
-    try {
-        const { caption } = req.body;
-        
-        if (!req.file) {
-            return res.status(400).json({
-                success: false,
-                message: 'الوسائط مطلوبة',
-                code: 'MISSING_MEDIA'
-            });
-        }
-
-        const story = await localStorageService.createStory({
-            userId: req.user._id,
-            mediaUrl: `/uploads/stories/${req.file.filename}`,
-            mediaType: req.file.mimetype.startsWith('image/') ? 'image' : 'video',
-            caption,
-            createdAt: new Date().toISOString()
-        });
-
-        await auditLog('CREATE_STORY', req.user._id, 'story', story._id);
-
-        res.status(201).json({
-            success: true,
-            message: 'تم نشر القصة بنجاح',
-            data: {
-                story
-            }
-        });
-    } catch (error) {
-        console.error('❌ خطأ في نشر القصة:', error);
-        res.status(500).json({
-            success: false,
-            message: 'حدث خطأ في الخادم',
-            code: 'SERVER_ERROR'
-        });
-    }
-});
-
-app.post('/api/stories/:storyId/view', authenticateToken, async (req, res) => {
-    try {
-        const { storyId } = req.params;
-        const success = await localStorageService.addStoryView(storyId, req.user._id);
-        
-        if (success) {
-            res.json({
-                success: true,
-                message: 'تم تسجيل المشاهدة'
-            });
-        } else {
-            res.status(400).json({
-                success: false,
-                message: 'لم يتم تسجيل المشاهدة'
-            });
-        }
-    } catch (error) {
-        console.error('❌ خطأ في تسجيل المشاهدة:', error);
-        res.status(500).json({
-            success: false,
-            message: 'حدث خطأ في الخادم',
-            code: 'SERVER_ERROR'
-        });
-    }
-});
-
-// مسار الحالة الصحية
-app.get('/api/health', (req, res) => {
-    res.json({
-        success: true,
-        data: {
-            status: 'healthy',
-            timestamp: new Date().toISOString(),
-            uptime: process.uptime(),
-            memory: process.memoryUsage(),
-            connectedUsers: connectedUsers.size
-        }
-    });
-});
-
-// ==================== نظام السوكت ====================
-
-io.on('connection', (socket) => {
-    console.log('🔌 مستخدم متصل:', socket.id);
-
-    // مصادقة المستخدم
-    socket.on('authenticate', async (data) => {
-        try {
-            const { token } = data;
-            if (!token) {
-                socket.emit('authentication_failed', { message: 'رمز المصادقة مطلوب' });
-                return;
-            }
-
-            const decoded = jwt.verify(token, JWT_SECRET);
-            const user = await localStorageService.findUserById(decoded.userId);
             
-            if (!user) {
-                socket.emit('authentication_failed', { message: 'المستخدم غير موجود' });
-                return;
-            }
-
-            // تخزين معلومات الاتصال
-            socket.userId = user._id;
-            connectedUsers.set(user._id, {
-                socketId: socket.id,
-                user: formatUserResponse(user),
-                lastSeen: new Date().toISOString()
-            });
-            userSockets.set(socket.id, user._id);
-
-            // تحديث حالة المستخدم إلى متصل
-            await localStorageService.updateUser(user._id, {
-                isOnline: true,
-                lastSeen: new Date().toISOString()
-            });
-
-            // الانضمام إلى غرف المستخدم
-            socket.join(`user:${user._id}`);
+            const usersList = document.getElementById('activeUsersList');
+            usersList.innerHTML = '';
             
-            // الانضمام إلى القنوات والمجموعات التي ينتمي إليها المستخدم
-            const userChannels = await localStorageService.getUserChannels(user._id);
-            userChannels.forEach(channel => {
-                socket.join(`channel:${channel._id}`);
+            users.forEach(user => {
+                const userItem = document.createElement('div');
+                userItem.className = 'user-list-item';
+                userItem.innerHTML = `
+                    <div class="user-status ${user.online ? '' : 'offline'}"></div>
+                    <div class="user-avatar">
+                        <i class="fas fa-user"></i>
+                    </div>
+                    <div class="user-details">
+                        <div class="user-name">${user.name}</div>
+                        <div class="user-role">${user.role}</div>
+                    </div>
+                `;
+                usersList.appendChild(userItem);
             });
-
-            const userGroups = await localStorageService.getUserGroups(user._id);
-            userGroups.forEach(group => {
-                socket.join(`group:${group._id}`);
-            });
-
-            // إعلام جميع العملاء بتحديث حالة المستخدم
-            io.emit('user_status_changed', {
-                userId: user._id,
-                isOnline: true,
-                lastSeen: new Date().toISOString()
-            });
-
-            socket.emit('authenticated', { 
-                user: formatUserResponse(user),
-                message: 'تم المصادقة بنجاح'
-            });
-
-            console.log(`✅ تم مصادقة المستخدم: ${user.fullName} (${socket.id})`);
-
-        } catch (error) {
-            console.error('❌ خطأ في مصادقة السوكت:', error);
-            socket.emit('authentication_failed', { message: 'فشل المصادقة' });
         }
-    });
 
-    // إرسال رسالة دردشة
-    socket.on('send_message', async (data) => {
-        try {
-            if (!socket.userId) {
-                socket.emit('error', { message: 'غير مصرح به' });
-                return;
-            }
-
-            const { conversationId, content, type = 'text' } = data;
-            
-            if (!conversationId || !content) {
-                socket.emit('error', { message: 'معرف المحادثة والمحتوى مطلوبان' });
-                return;
-            }
-
-            // التحقق من وجود المحادثة
-            const conversation = await localStorageService.getConversationById(conversationId);
-            if (!conversation) {
-                socket.emit('error', { message: 'المحادثة غير موجودة' });
-                return;
-            }
-
-            // إنشاء الرسالة
-            const message = await localStorageService.createMessage({
-                conversationId,
-                senderId: socket.userId,
-                content,
-                type,
-                createdAt: new Date().toISOString()
-            });
-
-            // جلب بيانات المرسل
-            const sender = await localStorageService.findUserById(socket.userId);
-
-            // إرسال الرسالة إلى جميع المشاركين في المحادثة
-            conversation.participants.forEach(participantId => {
-                io.to(`user:${participantId}`).emit('new_message', {
-                    conversationId,
-                    message: {
-                        ...message,
-                        sender: formatUserResponse(sender)
+        // تحميل المحادثات
+        async function loadConversations() {
+            try {
+                const response = await fetch('/api/chat/conversations', {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
                     }
                 });
-            });
-
-            console.log(`💬 رسالة جديدة في المحادثة ${conversationId}: ${content.substring(0, 50)}...`);
-
-        } catch (error) {
-            console.error('❌ خطأ في إرسال الرسالة:', error);
-            socket.emit('error', { message: 'فشل إرسال الرسالة' });
-        }
-    });
-
-    // إرسال رسالة قناة
-    socket.on('send_channel_message', async (data) => {
-        try {
-            if (!socket.userId) {
-                socket.emit('error', { message: 'غير مصرح به' });
-                return;
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    displayConversations(data.data.conversations);
+                }
+            } catch (error) {
+                console.error('❌ خطأ في تحميل المحادثات:', error);
+                // عرض بيانات تجريبية في حالة الخطأ
+                displaySampleConversations();
             }
+        }
 
-            const { channelId, content, type = 'text' } = data;
+        // عرض المحادثات
+        function displayConversations(conversations) {
+            const conversationsList = document.getElementById('conversationsList');
+            conversationsList.innerHTML = '';
             
-            if (!channelId || !content) {
-                socket.emit('error', { message: 'معرف القناة والمحتوى مطلوبان' });
+            if (conversations.length === 0) {
+                conversationsList.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-comments"></i>
+                        <p>لا توجد محادثات</p>
+                    </div>
+                `;
                 return;
             }
-
-            // التحقق من صلاحية المستخدم لإرسال رسائل في القناة
-            const channel = await localStorageService.getChannelById(channelId);
-            if (!channel) {
-                socket.emit('error', { message: 'القناة غير موجودة' });
-                return;
-            }
-
-            if (!channel.members.includes(socket.userId) && !channel.admins.includes(socket.userId)) {
-                socket.emit('error', { message: 'لست عضواً في هذه القناة' });
-                return;
-            }
-
-            // إنشاء رسالة القناة
-            const message = await localStorageService.createChannelMessage({
-                channelId,
-                senderId: socket.userId,
-                content,
-                type,
-                createdAt: new Date().toISOString()
-            });
-
-            // جلب بيانات المرسل
-            const sender = await localStorageService.findUserById(socket.userId);
-
-            // إرسال الرسالة إلى جميع مشتركي القناة
-            io.to(`channel:${channelId}`).emit('new_channel_message', {
-                channelId,
-                message: {
-                    ...message,
-                    sender: formatUserResponse(sender)
-                }
-            });
-
-            console.log(`📢 رسالة جديدة في القناة ${channelId}: ${content.substring(0, 50)}...`);
-
-        } catch (error) {
-            console.error('❌ خطأ في إرسال رسالة القناة:', error);
-            socket.emit('error', { message: 'فشل إرسال رسالة القناة' });
-        }
-    });
-
-    // إرسال رسالة مجموعة
-    socket.on('send_group_message', async (data) => {
-        try {
-            if (!socket.userId) {
-                socket.emit('error', { message: 'غير مصرح به' });
-                return;
-            }
-
-            const { groupId, content, type = 'text' } = data;
             
-            if (!groupId || !content) {
-                socket.emit('error', { message: 'معرف المجموعة والمحتوى مطلوبان' });
+            conversations.forEach(conversation => {
+                const conversationItem = document.createElement('div');
+                conversationItem.className = 'conversation-item';
+                conversationItem.onclick = () => selectConversation(conversation);
+                
+                conversationItem.innerHTML = `
+                    <div class="conversation-avatar">
+                        <i class="fas fa-user"></i>
+                    </div>
+                    <div class="conversation-info">
+                        <div class="conversation-name">${conversation.name}</div>
+                        <div class="conversation-last-message">${conversation.lastMessage?.content || 'لا توجد رسائل'}</div>
+                    </div>
+                    <div class="conversation-meta">
+                        <div class="conversation-time">${formatTime(conversation.updatedAt)}</div>
+                        ${conversation.unreadCount > 0 ? 
+                            `<div class="conversation-unread">${conversation.unreadCount}</div>` : ''}
+                    </div>
+                `;
+                
+                conversationsList.appendChild(conversationItem);
+            });
+        }
+
+        // عرض محادثات تجريبية
+        function displaySampleConversations() {
+            const sampleConversations = [
+                {
+                    _id: '1',
+                    name: 'أحمد محمد',
+                    lastMessage: { content: 'مرحباً، كيف يمكنني المساعدة؟ 😊' },
+                    updatedAt: new Date().toISOString(),
+                    unreadCount: 2
+                },
+                {
+                    _id: '2',
+                    name: 'فاطمة علي',
+                    lastMessage: { content: 'شكراً على المساعدة 👍' },
+                    updatedAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+                    unreadCount: 0
+                }
+            ];
+            
+            displayConversations(sampleConversations);
+        }
+
+        // تحميل القنوات
+        async function loadChannels() {
+            try {
+                const response = await fetch('/api/channels', {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    displayChannels(data.data.channels);
+                }
+            } catch (error) {
+                console.error('❌ خطأ في تحميل القنوات:', error);
+                // عرض بيانات تجريبية في حالة الخطأ
+                displaySampleChannels();
+            }
+        }
+
+        // عرض القنوات
+        function displayChannels(channels) {
+            const channelsList = document.getElementById('channelsList');
+            channelsList.innerHTML = '';
+            
+            if (channels.length === 0) {
+                channelsList.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-broadcast-tower"></i>
+                        <p>لا توجد قنوات</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            channels.forEach(channel => {
+                const channelItem = document.createElement('div');
+                channelItem.className = 'channel-item';
+                channelItem.onclick = () => selectChannel(channel);
+                
+                channelItem.innerHTML = `
+                    <div class="channel-avatar">
+                        <i class="fas fa-broadcast-tower"></i>
+                    </div>
+                    <div class="channel-info">
+                        <div class="channel-name">${channel.name}</div>
+                        <div class="channel-last-message">${channel.description || 'لا توجد وصف'}</div>
+                    </div>
+                    <div class="channel-meta">
+                        <div class="channel-time">${formatTime(channel.updatedAt)}</div>
+                        <div class="channel-unread">${channel.stats?.memberCount || 0}</div>
+                    </div>
+                `;
+                
+                channelsList.appendChild(channelItem);
+            });
+        }
+
+        // عرض قنوات تجريبية
+        function displaySampleChannels() {
+            const sampleChannels = [
+                {
+                    _id: '1',
+                    name: 'قناة الرياضيات',
+                    description: 'قناة مخصصة لدروس الرياضيات والتمارين',
+                    updatedAt: new Date().toISOString(),
+                    stats: { memberCount: 15 }
+                },
+                {
+                    _id: '2',
+                    name: 'قناة العلوم',
+                    description: 'مناقشات وأخبار علمية',
+                    updatedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+                    stats: { memberCount: 8 }
+                }
+            ];
+            
+            displayChannels(sampleChannels);
+        }
+
+        // تحميل المجموعات
+        async function loadGroups() {
+            try {
+                const response = await fetch('/api/groups', {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    displayGroups(data.data.groups);
+                }
+            } catch (error) {
+                console.error('❌ خطأ في تحميل المجموعات:', error);
+                // عرض بيانات تجريبية في حالة الخطأ
+                displaySampleGroups();
+            }
+        }
+
+        // عرض المجموعات
+        function displayGroups(groups) {
+            const groupsList = document.getElementById('groupsList');
+            groupsList.innerHTML = '';
+            
+            if (groups.length === 0) {
+                groupsList.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-users"></i>
+                        <p>لا توجد مجموعات</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            groups.forEach(group => {
+                const groupItem = document.createElement('div');
+                groupItem.className = 'group-item';
+                groupItem.onclick = () => selectGroup(group);
+                
+                groupItem.innerHTML = `
+                    <div class="group-avatar">
+                        <i class="fas fa-users"></i>
+                    </div>
+                    <div class="group-info">
+                        <div class="group-name">${group.name}</div>
+                        <div class="group-last-message">${group.description || 'لا توجد وصف'}</div>
+                    </div>
+                    <div class="group-meta">
+                        <div class="group-time">${formatTime(group.updatedAt)}</div>
+                        <div class="group-unread">${group.stats?.memberCount || 0}</div>
+                    </div>
+                `;
+                
+                groupsList.appendChild(groupItem);
+            });
+        }
+
+        // عرض مجموعات تجريبية
+        function displaySampleGroups() {
+            const sampleGroups = [
+                {
+                    _id: '1',
+                    name: 'مجموعة الرياضيات المتقدمة',
+                    description: 'مجموعة للمناقشات المتقدمة في الرياضيات',
+                    updatedAt: new Date().toISOString(),
+                    stats: { memberCount: 12 }
+                },
+                {
+                    _id: '2',
+                    name: 'مجموعة مشاريع التخرج',
+                    description: 'لمناقشة مشاريع التخرج والتعاون',
+                    updatedAt: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
+                    stats: { memberCount: 8 }
+                }
+            ];
+            
+            displayGroups(sampleGroups);
+        }
+
+        // تحميل الستوريات
+        async function loadStories() {
+            try {
+                const response = await fetch('/api/stories', {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    displayStories(data.data.stories);
+                }
+            } catch (error) {
+                console.error('❌ خطأ في تحميل الستوريات:', error);
+                // عرض بيانات تجريبية في حالة الخطأ
+                displaySampleStories();
+            }
+        }
+
+        // عرض الستوريات
+        function displayStories(stories) {
+            const storiesCarousel = document.getElementById('storiesCarousel');
+            const storiesGrid = document.getElementById('storiesGrid');
+            
+            storiesCarousel.innerHTML = '';
+            storiesGrid.innerHTML = '';
+            
+            if (stories.length === 0) {
+                storiesGrid.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-history"></i>
+                        <h3>لا توجد ستوريات</h3>
+                        <p>كن أول من ينشر قصة!</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            // عرض الستوريات في المتصفح
+            stories.forEach(story => {
+                const storyUser = document.createElement('div');
+                storyUser.className = 'story-user';
+                storyUser.innerHTML = `
+                    <div class="story-avatar has-story">
+                        <i class="fas fa-user"></i>
+                    </div>
+                    <div class="story-username">${story.userId}</div>
+                `;
+                storiesCarousel.appendChild(storyUser);
+            });
+            
+            // عرض الستوريات في الشبكة
+            stories.forEach(story => {
+                const storyCard = document.createElement('div');
+                storyCard.className = 'story-card';
+                storyCard.innerHTML = `
+                    <img src="${story.mediaUrl}" alt="قصة" class="story-media">
+                    <div class="story-content">
+                        <div class="story-user-info">
+                            <div class="user-avatar">
+                                <i class="fas fa-user"></i>
+                            </div>
+                            <div class="user-details">
+                                <div class="user-name">${story.userId}</div>
+                            </div>
+                        </div>
+                        <div class="story-caption">${story.caption || 'لا توجد وصف'}</div>
+                        <div class="story-meta">
+                            <span>${formatTime(story.createdAt)}</span>
+                            <span><i class="fas fa-eye"></i> ${story.metrics?.viewCount || 0}</span>
+                        </div>
+                    </div>
+                `;
+                storiesGrid.appendChild(storyCard);
+            });
+        }
+
+        // عرض ستوريات تجريبية
+        function displaySampleStories() {
+            const sampleStories = [
+                {
+                    _id: '1',
+                    userId: 'أحمد محمد',
+                    mediaUrl: 'https://via.placeholder.com/300x200/4a7bc8/ffffff?text=قصة+تعليمية',
+                    caption: 'درس جديد في الرياضيات 🧮',
+                    createdAt: new Date().toISOString(),
+                    metrics: { viewCount: 15 }
+                },
+                {
+                    _id: '2',
+                    userId: 'فاطمة علي',
+                    mediaUrl: 'https://via.placeholder.com/300x200/667eea/ffffff?text=مشروع+علمي',
+                    caption: 'تجربة جديدة في المختبر 🔬',
+                    createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+                    metrics: { viewCount: 8 }
+                }
+            ];
+            
+            displayStories(sampleStories);
+        }
+
+        // إظهار صفحة محددة
+        function showPage(pageId) {
+            // إخفاء جميع الصفحات
+            document.querySelectorAll('.page').forEach(page => {
+                page.classList.remove('active');
+            });
+            
+            // إظهار الصفحة المطلوبة
+            document.getElementById(pageId).classList.add('active');
+            
+            // تحديث التنقل النشط
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            
+            // إضافة النشط للعنصر المناسب
+            const navItem = document.querySelector(`.nav-item[onclick*="${pageId}"]`);
+            if (navItem) {
+                navItem.classList.add('active');
+            }
+            
+            // إغلاق شريط الأدوات السريع
+            document.getElementById('quickActionsBar').classList.remove('active');
+            
+            // التمرير إلى الأعلى
+            window.scrollTo(0, 0);
+        }
+
+        // إعداد تأثيرات التمرير
+        function setupScrollEffects() {
+            const header = document.getElementById('header');
+            
+            window.addEventListener('scroll', () => {
+                if (window.scrollY > 50) {
+                    header.classList.add('scrolled');
+                } else {
+                    header.classList.remove('scrolled');
+                }
+            });
+        }
+
+        // إعداد تحديثات الواجهة
+        function setupUIUpdates() {
+            // محاكاة تحديثات في الوقت الحقيقي
+            setInterval(() => {
+                // تحديث عدد الإشعارات بشكل عشوائي
+                const badges = document.querySelectorAll('.nav-item-badge');
+                badges.forEach(badge => {
+                    if (Math.random() > 0.9) {
+                        const current = parseInt(badge.textContent) || 0;
+                        badge.textContent = current + 1;
+                    }
+                });
+            }, 10000);
+        }
+
+        // تبديل شريط الأدوات السريع
+        function toggleQuickActions() {
+            document.getElementById('quickActionsBar').classList.toggle('active');
+        }
+
+        // إظهار إشعار التحديث
+        function showUpdateNotification() {
+            setTimeout(() => {
+                document.getElementById('updateNotification').classList.add('active');
+            }, 5000);
+        }
+
+        // إغلاق إشعار التحديث
+        function dismissUpdateNotification() {
+            document.getElementById('updateNotification').classList.remove('active');
+        }
+
+        // تهيئة منتقي الإيموجي
+        function initializeEmojiPicker() {
+            emojiPicker = document.querySelector('emoji-picker');
+            if (emojiPicker) {
+                emojiPicker.addEventListener('emoji-click', event => {
+                    const input = document.getElementById('chatInput');
+                    input.value += event.detail.unicode;
+                    input.focus();
+                });
+            }
+        }
+
+        // تبديل منتقي الإيموجي
+        function toggleEmojiPicker() {
+            document.getElementById('emojiPickerContainer').classList.toggle('active');
+        }
+
+        // ============ دوال المحادثات ============
+
+        // إنشاء دردشة جديدة
+        function createNewChat() {
+            // في التطبيق الحقيقي، سيتم فتح نافذة لاختيار المستخدمين
+            showToast('سيتم إضافة هذه الميزة قريباً', 'info');
+        }
+
+        // اختيار محادثة
+        function selectConversation(conversation) {
+            currentConversation = conversation;
+            document.getElementById('currentChatName').textContent = conversation.name;
+            
+            // تحميل رسائل المحادثة
+            loadConversationMessages(conversation._id);
+            
+            // تحديث الواجهة
+            document.querySelectorAll('.conversation-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            event.currentTarget.classList.add('active');
+        }
+
+        // تحميل رسائل المحادثة
+        async function loadConversationMessages(conversationId) {
+            try {
+                const response = await fetch(`/api/chat/conversations/${conversationId}/messages`, {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    displayChatMessages(data.data.messages);
+                }
+            } catch (error) {
+                console.error('❌ خطأ في تحميل رسائل المحادثة:', error);
+                // عرض رسائل تجريبية في حالة الخطأ
+                displaySampleChatMessages();
+            }
+        }
+
+        // عرض رسائل المحادثة
+        function displayChatMessages(messages) {
+            const chatMessages = document.getElementById('chatMessages');
+            chatMessages.innerHTML = '';
+            
+            if (messages.length === 0) {
+                chatMessages.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-comments"></i>
+                        <h3>لا توجد رسائل</h3>
+                        <p>ابدأ المحادثة بإرسال رسالة!</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            messages.forEach(message => {
+                const messageElement = document.createElement('div');
+                const isSent = message.senderId === currentUser._id;
+                
+                messageElement.className = `message ${isSent ? 'sent' : 'received'}`;
+                messageElement.innerHTML = `
+                    <div class="message-content">${message.content}</div>
+                    <div class="message-time">${formatTime(message.createdAt)}</div>
+                `;
+                
+                chatMessages.appendChild(messageElement);
+            });
+            
+            // التمرير إلى أحدث رسالة
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        // عرض رسائل تجريبية
+        function displaySampleChatMessages() {
+            const sampleMessages = [
+                {
+                    _id: '1',
+                    senderId: 'other',
+                    content: 'مرحباً! كيف يمكنني مساعدتك اليوم؟ 😊',
+                    createdAt: new Date(Date.now() - 10 * 60 * 1000).toISOString()
+                },
+                {
+                    _id: '2',
+                    senderId: 'current',
+                    content: 'أهلاً، أريد الاستفسار عن الدرس الجديد',
+                    createdAt: new Date(Date.now() - 8 * 60 * 1000).toISOString()
+                },
+                {
+                    _id: '3',
+                    senderId: 'other',
+                    content: 'بالطبع! الدرس الجديد عن أساسيات البرمجة وسيتم نشره غداً 🚀',
+                    createdAt: new Date(Date.now() - 5 * 60 * 1000).toISOString()
+                }
+            ];
+            
+            displayChatMessages(sampleMessages);
+        }
+
+        // إرسال رسالة دردشة
+        async function sendChatMessage() {
+            const input = document.getElementById('chatInput');
+            const content = input.value.trim();
+            
+            if (!content || !currentConversation) {
+                showToast('يرجى اختيار محادثة وكتابة رسالة', 'warning');
                 return;
             }
 
-            // التحقق من عضوية المستخدم في المجموعة
-            const group = await localStorageService.getGroupById(groupId);
-            if (!group) {
-                socket.emit('error', { message: 'المجموعة غير موجودة' });
+            if (!socket || !socket.connected) {
+                showToast('غير متصل بالخادم', 'error');
                 return;
             }
 
-            if (!group.members.includes(socket.userId)) {
-                socket.emit('error', { message: 'لست عضواً في هذه المجموعة' });
+            try {
+                socket.emit('send_message', {
+                    conversationId: currentConversation._id,
+                    content,
+                    type: 'text'
+                });
+                
+                // إضافة الرسالة إلى الواجهة فوراً
+                const chatMessages = document.getElementById('chatMessages');
+                const messageElement = document.createElement('div');
+                messageElement.className = 'message sent';
+                messageElement.innerHTML = `
+                    <div class="message-content">${content}</div>
+                    <div class="message-time">الآن</div>
+                `;
+                chatMessages.appendChild(messageElement);
+                
+                // مسح حقل الإدخال
+                input.value = '';
+                
+                // التمرير إلى أحدث رسالة
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+                
+            } catch (error) {
+                console.error('❌ خطأ في إرسال الرسالة:', error);
+                showToast('فشل إرسال الرسالة', 'error');
+            }
+        }
+
+        // ============ دوال القنوات ============
+
+        // إنشاء قناة جديدة
+        function createNewChannel() {
+            const name = prompt('أدخل اسم القناة الجديدة:');
+            if (!name) return;
+
+            // في التطبيق الحقيقي، سيتم إرسال طلب إلى الخادم
+            showToast(`تم إنشاء القناة "${name}" بنجاح`, 'success');
+            
+            // إضافة القناة الجديدة إلى القائمة
+            const newChannel = {
+                _id: Date.now().toString(),
+                name,
+                description: 'قناة جديدة',
+                updatedAt: new Date().toISOString(),
+                stats: { memberCount: 1 }
+            };
+            
+            // إعادة تحميل القنوات
+            loadChannels();
+        }
+
+        // اختيار قناة
+        function selectChannel(channel) {
+            currentChannel = channel;
+            document.getElementById('currentChannelName').textContent = channel.name;
+            
+            // تحميل رسائل القناة
+            loadChannelMessages(channel._id);
+            
+            // تحديث الواجهة
+            document.querySelectorAll('.channel-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            event.currentTarget.classList.add('active');
+        }
+
+        // تحميل رسائل القناة
+        async function loadChannelMessages(channelId) {
+            try {
+                const response = await fetch(`/api/channels/${channelId}/messages`, {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    displayChannelMessages(data.data.messages);
+                }
+            } catch (error) {
+                console.error('❌ خطأ في تحميل رسائل القناة:', error);
+                // عرض رسائل تجريبية في حالة الخطأ
+                displaySampleChannelMessages();
+            }
+        }
+
+        // عرض رسائل القناة
+        function displayChannelMessages(messages) {
+            const channelMessages = document.getElementById('channelMessages');
+            channelMessages.innerHTML = '';
+            
+            if (messages.length === 0) {
+                channelMessages.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-broadcast-tower"></i>
+                        <h3>لا توجد رسائل</h3>
+                        <p>كن أول من يرسل رسالة في هذه القناة!</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            messages.forEach(message => {
+                const messageElement = document.createElement('div');
+                const isAdmin = message.senderId === currentUser._id;
+                
+                messageElement.className = `channel-message ${isAdmin ? 'admin' : ''}`;
+                messageElement.innerHTML = `
+                    <div class="channel-message-header">
+                        <span>${isAdmin ? 'أنت' : 'مدير القناة'}</span>
+                        <span>${formatTime(message.createdAt)}</span>
+                    </div>
+                    <div class="message-content">${message.content}</div>
+                `;
+                
+                channelMessages.appendChild(messageElement);
+            });
+            
+            // التمرير إلى أحدث رسالة
+            channelMessages.scrollTop = channelMessages.scrollHeight;
+        }
+
+        // عرض رسائل تجريبية للقناة
+        function displaySampleChannelMessages() {
+            const sampleMessages = [
+                {
+                    _id: '1',
+                    senderId: 'admin',
+                    content: 'مرحباً بالجميع في قناة الرياضيات! 🧮',
+                    createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
+                },
+                {
+                    _id: '2',
+                    senderId: 'admin',
+                    content: 'تم نشر تمرين جديد في وحدة الجبر. الرجاء حل التمرين وإرسال الإجابات قبل نهاية الأسبوع.',
+                    createdAt: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString()
+                },
+                {
+                    _id: '3',
+                    senderId: 'admin',
+                    content: 'تذكير: الاختبار الشهري سيعقد يوم الأربعاء القادم. الرجاء المراجعة جيداً. 📚',
+                    createdAt: new Date(Date.now() - 30 * 60 * 1000).toISOString()
+                }
+            ];
+            
+            displayChannelMessages(sampleMessages);
+        }
+
+        // إرسال رسالة قناة
+        async function sendChannelMessage() {
+            const input = document.getElementById('channelInput');
+            const content = input.value.trim();
+            
+            if (!content || !currentChannel) {
+                showToast('يرجى اختيار قناة وكتابة رسالة', 'warning');
                 return;
             }
 
-            // إنشاء رسالة المجموعة
-            const message = await localStorageService.createGroupMessage({
-                groupId,
-                senderId: socket.userId,
-                content,
-                type,
-                createdAt: new Date().toISOString()
-            });
-
-            // جلب بيانات المرسل
-            const sender = await localStorageService.findUserById(socket.userId);
-
-            // إرسال الرسالة إلى جميع أعضاء المجموعة
-            io.to(`group:${groupId}`).emit('new_group_message', {
-                groupId,
-                message: {
-                    ...message,
-                    sender: formatUserResponse(sender)
-                }
-            });
-
-            console.log(`👥 رسالة جديدة في المجموعة ${groupId}: ${content.substring(0, 50)}...`);
-
-        } catch (error) {
-            console.error('❌ خطأ في إرسال رسالة المجموعة:', error);
-            socket.emit('error', { message: 'فشل إرسال رسالة المجموعة' });
-        }
-    });
-
-    // انضمام إلى قناة
-    socket.on('join_channel', async (data) => {
-        try {
-            const { channelId } = data;
-            if (channelId && socket.userId) {
-                const success = await localStorageService.addMemberToChannel(channelId, socket.userId);
-                if (success) {
-                    socket.join(`channel:${channelId}`);
-                    socket.emit('channel_joined', { channelId });
-                    console.log(`✅ المستخدم ${socket.userId} انضم إلى القناة ${channelId}`);
-                }
+            if (!socket || !socket.connected) {
+                showToast('غير متصل بالخادم', 'error');
+                return;
             }
-        } catch (error) {
-            console.error('❌ خطأ في الانضمام إلى القناة:', error);
-        }
-    });
 
-    // انضمام إلى مجموعة
-    socket.on('join_group', async (data) => {
-        try {
-            const { groupId } = data;
-            if (groupId && socket.userId) {
-                const success = await localStorageService.addMemberToGroup(groupId, socket.userId);
-                if (success) {
-                    socket.join(`group:${groupId}`);
-                    socket.emit('group_joined', { groupId });
-                    console.log(`✅ المستخدم ${socket.userId} انضم إلى المجموعة ${groupId}`);
+            try {
+                socket.emit('send_channel_message', {
+                    channelId: currentChannel._id,
+                    content,
+                    type: 'text'
+                });
+                
+                // إضافة الرسالة إلى الواجهة فوراً
+                const channelMessages = document.getElementById('channelMessages');
+                const messageElement = document.createElement('div');
+                messageElement.className = 'channel-message admin';
+                messageElement.innerHTML = `
+                    <div class="channel-message-header">
+                        <span>أنت</span>
+                        <span>الآن</span>
+                    </div>
+                    <div class="message-content">${content}</div>
+                `;
+                channelMessages.appendChild(messageElement);
+                
+                // مسح حقل الإدخال
+                input.value = '';
+                
+                // التمرير إلى أحدث رسالة
+                channelMessages.scrollTop = channelMessages.scrollHeight;
+                
+            } catch (error) {
+                console.error('❌ خطأ في إرسال رسالة القناة:', error);
+                showToast('فشل إرسال الرسالة', 'error');
+            }
+        }
+
+        // الانضمام إلى قناة
+        function joinChannel() {
+            if (!currentChannel) {
+                showToast('يرجى اختيار قناة أولاً', 'warning');
+                return;
+            }
+
+            if (!socket || !socket.connected) {
+                showToast('غير متصل بالخادم', 'error');
+                return;
+            }
+
+            socket.emit('join_channel', { channelId: currentChannel._id });
+            showToast(`تم الانضمام إلى قناة ${currentChannel.name}`, 'success');
+        }
+
+        // ============ دوال المجموعات ============
+
+        // إنشاء مجموعة جديدة
+        function createNewGroup() {
+            const name = prompt('أدخل اسم المجموعة الجديدة:');
+            if (!name) return;
+
+            // في التطبيق الحقيقي، سيتم إرسال طلب إلى الخادم
+            showToast(`تم إنشاء المجموعة "${name}" بنجاح`, 'success');
+            
+            // إضافة المجموعة الجديدة إلى القائمة
+            const newGroup = {
+                _id: Date.now().toString(),
+                name,
+                description: 'مجموعة جديدة',
+                updatedAt: new Date().toISOString(),
+                stats: { memberCount: 1 }
+            };
+            
+            // إعادة تحميل المجموعات
+            loadGroups();
+        }
+
+        // اختيار مجموعة
+        function selectGroup(group) {
+            currentGroup = group;
+            document.getElementById('currentGroupName').textContent = group.name;
+            
+            // تحميل رسائل المجموعة
+            loadGroupMessages(group._id);
+            
+            // تحديث الواجهة
+            document.querySelectorAll('.group-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            event.currentTarget.classList.add('active');
+        }
+
+        // تحميل رسائل المجموعة
+        async function loadGroupMessages(groupId) {
+            try {
+                const response = await fetch(`/api/groups/${groupId}/messages`, {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    displayGroupMessages(data.data.messages);
                 }
+            } catch (error) {
+                console.error('❌ خطأ في تحميل رسائل المجموعة:', error);
+                // عرض رسائل تجريبية في حالة الخطأ
+                displaySampleGroupMessages();
             }
-        } catch (error) {
-            console.error('❌ خطأ في الانضمام إلى المجموعة:', error);
         }
-    });
 
-    // كتابة رسالة
-    socket.on('typing_start', (data) => {
-        const { conversationId } = data;
-        if (conversationId && socket.userId) {
-            socket.to(conversationId).emit('user_typing', {
-                userId: socket.userId,
-                conversationId,
-                isTyping: true
-            });
-        }
-    });
-
-    socket.on('typing_stop', (data) => {
-        const { conversationId } = data;
-        if (conversationId && socket.userId) {
-            socket.to(conversationId).emit('user_typing', {
-                userId: socket.userId,
-                conversationId,
-                isTyping: false
-            });
-        }
-    });
-
-    // قراءة الرسائل
-    socket.on('mark_messages_read', async (data) => {
-        try {
-            const { conversationId } = data;
-            if (conversationId && socket.userId) {
-                await localStorageService.markMessagesAsRead(conversationId, socket.userId);
-                socket.emit('messages_marked_read', { conversationId });
+        // عرض رسائل المجموعة
+        function displayGroupMessages(messages) {
+            const groupMessages = document.getElementById('groupMessages');
+            groupMessages.innerHTML = '';
+            
+            if (messages.length === 0) {
+                groupMessages.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-users"></i>
+                        <h3>لا توجد رسائل</h3>
+                        <p>ابدأ المحادثة في المجموعة!</p>
+                    </div>
+                `;
+                return;
             }
-        } catch (error) {
-            console.error('❌ خطأ في تحديد الرسائل كمقروءة:', error);
-        }
-    });
-
-    // فصل الاتصال
-    socket.on('disconnect', async () => {
-        console.log('🔌 مستخدم منفصل:', socket.id);
-        
-        const userId = userSockets.get(socket.id);
-        if (userId) {
-            // تحديث حالة المستخدم إلى غير متصل
-            await localStorageService.updateUser(userId, {
-                isOnline: false,
-                lastSeen: new Date().toISOString()
+            
+            messages.forEach(message => {
+                const messageElement = document.createElement('div');
+                const isSelf = message.senderId === currentUser._id;
+                
+                messageElement.className = `group-message ${isSelf ? 'self' : ''}`;
+                messageElement.innerHTML = `
+                    <div class="group-message-header">
+                        <span>${isSelf ? 'أنت' : 'عضو'}</span>
+                        <span>${formatTime(message.createdAt)}</span>
+                    </div>
+                    <div class="message-content">${message.content}</div>
+                `;
+                
+                groupMessages.appendChild(messageElement);
             });
-
-            // إعلام جميع العملاء بتحديث حالة المستخدم
-            io.emit('user_status_changed', {
-                userId,
-                isOnline: false,
-                lastSeen: new Date().toISOString()
-            });
-
-            connectedUsers.delete(userId);
-            userSockets.delete(socket.id);
+            
+            // التمرير إلى أحدث رسالة
+            groupMessages.scrollTop = groupMessages.scrollHeight;
         }
-    });
-});
 
-// بدء الخادم
-server.listen(PORT, '0.0.0.0', () => {
-    console.log(`
-🚀 خادم المنصة التعليمية المحسن يعمل بنجاح!
-📍 العنوان: http://localhost:${PORT}
-📊 البيئة: ${NODE_ENV}
-⏰ الوقت: ${new Date().toLocaleString('ar-SA')}
-🗄️  التخزين: محلي (JSON/CSV)
-👥 المستخدمون المتصلون: ${connectedUsers.size}
-💾 المسارات:
-   📁 الجذر: ${__dirname}
-   📁 الرفع: ${UPLOAD_DIR}
-   📁 النسخ الاحتياطي: ${BACKUP_DIR}
-   📁 التصدير: ${EXPORT_DIR}
-   
-🔐 حساب المدير الافتراضي:
-   📧 البريد الإلكتروني: admin@platform.edu
-   🔑 كلمة المرور: 77007700
+        // عرض رسائل تجريبية للمجموعة
+        function displaySampleGroupMessages() {
+            const sampleMessages = [
+                {
+                    _id: '1',
+                    senderId: 'other',
+                    content: 'مرحباً بالجميع في مجموعة الرياضيات! 🧮',
+                    createdAt: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString()
+                },
+                {
+                    _id: '2',
+                    senderId: 'other',
+                    content: 'هل يمكن لأحد مساعدتي في حل التمرين الثالث؟',
+                    createdAt: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString()
+                },
+                {
+                    _id: '3',
+                    senderId: 'current',
+                    content: 'بالطاعة! سأشارك الحل قريباً 👍',
+                    createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
+                }
+            ];
+            
+            displayGroupMessages(sampleMessages);
+        }
 
-✨ المميزات المتاحة:
-   💬 دردشة فورية مع الإيموجي
-   📢 قنوات بث (مثل تليجرام)
-   👥 مجموعات تفاعلية
-   📖 ستوريات (مثل انستقرام)
-   📁 رفع الملفات
-   🔔 إشعارات فورية
-   🌙 وضع ليلي
+        // إرسال رسالة مجموعة
+        async function sendGroupMessage() {
+            const input = document.getElementById('groupInput');
+            const content = input.value.trim();
+            
+            if (!content || !currentGroup) {
+                showToast('يرجى اختيار مجموعة وكتابة رسالة', 'warning');
+                return;
+            }
 
-✅ تم إصلاح جميع المشاكل:
-   ✓ إرسال الرسائل في المجموعات والقنوات
-   ✓ فتح دردشات جديدة
-   ✓ إنشاء مجموعات وقنوات جديدة
-   ✓ نشر الستوريات
-   ✓ وصول الرسائل بين المستخدمين
-    `);
-});
+            if (!socket || !socket.connected) {
+                showToast('غير متصل بالخادم', 'error');
+                return;
+            }
 
-export default app;
+            try {
+                socket.emit('send_group_message', {
+                    groupId: currentGroup._id,
+                    content,
+                    type: 'text'
+                });
+                
+                // إضافة الرسالة إلى الواجهة فوراً
+                const groupMessages = document.getElementById('groupMessages');
+                const messageElement = document.createElement('div');
+                messageElement.className = 'group-message self';
+                messageElement.innerHTML = `
+                    <div class="group-message-header">
+                        <span>أنت</span>
+                        <span>الآن</span>
+                    </div>
+                    <div class="message-content">${content}</div>
+                `;
+                groupMessages.appendChild(messageElement);
+                
+                // مسح حقل الإدخال
+                input.value = '';
+                
+                // التمرير إلى أحدث رسالة
+                groupMessages.scrollTop = groupMessages.scrollHeight;
+                
+            } catch (error) {
+                console.error('❌ خطأ في إرسال رسالة المجموعة:', error);
+                showToast('فشل إرسال الرسالة', 'error');
+            }
+        }
+
+        // الانضمام إلى مجموعة
+        function joinGroup() {
+            if (!currentGroup) {
+                showToast('يرجى اختيار مجموعة أولاً', 'warning');
+                return;
+            }
+
+            if (!socket || !socket.connected) {
+                showToast('غير متصل بالخادم', 'error');
+                return;
+            }
+
+            socket.emit('join_group', { groupId: currentGroup._id });
+            showToast(`تم الانضمام إلى مجموعة ${currentGroup.name}`, 'success');
+        }
+
+        // ============ دوال الستوريات ============
+
+        // إنشاء قصة جديدة
+        function createNewStory() {
+            // في التطبيق الحقيقي، سيتم فتح نافذة لرفع صورة أو فيديو
+            showToast('سيتم إضافة هذه الميزة قريباً', 'info');
+        }
+
+        // ============ معالجات الأحداث من السوكت ============
+
+        // معالجة رسالة جديدة
+        function handleNewMessage(data) {
+            if (currentConversation && data.conversationId === currentConversation._id) {
+                // إضافة الرسالة إلى المحادثة الحالية
+                const chatMessages = document.getElementById('chatMessages');
+                const messageElement = document.createElement('div');
+                const isSent = data.message.senderId === currentUser._id;
+                
+                messageElement.className = `message ${isSent ? 'sent' : 'received'}`;
+                messageElement.innerHTML = `
+                    <div class="message-content">${data.message.content}</div>
+                    <div class="message-time">${formatTime(data.message.createdAt)}</div>
+                `;
+                chatMessages.appendChild(messageElement);
+                
+                // التمرير إلى أحدث رسالة
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }
+            
+            // تحديث عدد الإشعارات
+            updateChatBadge();
+        }
+
+        // معالجة رسالة قناة جديدة
+        function handleNewChannelMessage(data) {
+            if (currentChannel && data.channelId === currentChannel._id) {
+                // إضافة الرسالة إلى القناة الحالية
+                const channelMessages = document.getElementById('channelMessages');
+                const messageElement = document.createElement('div');
+                const isAdmin = data.message.senderId === currentUser._id;
+                
+                messageElement.className = `channel-message ${isAdmin ? 'admin' : ''}`;
+                messageElement.innerHTML = `
+                    <div class="channel-message-header">
+                        <span>${isAdmin ? 'أنت' : 'مدير القناة'}</span>
+                        <span>${formatTime(data.message.createdAt)}</span>
+                    </div>
+                    <div class="message-content">${data.message.content}</div>
+                `;
+                channelMessages.appendChild(messageElement);
+                
+                // التمرير إلى أحدث رسالة
+                channelMessages.scrollTop = channelMessages.scrollHeight;
+            }
+        }
+
+        // معالجة رسالة مجموعة جديدة
+        function handleNewGroupMessage(data) {
+            if (currentGroup && data.groupId === currentGroup._id) {
+                // إضافة الرسالة إلى المجموعة الحالية
+                const groupMessages = document.getElementById('groupMessages');
+                const messageElement = document.createElement('div');
+                const isSelf = data.message.senderId === currentUser._id;
+                
+                messageElement.className = `group-message ${isSelf ? 'self' : ''}`;
+                messageElement.innerHTML = `
+                    <div class="group-message-header">
+                        <span>${isSelf ? 'أنت' : 'عضو'}</span>
+                        <span>${formatTime(data.message.createdAt)}</span>
+                    </div>
+                    <div class="message-content">${data.message.content}</div>
+                `;
+                groupMessages.appendChild(messageElement);
+                
+                // التمرير إلى أحدث رسالة
+                groupMessages.scrollTop = groupMessages.scrollHeight;
+                
+                // تحديث عدد الإشعارات
+                updateGroupsBadge();
+            }
+        }
+
+        // تحديث حالة المستخدم
+        function updateUserStatus(data) {
+            // في التطبيق الحقيقي، سيتم تحديث حالة المستخدم في القوائم
+            console.log('تحديث حالة المستخدم:', data);
+        }
+
+        // معالجة الكتابة
+        function handleUserTyping(data) {
+            // في التطبيق الحقيقي، سيتم عرض مؤشر الكتابة
+            console.log('المستخدم يكتب:', data);
+        }
+
+        // تحديث إشعارات الدردشة
+        function updateChatBadge() {
+            const badge = document.getElementById('chatBadge');
+            const current = parseInt(badge.textContent) || 0;
+            badge.textContent = current + 1;
+        }
+
+        // تحديث إشعارات المجموعات
+        function updateGroupsBadge() {
+            const badge = document.getElementById('groupsBadge');
+            const current = parseInt(badge.textContent) || 0;
+            badge.textContent = current + 1;
+        }
+
+        // ============ دوال مساعدة ============
+
+        // تنسيق الوقت
+        function formatTime(dateString) {
+            const date = new Date(dateString);
+            const now = new Date();
+            const diff = now - date;
+            
+            if (diff < 60 * 1000) {
+                return 'الآن';
+            } else if (diff < 60 * 60 * 1000) {
+                const minutes = Math.floor(diff / (60 * 1000));
+                return `منذ ${minutes} دقيقة`;
+            } else if (diff < 24 * 60 * 60 * 1000) {
+                const hours = Math.floor(diff / (60 * 60 * 1000));
+                return `منذ ${hours} ساعة`;
+            } else {
+                return date.toLocaleDateString('ar-SA');
+            }
+        }
+
+        // إظهار رسالة عائمة
+        function showToast(message, type = 'info') {
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.innerHTML = `
+                <i class="fas fa-${getToastIcon(type)}"></i>
+                <span>${message}</span>
+            `;
+            
+            document.getElementById('toastContainer').appendChild(toast);
+            
+            // إزالة الرسالة بعد 3 ثواني
+            setTimeout(() => {
+                toast.remove();
+            }, 3000);
+        }
+
+        // الحصول على أيقونة الرسالة العائمة
+        function getToastIcon(type) {
+            const icons = {
+                'success': 'check-circle',
+                'error': 'exclamation-circle',
+                'warning': 'exclamation-triangle',
+                'info': 'info-circle'
+            };
+            return icons[type] || 'info-circle';
+        }
+    </script>
+</body>
+</html>
