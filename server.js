@@ -2,7 +2,6 @@ import express from 'express';
 import http from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
-import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import multer from 'multer';
 import path from 'path';
@@ -817,14 +816,13 @@ async function createDefaultAdmin() {
     try {
         const adminExists = await localStorageService.findUserByPhone('500000000');
         if (!adminExists) {
-            const hashedPassword = await bcrypt.hash('77007700', 12);
             const admin = await localStorageService.createUser({
                 fullName: 'مدير النظام',
                 phone: '500000000',
                 university: 'المنصة التعليمية',
                 major: 'إدارة النظام',
                 batch: '2024',
-                password: hashedPassword,
+                password: '77007700', // كلمة مرور غير مشفرة
                 role: 'admin',
                 email: 'admin@platform.edu',
                 studentId: 'ADMIN001',
@@ -840,7 +838,6 @@ async function createDefaultAdmin() {
             console.log('✅ تم إنشاء حساب المدير الافتراضي');
             console.log('📱 رقم الهاتف: 500000000');
             console.log('🔑 كلمة المرور: 77007700');
-            console.log('🔐 كلمة المرور المشفرة:', hashedPassword);
         } else {
             console.log('✅ حساب المدير موجود بالفعل');
         }
@@ -858,7 +855,7 @@ async function createDefaultUsers() {
             university: "جامعة الملك سعود",
             major: "هندسة الحاسب",
             batch: "2024",
-            password: "12345678",
+            password: "12345678", // كلمة مرور غير مشفرة
             role: "student"
         },
         {
@@ -867,7 +864,7 @@ async function createDefaultUsers() {
             university: "جامعة الأميرة نورة",
             major: "الطب",
             batch: "2023",
-            password: "12345678",
+            password: "12345678", // كلمة مرور غير مشفرة
             role: "student"
         },
         {
@@ -876,7 +873,7 @@ async function createDefaultUsers() {
             university: "جامعة الملك فهد",
             major: "إدارة الأعمال", 
             batch: "2024",
-            password: "12345678",
+            password: "12345678", // كلمة مرور غير مشفرة
             role: "moderator"
         }
     ];
@@ -884,10 +881,8 @@ async function createDefaultUsers() {
     for (const userData of defaultUsers) {
         const existingUser = await localStorageService.findUserByPhone(userData.phone);
         if (!existingUser) {
-            const hashedPassword = await bcrypt.hash(userData.password, 12);
             await localStorageService.createUser({
-                ...userData,
-                password: hashedPassword
+                ...userData
             });
             console.log(`✅ تم إنشاء المستخدم الافتراضي: ${userData.fullName} (${userData.phone})`);
         }
@@ -952,19 +947,16 @@ app.post('/api/auth/register', async (req, res) => {
             });
         }
 
-        // تشفير كلمة المرور
-        console.log('🔐 تشفير كلمة المرور للمستخدم:', phone);
-        const hashedPassword = await bcrypt.hash(password, 12);
-        console.log('✅ تم تشفير كلمة المرور، الطول:', hashedPassword.length);
+        console.log('🔐 إنشاء مستخدم جديد:', phone);
 
-        // إنشاء المستخدم
+        // إنشاء المستخدم (بدون تشفير كلمة المرور)
         const user = await localStorageService.createUser({
             fullName: fullName.trim(),
             phone,
             university,
             major,
             batch,
-            password: hashedPassword,
+            password: password, // حفظ كلمة المرور كما هي
             email: email || null,
             studentId: studentId || null,
             role: 'student'
@@ -1001,7 +993,7 @@ app.post('/api/auth/login', async (req, res) => {
     try {
         const { phone, password } = req.body;
 
-        console.log('🔐 محاولة تسجيل الدخول:', { phone, passwordLength: password ? password.length : 0 });
+        console.log('🔐 محاولة تسجيل الدخول:', { phone, password });
 
         if (!phone || !password) {
             console.log('❌ بيانات ناقصة:', { phone: !!phone, password: !!password });
@@ -1035,8 +1027,8 @@ app.post('/api/auth/login', async (req, res) => {
         console.log('🔍 بيانات المستخدم:', {
             name: user.fullName,
             hasPassword: !!user.password,
-            passwordLength: user.password ? user.password.length : 0,
-            passwordStart: user.password ? user.password.substring(0, 20) + '...' : 'غير موجود'
+            storedPassword: user.password,
+            inputPassword: password
         });
 
         if (!user.password) {
@@ -1048,8 +1040,8 @@ app.post('/api/auth/login', async (req, res) => {
             });
         }
 
-        console.log('🔐 مقارنة كلمات المرور...');
-        const isPasswordValid = await bcrypt.compare(password, user.password);
+        // مقارنة كلمات المرور مباشرة (بدون تشفير)
+        const isPasswordValid = user.password === password;
         console.log('✅ نتيجة المقارنة:', isPasswordValid);
 
         if (!isPasswordValid) {
@@ -1211,17 +1203,14 @@ app.post('/api/auth/create-test-user', async (req, res) => {
             });
         }
 
-        // تشفير كلمة المرور
-        const hashedPassword = await bcrypt.hash(password, 12);
-
-        // إنشاء المستخدم
+        // إنشاء المستخدم (بدون تشفير كلمة المرور)
         const user = await localStorageService.createUser({
             fullName,
             phone,
             university,
             major,
             batch,
-            password: hashedPassword,
+            password: password, // حفظ كلمة المرور كما هي
             role: 'student'
         });
 
@@ -1572,7 +1561,7 @@ server.listen(PORT, '0.0.0.0', () => {
    📁 النسخ الاحتياطي: ${BACKUP_DIR}
    📁 التصدير: ${EXPORT_DIR}
    
-🔐 حسابات الاختبار المتاحة:
+🔐 حسابات الاختبار المتاحة (بدون تشفير):
    👑 المدير: 500000000 / 77007700
    👨‍🎓 أحمد: 512345678 / 12345678
    👩‍🎓 سارة: 511111111 / 12345678
