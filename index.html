@@ -2015,6 +2015,167 @@
             visibility: visible;
             opacity: 1;
         }
+
+        /* تحسينات البحث */
+        .search-container {
+            position: relative;
+            margin-bottom: 1.5rem;
+        }
+        
+        .search-input {
+            width: 100%;
+            padding: 0.75rem 1rem 0.75rem 3rem;
+            border: 2px solid var(--border);
+            border-radius: var(--border-radius);
+            font-size: 1rem;
+            transition: var(--transition);
+        }
+        
+        .search-input:focus {
+            border-color: var(--primary);
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(44, 90, 160, 0.1);
+        }
+        
+        .search-icon {
+            position: absolute;
+            right: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--gray-500);
+        }
+        
+        .search-results {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow-lg);
+            max-height: 300px;
+            overflow-y: auto;
+            z-index: 100;
+            display: none;
+        }
+        
+        .search-results.active {
+            display: block;
+        }
+        
+        .search-result-item {
+            padding: 1rem;
+            border-bottom: 1px solid var(--border);
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        
+        .search-result-item:hover {
+            background: var(--gray-100);
+        }
+        
+        .search-result-item:last-child {
+            border-bottom: none;
+        }
+        
+        .search-result-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: var(--gradient-primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+            margin-left: 1rem;
+        }
+        
+        .search-result-info {
+            flex: 1;
+        }
+        
+        .search-result-name {
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+        
+        .search-result-email {
+            font-size: 0.85rem;
+            color: var(--gray-600);
+        }
+
+        /* تحسينات التحميل */
+        .upload-area {
+            border: 2px dashed var(--border);
+            border-radius: var(--border-radius);
+            padding: 2rem;
+            text-align: center;
+            cursor: pointer;
+            transition: var(--transition);
+            margin-bottom: 1rem;
+        }
+        
+        .upload-area:hover {
+            border-color: var(--primary);
+            background: var(--gray-100);
+        }
+        
+        .upload-area.dragover {
+            border-color: var(--primary);
+            background: var(--primary-light);
+            color: white;
+        }
+        
+        .upload-icon {
+            font-size: 3rem;
+            color: var(--primary);
+            margin-bottom: 1rem;
+        }
+        
+        .file-preview {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 1rem;
+            background: var(--gray-100);
+            border-radius: var(--border-radius);
+            margin-bottom: 1rem;
+        }
+        
+        .file-icon {
+            font-size: 2rem;
+            color: var(--primary);
+        }
+        
+        .file-info {
+            flex: 1;
+        }
+        
+        .file-name {
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+        
+        .file-size {
+            font-size: 0.85rem;
+            color: var(--gray-600);
+        }
+        
+        .progress-bar {
+            height: 6px;
+            background: var(--gray-300);
+            border-radius: 3px;
+            overflow: hidden;
+            margin-top: 0.5rem;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: var(--primary);
+            transition: width 0.3s ease;
+        }
     </style>
 </head>
 <body>
@@ -2190,6 +2351,22 @@
                         </div>
                         <h3>الستوريات</h3>
                         <p>شارك لحظاتك التعليمية مع الستوريات المؤقتة</p>
+                    </div>
+
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="fas fa-search"></i>
+                        </div>
+                        <h3>بحث متقدم</h3>
+                        <p>ابحث عن المستخدمين والمحتوى بسرعة وسهولة</p>
+                    </div>
+
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="fas fa-bolt"></i>
+                        </div>
+                        <h3>أداء محسن</h3>
+                        <p>نظام سريع ومستجيب مع تحديثات فورية</p>
                     </div>
                 </div>
             </div>
@@ -2369,13 +2546,22 @@
                 <div class="chat-sidebar">
                     <div class="chat-header">
                         <h3>المحادثات</h3>
-                        <button class="btn btn-sm btn-outline" style="color: white; border-color: white;" onclick="createNewChat()">
-                            <i class="fas fa-edit"></i>
-                        </button>
+                        <div>
+                            <button class="btn btn-sm btn-outline" style="color: white; border-color: white;" onclick="openUserSearch()">
+                                <i class="fas fa-user-plus"></i>
+                            </button>
+                            <button class="btn btn-sm btn-outline" style="color: white; border-color: white;" onclick="createNewChat()">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                        </div>
                     </div>
                     
                     <div class="chat-search">
-                        <input type="text" placeholder="بحث في المحادثات...">
+                        <div class="search-container">
+                            <input type="text" id="chatSearch" placeholder="بحث في المحادثات...">
+                            <i class="fas fa-search search-icon"></i>
+                            <div class="search-results" id="chatSearchResults"></div>
+                        </div>
                     </div>
                     
                     <div class="conversations-list" id="conversationsList">
@@ -2409,10 +2595,10 @@
                     
                     <div class="chat-input-container">
                         <div class="chat-input-tools">
-                            <button class="chat-tool-btn">
+                            <button class="chat-tool-btn" onclick="openFileUpload('chat')">
                                 <i class="fas fa-paperclip"></i>
                             </button>
-                            <button class="chat-tool-btn">
+                            <button class="chat-tool-btn" onclick="openImageUpload('chat')">
                                 <i class="fas fa-image"></i>
                             </button>
                         </div>
@@ -2450,6 +2636,12 @@
                         <button class="btn btn-sm btn-outline" style="color: white; border-color: white;" onclick="createNewChannel()">
                             <i class="fas fa-plus"></i>
                         </button>
+                    </div>
+                    
+                    <div class="search-container" style="padding: 1rem;">
+                        <input type="text" id="channelSearch" placeholder="بحث في القنوات...">
+                        <i class="fas fa-search search-icon"></i>
+                        <div class="search-results" id="channelSearchResults"></div>
                     </div>
                     
                     <div class="channels-list" id="channelsList">
@@ -2502,6 +2694,12 @@
                         <button class="btn btn-sm btn-outline" style="color: white; border-color: white;" onclick="createNewGroup()">
                             <i class="fas fa-plus"></i>
                         </button>
+                    </div>
+                    
+                    <div class="search-container" style="padding: 1rem;">
+                        <input type="text" id="groupSearch" placeholder="بحث في المجموعات...">
+                        <i class="fas fa-search search-icon"></i>
+                        <div class="search-results" id="groupSearchResults"></div>
                     </div>
                     
                     <div class="groups-list" id="groupsList">
@@ -2566,6 +2764,65 @@
                 </div>
             </div>
         </section>
+
+        <!-- صفحة البحث المتقدم -->
+        <section class="page" id="search">
+            <div class="search-header">
+                <h1 class="section-title">البحث المتقدم</h1>
+                <p>ابحث عن المستخدمين والمحتوى في المنصة</p>
+            </div>
+            
+            <div class="search-container" style="max-width: 600px; margin: 0 auto 2rem;">
+                <input type="text" id="globalSearch" placeholder="ابحث عن المستخدمين، المحادثات، القنوات، المجموعات...">
+                <i class="fas fa-search search-icon"></i>
+                <div class="search-results" id="globalSearchResults"></div>
+            </div>
+            
+            <div class="content-grid">
+                <div class="content-card">
+                    <div class="card-header">
+                        <h3>نتائج البحث</h3>
+                    </div>
+                    <div class="card-body">
+                        <div id="searchResultsContent">
+                            <div class="empty-state">
+                                <i class="fas fa-search"></i>
+                                <h3>ابدأ بالبحث</h3>
+                                <p>استخدم شريط البحث أعلاه للعثور على المحتوى</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="content-card">
+                    <div class="card-header">
+                        <h3>التصفية</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="form-group">
+                            <label>نوع المحتوى</label>
+                            <select id="searchFilterType" class="search-input">
+                                <option value="all">الكل</option>
+                                <option value="users">المستخدمين</option>
+                                <option value="conversations">المحادثات</option>
+                                <option value="channels">القنوات</option>
+                                <option value="groups">المجموعات</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>تاريخ النشر</label>
+                            <select id="searchFilterDate" class="search-input">
+                                <option value="all">أي وقت</option>
+                                <option value="today">اليوم</option>
+                                <option value="week">هذا الأسبوع</option>
+                                <option value="month">هذا الشهر</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
     </main>
 
     <!-- شريط الأدوات السريع -->
@@ -2582,6 +2839,10 @@
             <i class="fas fa-users"></i>
             <span>المجموعات</span>
         </div>
+        <div class="quick-action" onclick="showPage('search')">
+            <i class="fas fa-search"></i>
+            <span>بحث متقدم</span>
+        </div>
         <div class="quick-action" onclick="showPage('dashboard')">
             <i class="fas fa-tachometer-alt"></i>
             <span>لوحة التحكم</span>
@@ -2592,6 +2853,52 @@
     <button class="floating-action-btn" id="floatingActionBtn">
         <i class="fas fa-plus"></i>
     </button>
+
+    <!-- نافذة البحث عن المستخدمين -->
+    <div class="modal" id="userSearchModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; align-items: center; justify-content: center;">
+        <div class="card" style="max-width: 500px; width: 90%; max-height: 80vh;">
+            <div class="card-header">
+                <h3>البحث عن مستخدم</h3>
+                <button class="btn btn-sm btn-outline" onclick="closeUserSearch()">✕</button>
+            </div>
+            <div class="card-body">
+                <div class="search-container">
+                    <input type="text" id="userSearchInput" placeholder="ابحث عن مستخدم بالاسم أو البريد الإلكتروني...">
+                    <i class="fas fa-search search-icon"></i>
+                    <div class="search-results" id="userSearchResults"></div>
+                </div>
+                <div id="userSearchResultsList" style="max-height: 300px; overflow-y: auto; margin-top: 1rem;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- نافذة تحميل الملفات -->
+    <div class="modal" id="fileUploadModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; align-items: center; justify-content: center;">
+        <div class="card" style="max-width: 500px; width: 90%;">
+            <div class="card-header">
+                <h3>تحميل ملف</h3>
+                <button class="btn btn-sm btn-outline" onclick="closeFileUpload()">✕</button>
+            </div>
+            <div class="card-body">
+                <div class="upload-area" id="uploadArea" onclick="document.getElementById('fileInput').click()">
+                    <div class="upload-icon">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                    </div>
+                    <h4>اسحب وأفلت الملف هنا</h4>
+                    <p>أو انقر لاختيار ملف</p>
+                    <p style="font-size: 0.8rem; color: var(--gray-600); margin-top: 0.5rem;">الحد الأقصى لحجم الملف: 100MB</p>
+                </div>
+                <input type="file" id="fileInput" style="display: none;" onchange="handleFileSelect(this.files)">
+                <div id="filePreviewContainer"></div>
+                <div class="progress-bar" id="uploadProgress" style="display: none;">
+                    <div class="progress-fill" id="uploadProgressFill"></div>
+                </div>
+            </div>
+            <div class="card-footer">
+                <button class="btn btn-primary btn-block" id="uploadButton" onclick="uploadFile()" disabled>تحميل الملف</button>
+            </div>
+        </div>
+    </div>
 
     <!-- الرسائل العائمة -->
     <div id="toastContainer"></div>
@@ -2605,6 +2912,7 @@
         let currentConversation = null;
         let currentChannel = null;
         let currentGroup = null;
+        let selectedFile = null;
 
         // تهيئة التطبيق عند تحميل الصفحة
         document.addEventListener('DOMContentLoaded', function() {
@@ -2619,6 +2927,9 @@
             
             // إعداد معالج الأحداث
             setupEventListeners();
+            
+            // تهيئة منتقي الإيموجي
+            initializeEmojiPicker();
         });
 
         // تهيئة التطبيق
@@ -2635,8 +2946,8 @@
             // إعداد تحديثات الواجهة
             setupUIUpdates();
             
-            // إظهار إشعار التحديث
-            showUpdateNotification();
+            // إعداد نظام السحب والإفلات
+            setupDragAndDrop();
         }
 
         // الاتصال بالسوكت
@@ -2733,6 +3044,51 @@
                     sendGroupMessage();
                 }
             });
+            
+            // البحث في الوقت الحقيقي
+            document.getElementById('chatSearch').addEventListener('input', handleChatSearch);
+            document.getElementById('channelSearch').addEventListener('input', handleChannelSearch);
+            document.getElementById('groupSearch').addEventListener('input', handleGroupSearch);
+            document.getElementById('globalSearch').addEventListener('input', handleGlobalSearch);
+            document.getElementById('userSearchInput').addEventListener('input', handleUserSearch);
+        }
+
+        // إعداد نظام السحب والإفلات
+        function setupDragAndDrop() {
+            const uploadArea = document.getElementById('uploadArea');
+            
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                uploadArea.addEventListener(eventName, preventDefaults, false);
+            });
+            
+            function preventDefaults(e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+            
+            ['dragenter', 'dragover'].forEach(eventName => {
+                uploadArea.addEventListener(eventName, highlight, false);
+            });
+            
+            ['dragleave', 'drop'].forEach(eventName => {
+                uploadArea.addEventListener(eventName, unhighlight, false);
+            });
+            
+            function highlight() {
+                uploadArea.classList.add('dragover');
+            }
+            
+            function unhighlight() {
+                uploadArea.classList.remove('dragover');
+            }
+            
+            uploadArea.addEventListener('drop', handleDrop, false);
+            
+            function handleDrop(e) {
+                const dt = e.dataTransfer;
+                const files = dt.files;
+                handleFileSelect(files);
+            }
         }
 
         // تحديث حالة الاتصال
@@ -3506,10 +3862,22 @@
 
         // ============ دوال المحادثات ============
 
+        // فتح البحث عن المستخدمين
+        function openUserSearch() {
+            document.getElementById('userSearchModal').style.display = 'flex';
+            document.getElementById('userSearchInput').focus();
+        }
+
+        // إغلاق البحث عن المستخدمين
+        function closeUserSearch() {
+            document.getElementById('userSearchModal').style.display = 'none';
+            document.getElementById('userSearchInput').value = '';
+            document.getElementById('userSearchResultsList').innerHTML = '';
+        }
+
         // إنشاء دردشة جديدة
         function createNewChat() {
-            // في التطبيق الحقيقي، سيتم فتح نافذة لاختيار المستخدمين
-            showToast('سيتم إضافة هذه الميزة قريباً', 'info');
+            openUserSearch();
         }
 
         // اختيار محادثة
@@ -4025,6 +4393,400 @@
         function createNewStory() {
             // في التطبيق الحقيقي، سيتم فتح نافذة لرفع صورة أو فيديو
             showToast('سيتم إضافة هذه الميزة قريباً', 'info');
+        }
+
+        // ============ دوال البحث ============
+
+        // معالجة البحث في المحادثات
+        function handleChatSearch(e) {
+            const query = e.target.value.trim();
+            const resultsContainer = document.getElementById('chatSearchResults');
+            
+            if (query.length < 2) {
+                resultsContainer.classList.remove('active');
+                return;
+            }
+            
+            // محاكاة نتائج البحث
+            const results = [
+                { name: 'أحمد محمد', type: 'user', lastMessage: 'مرحباً، كيف يمكنني المساعدة؟' },
+                { name: 'فاطمة علي', type: 'user', lastMessage: 'شكراً على المساعدة' },
+                { name: 'مجموعة الرياضيات', type: 'group', lastMessage: 'تم نشر تمرين جديد' }
+            ].filter(item => 
+                item.name.toLowerCase().includes(query.toLowerCase()) ||
+                item.lastMessage.toLowerCase().includes(query.toLowerCase())
+            );
+            
+            displaySearchResults(results, resultsContainer, 'chat');
+        }
+
+        // معالجة البحث في القنوات
+        function handleChannelSearch(e) {
+            const query = e.target.value.trim();
+            const resultsContainer = document.getElementById('channelSearchResults');
+            
+            if (query.length < 2) {
+                resultsContainer.classList.remove('active');
+                return;
+            }
+            
+            // محاكاة نتائج البحث
+            const results = [
+                { name: 'قناة الرياضيات', description: 'قناة مخصصة لدروس الرياضيات' },
+                { name: 'قناة العلوم', description: 'مناقشات وأخبار علمية' },
+                { name: 'قناة اللغة العربية', description: 'دروس ونصوص أدبية' }
+            ].filter(item => 
+                item.name.toLowerCase().includes(query.toLowerCase()) ||
+                item.description.toLowerCase().includes(query.toLowerCase())
+            );
+            
+            displaySearchResults(results, resultsContainer, 'channel');
+        }
+
+        // معالجة البحث في المجموعات
+        function handleGroupSearch(e) {
+            const query = e.target.value.trim();
+            const resultsContainer = document.getElementById('groupSearchResults');
+            
+            if (query.length < 2) {
+                resultsContainer.classList.remove('active');
+                return;
+            }
+            
+            // محاكاة نتائج البحث
+            const results = [
+                { name: 'مجموعة الرياضيات المتقدمة', description: 'مجموعة للمناقشات المتقدمة' },
+                { name: 'مجموعة مشاريع التخرج', description: 'لمناقشة مشاريع التخرج' },
+                { name: 'مجموعة اللغة الإنجليزية', description: 'لممارسة اللغة الإنجليزية' }
+            ].filter(item => 
+                item.name.toLowerCase().includes(query.toLowerCase()) ||
+                item.description.toLowerCase().includes(query.toLowerCase())
+            );
+            
+            displaySearchResults(results, resultsContainer, 'group');
+        }
+
+        // معالجة البحث العام
+        function handleGlobalSearch(e) {
+            const query = e.target.value.trim();
+            const resultsContainer = document.getElementById('globalSearchResults');
+            
+            if (query.length < 2) {
+                resultsContainer.classList.remove('active');
+                return;
+            }
+            
+            // محاكاة نتائج البحث الشامل
+            const results = [
+                { name: 'أحمد محمد', type: 'user', description: 'مدرس رياضيات' },
+                { name: 'قناة الرياضيات', type: 'channel', description: 'قناة مخصصة لدروس الرياضيات' },
+                { name: 'مجموعة الرياضيات المتقدمة', type: 'group', description: 'مجموعة للمناقشات المتقدمة' },
+                { name: 'فاطمة علي', type: 'user', description: 'طالبة' }
+            ].filter(item => 
+                item.name.toLowerCase().includes(query.toLowerCase()) ||
+                item.description.toLowerCase().includes(query.toLowerCase())
+            );
+            
+            displaySearchResults(results, resultsContainer, 'global');
+        }
+
+        // معالجة البحث عن المستخدمين
+        function handleUserSearch(e) {
+            const query = e.target.value.trim();
+            const resultsList = document.getElementById('userSearchResultsList');
+            
+            if (query.length < 2) {
+                resultsList.innerHTML = '';
+                return;
+            }
+            
+            // محاكاة نتائج البحث عن المستخدمين
+            const users = [
+                { _id: '1', fullName: 'أحمد محمد', email: 'ahmed@example.com', role: 'teacher' },
+                { _id: '2', fullName: 'فاطمة علي', email: 'fatima@example.com', role: 'student' },
+                { _id: '3', fullName: 'خالد إبراهيم', email: 'khaled@example.com', role: 'student' },
+                { _id: '4', fullName: 'سارة عبدالله', email: 'sara@example.com', role: 'teacher' }
+            ].filter(user => 
+                user.fullName.toLowerCase().includes(query.toLowerCase()) ||
+                user.email.toLowerCase().includes(query.toLowerCase())
+            );
+            
+            displayUserSearchResults(users, resultsList);
+        }
+
+        // عرض نتائج البحث
+        function displaySearchResults(results, container, type) {
+            container.innerHTML = '';
+            
+            if (results.length === 0) {
+                container.innerHTML = '<div class="search-result-item">لا توجد نتائج</div>';
+            } else {
+                results.forEach(result => {
+                    const item = document.createElement('div');
+                    item.className = 'search-result-item';
+                    item.innerHTML = `
+                        <div style="display: flex; align-items: center; gap: 1rem;">
+                            <div class="search-result-avatar">
+                                <i class="fas fa-${getSearchResultIcon(result.type || type)}"></i>
+                            </div>
+                            <div class="search-result-info">
+                                <div class="search-result-name">${result.name}</div>
+                                <div class="search-result-email">${result.description || result.lastMessage || ''}</div>
+                            </div>
+                        </div>
+                    `;
+                    item.onclick = () => handleSearchResultClick(result, type);
+                    container.appendChild(item);
+                });
+            }
+            
+            container.classList.add('active');
+        }
+
+        // عرض نتائج بحث المستخدمين
+        function displayUserSearchResults(users, container) {
+            container.innerHTML = '';
+            
+            if (users.length === 0) {
+                container.innerHTML = '<div class="search-result-item">لا توجد نتائج</div>';
+            } else {
+                users.forEach(user => {
+                    const item = document.createElement('div');
+                    item.className = 'search-result-item';
+                    item.innerHTML = `
+                        <div style="display: flex; align-items: center; gap: 1rem;">
+                            <div class="search-result-avatar">
+                                <i class="fas fa-user"></i>
+                            </div>
+                            <div class="search-result-info">
+                                <div class="search-result-name">${user.fullName}</div>
+                                <div class="search-result-email">${user.email} • ${getRoleText(user.role)}</div>
+                            </div>
+                        </div>
+                    `;
+                    item.onclick = () => startConversationWithUser(user);
+                    container.appendChild(item);
+                });
+            }
+        }
+
+        // الحصول على أيقونة نتيجة البحث
+        function getSearchResultIcon(type) {
+            const icons = {
+                'user': 'user',
+                'channel': 'broadcast-tower',
+                'group': 'users',
+                'chat': 'comments',
+                'global': 'search'
+            };
+            return icons[type] || 'search';
+        }
+
+        // معالجة النقر على نتيجة البحث
+        function handleSearchResultClick(result, type) {
+            switch (type) {
+                case 'chat':
+                    // فتح المحادثة مع المستخدم
+                    showToast(`فتح محادثة مع ${result.name}`, 'info');
+                    break;
+                case 'channel':
+                    // فتح القناة
+                    showToast(`فتح قناة ${result.name}`, 'info');
+                    break;
+                case 'group':
+                    // فتح المجموعة
+                    showToast(`فتح مجموعة ${result.name}`, 'info');
+                    break;
+                case 'global':
+                    // فتح حسب النوع
+                    if (result.type === 'user') {
+                        showToast(`فتح ملف ${result.name}`, 'info');
+                    } else if (result.type === 'channel') {
+                        showToast(`فتح قناة ${result.name}`, 'info');
+                    } else if (result.type === 'group') {
+                        showToast(`فتح مجموعة ${result.name}`, 'info');
+                    }
+                    break;
+            }
+            
+            // إخفاء نتائج البحث
+            document.querySelectorAll('.search-results').forEach(container => {
+                container.classList.remove('active');
+            });
+        }
+
+        // بدء محادثة مع مستخدم
+        function startConversationWithUser(user) {
+            closeUserSearch();
+            showToast(`بدأت محادثة مع ${user.fullName}`, 'success');
+            
+            // إنشاء محادثة جديدة في الواجهة
+            const newConversation = {
+                _id: Date.now().toString(),
+                name: user.fullName,
+                lastMessage: null,
+                updatedAt: new Date().toISOString(),
+                unreadCount: 0
+            };
+            
+            // إضافة المحادثة للقائمة
+            const conversationsList = document.getElementById('conversationsList');
+            const conversationItem = document.createElement('div');
+            conversationItem.className = 'conversation-item';
+            conversationItem.onclick = () => selectConversation(newConversation);
+            
+            conversationItem.innerHTML = `
+                <div class="conversation-avatar">
+                    <i class="fas fa-user"></i>
+                </div>
+                <div class="conversation-info">
+                    <div class="conversation-name">${newConversation.name}</div>
+                    <div class="conversation-last-message">ابدأ المحادثة...</div>
+                </div>
+                <div class="conversation-meta">
+                    <div class="conversation-time">الآن</div>
+                </div>
+            `;
+            
+            conversationsList.insertBefore(conversationItem, conversationsList.firstChild);
+            
+            // اختيار المحادثة الجديدة
+            selectConversation(newConversation);
+        }
+
+        // ============ دوال التحميل ============
+
+        // فتح نافذة تحميل الملفات
+        function openFileUpload(context) {
+            document.getElementById('fileUploadModal').style.display = 'flex';
+            selectedFile = null;
+            document.getElementById('filePreviewContainer').innerHTML = '';
+            document.getElementById('uploadButton').disabled = true;
+            document.getElementById('uploadProgress').style.display = 'none';
+        }
+
+        // إغلاق نافذة تحميل الملفات
+        function closeFileUpload() {
+            document.getElementById('fileUploadModal').style.display = 'none';
+            document.getElementById('fileInput').value = '';
+        }
+
+        // فتح نافذة تحميل الصور
+        function openImageUpload(context) {
+            openFileUpload(context);
+            // يمكن إضافة فلتر للصور فقط
+        }
+
+        // معالجة اختيار الملف
+        function handleFileSelect(files) {
+            if (files.length === 0) return;
+            
+            const file = files[0];
+            selectedFile = file;
+            
+            // عرض معاينة الملف
+            const previewContainer = document.getElementById('filePreviewContainer');
+            previewContainer.innerHTML = `
+                <div class="file-preview">
+                    <div class="file-icon">
+                        <i class="fas fa-${getFileIcon(file.type)}"></i>
+                    </div>
+                    <div class="file-info">
+                        <div class="file-name">${file.name}</div>
+                        <div class="file-size">${formatFileSize(file.size)}</div>
+                    </div>
+                    <button class="btn btn-sm btn-outline" onclick="removeSelectedFile()">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            `;
+            
+            document.getElementById('uploadButton').disabled = false;
+        }
+
+        // إزالة الملف المحدد
+        function removeSelectedFile() {
+            selectedFile = null;
+            document.getElementById('filePreviewContainer').innerHTML = '';
+            document.getElementById('fileInput').value = '';
+            document.getElementById('uploadButton').disabled = true;
+        }
+
+        // الحصول على أيقونة الملف
+        function getFileIcon(fileType) {
+            if (fileType.startsWith('image/')) return 'file-image';
+            if (fileType.startsWith('video/')) return 'file-video';
+            if (fileType === 'application/pdf') return 'file-pdf';
+            if (fileType.includes('word')) return 'file-word';
+            if (fileType.includes('excel') || fileType.includes('sheet')) return 'file-excel';
+            if (fileType.includes('zip') || fileType.includes('rar')) return 'file-archive';
+            return 'file';
+        }
+
+        // تنسيق حجم الملف
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        // تحميل الملف
+        async function uploadFile() {
+            if (!selectedFile) return;
+            
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+            
+            // عرض شريط التقدم
+            const progressBar = document.getElementById('uploadProgress');
+            const progressFill = document.getElementById('uploadProgressFill');
+            progressBar.style.display = 'block';
+            progressFill.style.width = '0%';
+            
+            try {
+                const response = await fetch('/api/upload', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+                    },
+                    body: formData
+                });
+                
+                // محاكاة تقدم التحميل
+                let progress = 0;
+                const interval = setInterval(() => {
+                    progress += 5;
+                    progressFill.style.width = `${progress}%`;
+                    
+                    if (progress >= 100) {
+                        clearInterval(interval);
+                    }
+                }, 100);
+                
+                const data = await response.json();
+                clearInterval(interval);
+                progressFill.style.width = '100%';
+                
+                if (data.success) {
+                    showToast('تم تحميل الملف بنجاح', 'success');
+                    closeFileUpload();
+                    
+                    // إرسال رابط الملف في المحادثة الحالية
+                    if (currentConversation) {
+                        const fileMessage = `📎 ${selectedFile.name} - ${data.data.url}`;
+                        document.getElementById('chatInput').value = fileMessage;
+                        sendChatMessage();
+                    }
+                } else {
+                    showToast('فشل في تحميل الملف', 'error');
+                }
+                
+            } catch (error) {
+                console.error('❌ خطأ في تحميل الملف:', error);
+                showToast('حدث خطأ أثناء تحميل الملف', 'error');
+            }
         }
 
         // ============ معالجات الأحداث من السوكت ============
