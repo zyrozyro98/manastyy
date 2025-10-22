@@ -25,7 +25,9 @@ const io = new Server(server, {
         origin: "*",
         methods: ["GET", "POST", "PUT", "DELETE"],
         credentials: true
-    }
+    },
+    pingTimeout: 60000,
+    pingInterval: 25000
 });
 
 // إعدادات البيئة
@@ -43,6 +45,7 @@ const requiredDirs = [
     path.join(UPLOAD_DIR, 'stories'), 
     path.join(UPLOAD_DIR, 'channels'), 
     path.join(UPLOAD_DIR, 'files'), 
+    path.join(UPLOAD_DIR, 'groups'),
     BACKUP_DIR, 
     EXPORT_DIR,
     path.join(__dirname, 'public')
@@ -95,6 +98,7 @@ const storage = multer.diskStorage({
         if (file.fieldname === 'avatar') uploadPath = path.join(UPLOAD_DIR, 'profiles');
         else if (file.fieldname === 'story') uploadPath = path.join(UPLOAD_DIR, 'stories');
         else if (file.fieldname === 'channelAvatar') uploadPath = path.join(UPLOAD_DIR, 'channels');
+        else if (file.fieldname === 'groupAvatar') uploadPath = path.join(UPLOAD_DIR, 'groups');
         else if (file.fieldname === 'file') uploadPath = path.join(UPLOAD_DIR, 'files');
         else if (file.fieldname === 'backup') uploadPath = BACKUP_DIR;
         
@@ -116,8 +120,11 @@ const fileFilter = (req, file, cb) => {
         'avatar': ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
         'story': ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'video/mp4', 'video/quicktime', 'video/webm'],
         'channelAvatar': ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
+        'groupAvatar': ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
         'file': ['image/jpeg', 'image/png', 'image/gif', 'application/pdf', 'text/plain', 
-                'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
+                'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                'application/zip', 'application/vnd.rar'],
         'backup': ['application/json']
     };
     
@@ -178,6 +185,9 @@ class LocalStorageService {
             messages: [],
             conversations: [],
             channels: [],
+            groups: [],
+            groupMessages: [],
+            channelMessages: [],
             notifications: [],
             reports: [],
             backups: [],
@@ -189,6 +199,7 @@ class LocalStorageService {
                 totalMessages: 0,
                 totalStories: 0,
                 totalChannels: 0,
+                totalGroups: 0,
                 totalConversations: 0
             }
         };
@@ -210,6 +221,7 @@ class LocalStorageService {
                 messagesSent: 0,
                 storiesPosted: 0,
                 channelsJoined: 0,
+                groupsJoined: 0,
                 totalLikes: 0
             },
             settings: userData.settings || {
@@ -223,6 +235,7 @@ class LocalStorageService {
                     messages: true,
                     stories: true,
                     channels: true,
+                    groups: true,
                     system: true,
                     emailNotifications: false
                 },
@@ -271,6 +284,11 @@ class LocalStorageService {
     async findUserById(userId) {
         const data = this.loadData();
         return data.users.find(user => user._id === userId && user.isActive);
+    }
+
+    async findUserByEmail(email) {
+        const data = this.loadData();
+        return data.users.find(user => user.email === email && user.isActive);
     }
 
     async updateUser(userId, updates) {
@@ -341,7 +359,7 @@ class LocalStorageService {
         return null;
     }
 
-    // دوال المحادثات
+    // دوال المحادثات والرسائل
     async createConversation(conversationData) {
         const data = this.loadData();
         const conversationId = uuidv4();
@@ -367,7 +385,6 @@ class LocalStorageService {
         );
     }
 
-    // دوال الرسائل
     async createMessage(messageData) {
         const data = this.loadData();
         const messageId = uuidv4();
@@ -428,6 +445,112 @@ class LocalStorageService {
     async getAllChannels() {
         const data = this.loadData();
         return data.channels.filter(channel => channel.isActive);
+    }
+
+    async getChannelById(channelId) {
+        const data = this.loadData();
+        return data.channels.find(channel => channel._id === channelId && channel.isActive);
+    }
+
+    async createChannelMessage(messageData) {
+        const data = this.loadData();
+        const messageId = uuidv4();
+        const message = {
+            _id: messageId,
+            ...messageData,
+            createdAt: new Date().toISOString(),
+            readBy: [],
+            reactions: [],
+            edited: { isEdited: false },
+            deleted: { isDeleted: false }
+        };
+        
+        data.channelMessages.push(message);
+        
+        // تحديث إحصائيات القناة
+        const channelIndex = data.channels.findIndex(channel => channel._id === messageData.channelId);
+        if (channelIndex !== -1) {
+            data.channels[channelIndex].stats.messageCount += 1;
+            data.channels[channelIndex].updatedAt = new Date().toISOString();
+        }
+        
+        this.updateStats(data);
+        this.saveData(data);
+        return message;
+    }
+
+    async getChannelMessages(channelId) {
+        const data = this.loadData();
+        return data.channelMessages
+            .filter(msg => msg.channelId === channelId && !msg.deleted.isDeleted)
+            .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+    }
+
+    // دوال المجموعات
+    async createGroup(groupData) {
+        const data = this.loadData();
+        const groupId = uuidv4();
+        const group = {
+            _id: groupId,
+            ...groupData,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            isActive: true,
+            stats: {
+                memberCount: groupData.members?.length || 1,
+                messageCount: 0,
+                dailyActiveUsers: 0
+            }
+        };
+        
+        data.groups.push(group);
+        this.updateStats(data);
+        this.saveData(data);
+        return group;
+    }
+
+    async getAllGroups() {
+        const data = this.loadData();
+        return data.groups.filter(group => group.isActive);
+    }
+
+    async getGroupById(groupId) {
+        const data = this.loadData();
+        return data.groups.find(group => group._id === groupId && group.isActive);
+    }
+
+    async createGroupMessage(messageData) {
+        const data = this.loadData();
+        const messageId = uuidv4();
+        const message = {
+            _id: messageId,
+            ...messageData,
+            createdAt: new Date().toISOString(),
+            readBy: [],
+            reactions: [],
+            edited: { isEdited: false },
+            deleted: { isDeleted: false }
+        };
+        
+        data.groupMessages.push(message);
+        
+        // تحديث إحصائيات المجموعة
+        const groupIndex = data.groups.findIndex(group => group._id === messageData.groupId);
+        if (groupIndex !== -1) {
+            data.groups[groupIndex].stats.messageCount += 1;
+            data.groups[groupIndex].updatedAt = new Date().toISOString();
+        }
+        
+        this.updateStats(data);
+        this.saveData(data);
+        return message;
+    }
+
+    async getGroupMessages(groupId) {
+        const data = this.loadData();
+        return data.groupMessages
+            .filter(msg => msg.groupId === groupId && !msg.deleted.isDeleted)
+            .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
     }
 
     // النسخ الاحتياطي
@@ -538,9 +661,9 @@ class LocalStorageService {
         // تصدير المستخدمين
         if (data.users && data.users.length > 0) {
             csvContent += 'المستخدمين\n';
-            csvContent += 'الاسم,الهاتف,الجامعة,التخصص,الدور,تاريخ الإنشاء\n';
+            csvContent += 'الاسم,البريد الإلكتروني,الدور,الحالة,تاريخ الإنشاء\n';
             data.users.forEach(user => {
-                csvContent += `"${user.fullName}","${user.phone}","${user.university}","${user.major}","${user.role}","${user.createdAt}"\n`;
+                csvContent += `"${user.fullName}","${user.email}","${user.role}","${user.isActive ? 'نشط' : 'غير نشط'}","${user.createdAt}"\n`;
             });
             csvContent += '\n';
         }
@@ -548,19 +671,19 @@ class LocalStorageService {
         // تصدير القنوات
         if (data.channels && data.channels.length > 0) {
             csvContent += 'القنوات\n';
-            csvContent += 'الاسم,النوع,الوصف,عدد الأعضاء,تاريخ الإنشاء\n';
+            csvContent += 'الاسم,الوصف,عدد الأعضاء,عدد الرسائل,تاريخ الإنشاء\n';
             data.channels.forEach(channel => {
-                csvContent += `"${channel.name}","${channel.type}","${channel.description}","${channel.stats?.memberCount || 0}","${channel.createdAt}"\n`;
+                csvContent += `"${channel.name}","${channel.description}","${channel.stats?.memberCount || 0}","${channel.stats?.messageCount || 0}","${channel.createdAt}"\n`;
             });
             csvContent += '\n';
         }
 
-        // تصدير الستوريات
-        if (data.stories && data.stories.length > 0) {
-            csvContent += 'الستوريات\n';
-            csvContent += 'النوع,عدد المشاهدات,عدد التفاعلات,تاريخ النشر,تاريخ الانتهاء\n';
-            data.stories.forEach(story => {
-                csvContent += `"${story.mediaType}","${story.metrics?.viewCount || 0}","${story.metrics?.reactionCount || 0}","${story.createdAt}","${story.expiresAt}"\n`;
+        // تصدير المجموعات
+        if (data.groups && data.groups.length > 0) {
+            csvContent += 'المجموعات\n';
+            csvContent += 'الاسم,الوصف,عدد الأعضاء,عدد الرسائل,تاريخ الإنشاء\n';
+            data.groups.forEach(group => {
+                csvContent += `"${group.name}","${group.description}","${group.stats?.memberCount || 0}","${group.stats?.messageCount || 0}","${group.createdAt}"\n`;
             });
         }
 
@@ -592,6 +715,7 @@ class LocalStorageService {
             totalMessages: data.messages.length,
             totalStories: data.stories.length,
             totalChannels: data.channels.length,
+            totalGroups: data.groups.length,
             totalConversations: data.conversations.length,
             lastUpdate: new Date().toISOString()
         };
@@ -690,6 +814,7 @@ const formatUserResponse = (user) => {
         _id: user._id,
         fullName: user.fullName,
         phone: user.phone,
+        email: user.email,
         university: user.university,
         major: user.major,
         batch: user.batch,
@@ -698,13 +823,13 @@ const formatUserResponse = (user) => {
         role: user.role,
         isOnline: user.isOnline,
         lastSeen: user.lastSeen,
-        email: user.email,
         studentId: user.studentId,
         badges: user.badges || [],
         stats: user.stats || {
             messagesSent: 0,
             storiesPosted: 0,
             channelsJoined: 0,
+            groupsJoined: 0,
             totalLikes: 0
         },
         settings: user.settings || {
@@ -718,6 +843,7 @@ const formatUserResponse = (user) => {
                 messages: true,
                 stories: true,
                 channels: true,
+                groups: true,
                 system: true,
                 emailNotifications: false
             },
@@ -764,26 +890,27 @@ async function createDefaultAdmin() {
             const admin = await localStorageService.createUser({
                 fullName: 'مدير النظام',
                 phone: '500000000',
+                email: 'admin@platform.edu',
                 university: 'المنصة التعليمية',
                 major: 'إدارة النظام',
                 batch: '2024',
                 password: hashedPassword,
                 role: 'admin',
-                email: 'admin@platform.edu',
                 studentId: 'ADMIN001',
                 badges: ['👑 مدير النظام'],
                 stats: {
                     messagesSent: 0,
                     storiesPosted: 0,
                     channelsJoined: 0,
+                    groupsJoined: 0,
                     totalLikes: 0
                 }
             });
             
             console.log('✅ تم إنشاء حساب المدير الافتراضي');
             console.log('📱 رقم الهاتف: 500000000');
+            console.log('📧 البريد الإلكتروني: admin@platform.edu');
             console.log('🔑 كلمة المرور: 77007700');
-            console.log('🔐 كلمة المرور المشفرة:', hashedPassword);
         } else {
             console.log('✅ حساب المدير موجود بالفعل');
         }
@@ -805,17 +932,25 @@ const userSockets = new Map();
 app.get('/', (req, res) => {
     res.json({
         success: true,
-        message: '🚀 خادم المنصة التعليمية يعمل بنجاح! (التخزين المحلي)',
-        version: '2.0.0',
+        message: '🚀 خادم المنصة التعليمية يعمل بنجاح! (الإصدار المحسن)',
+        version: '2.1.0',
         timestamp: new Date().toISOString(),
         environment: NODE_ENV,
         storage: 'local',
+        features: {
+            realtime_chat: true,
+            channels: true,
+            groups: true,
+            file_upload: true,
+            emoji_support: true,
+            notifications: true
+        },
         endpoints: {
             auth: '/api/auth/*',
             users: '/api/users/*',
-            stories: '/api/stories/*',
-            conversations: '/api/conversations/*',
+            chat: '/api/chat/*',
             channels: '/api/channels/*',
+            groups: '/api/groups/*',
             admin: '/api/admin/*',
             health: '/api/health'
         }
@@ -825,10 +960,10 @@ app.get('/', (req, res) => {
 // مسارات المصادقة
 app.post('/api/auth/register', async (req, res) => {
     try {
-        const { fullName, phone, university, major, batch, password, email, studentId } = req.body;
+        const { fullName, email, role, password, phone, university, major, batch } = req.body;
 
         // التحقق من البيانات المطلوبة
-        if (!fullName || !phone || !university || !major || !batch || !password) {
+        if (!fullName || !email || !role || !password) {
             return res.status(400).json({
                 success: false,
                 message: 'جميع الحقول مطلوبة',
@@ -836,35 +971,34 @@ app.post('/api/auth/register', async (req, res) => {
             });
         }
 
-        // التحقق من عدم وجود مستخدم بنفس رقم الهاتف
-        const existingUser = await localStorageService.findUserByPhone(phone);
+        // التحقق من عدم وجود مستخدم بنفس البريد الإلكتروني
+        const existingUser = await localStorageService.findUserByEmail(email);
         if (existingUser) {
             return res.status(400).json({
                 success: false,
-                message: 'رقم الهاتف مسجل مسبقاً',
-                code: 'PHONE_EXISTS'
+                message: 'البريد الإلكتروني مسجل مسبقاً',
+                code: 'EMAIL_EXISTS'
             });
         }
 
         // تشفير كلمة المرور
-        console.log('🔐 تشفير كلمة المرور للمستخدم:', phone);
+        console.log('🔐 تشفير كلمة المرور للمستخدم:', email);
         const hashedPassword = await bcrypt.hash(password, 12);
         console.log('✅ تم تشفير كلمة المرور، الطول:', hashedPassword.length);
 
         // إنشاء المستخدم
         const user = await localStorageService.createUser({
             fullName: fullName.trim(),
-            phone,
-            university,
-            major,
-            batch,
+            email,
+            phone: phone || null,
+            university: university || null,
+            major: major || null,
+            batch: batch || null,
             password: hashedPassword,
-            email: email || null,
-            studentId: studentId || null,
-            role: 'student'
+            role: role
         });
 
-        await auditLog('REGISTER', user._id, 'user', user._id, { phone, university });
+        await auditLog('REGISTER', user._id, 'user', user._id, { email, role });
 
         // إنشاء التوكن
         const token = generateToken(user._id);
@@ -893,32 +1027,32 @@ app.post('/api/auth/register', async (req, res) => {
 
 app.post('/api/auth/login', async (req, res) => {
     try {
-        const { phone, password } = req.body;
+        const { email, password } = req.body;
 
-        console.log('🔐 محاولة تسجيل الدخول:', { phone, passwordLength: password ? password.length : 0 });
+        console.log('🔐 محاولة تسجيل الدخول:', { email, passwordLength: password ? password.length : 0 });
 
-        if (!phone || !password) {
-            console.log('❌ بيانات ناقصة:', { phone: !!phone, password: !!password });
+        if (!email || !password) {
+            console.log('❌ بيانات ناقصة:', { email: !!email, password: !!password });
             return res.status(400).json({
                 success: false,
-                message: 'رقم الهاتف وكلمة المرور مطلوبان',
+                message: 'البريد الإلكتروني وكلمة المرور مطلوبان',
                 code: 'MISSING_CREDENTIALS'
             });
         }
 
-        const user = await localStorageService.findUserByPhone(phone);
+        const user = await localStorageService.findUserByEmail(email);
         
         if (!user) {
-            console.log('❌ مستخدم غير موجود:', phone);
+            console.log('❌ مستخدم غير موجود:', email);
             return res.status(401).json({
                 success: false,
-                message: 'رقم الهاتف أو كلمة المرور غير صحيحة',
+                message: 'البريد الإلكتروني أو كلمة المرور غير صحيحة',
                 code: 'INVALID_CREDENTIALS'
             });
         }
 
         if (!user.isActive) {
-            console.log('❌ حساب موقوف:', phone);
+            console.log('❌ حساب موقوف:', email);
             return res.status(401).json({
                 success: false,
                 message: 'الحساب موقوف. يرجى التواصل مع الإدارة',
@@ -929,8 +1063,7 @@ app.post('/api/auth/login', async (req, res) => {
         console.log('🔍 بيانات المستخدم:', {
             name: user.fullName,
             hasPassword: !!user.password,
-            passwordLength: user.password ? user.password.length : 0,
-            passwordStart: user.password ? user.password.substring(0, 20) + '...' : 'غير موجود'
+            passwordLength: user.password ? user.password.length : 0
         });
 
         if (!user.password) {
@@ -950,7 +1083,7 @@ app.post('/api/auth/login', async (req, res) => {
             console.log('❌ كلمة المرور غير صحيحة');
             return res.status(401).json({
                 success: false,
-                message: 'رقم الهاتف أو كلمة المرور غير صحيحة',
+                message: 'البريد الإلكتروني أو كلمة المرور غير صحيحة',
                 code: 'INVALID_CREDENTIALS'
             });
         }
@@ -964,7 +1097,7 @@ app.post('/api/auth/login', async (req, res) => {
         const token = generateToken(user._id);
         const refreshToken = generateRefreshToken(user._id);
 
-        await auditLog('LOGIN', user._id, 'user', user._id, { phone });
+        await auditLog('LOGIN', user._id, 'user', user._id, { email });
 
         console.log('✅ تسجيل الدخول ناجح للمستخدم:', user.fullName);
 
@@ -1014,16 +1147,450 @@ app.post('/api/auth/logout', authenticateToken, async (req, res) => {
     }
 });
 
-// ... باقي المسارات تبقى كما هي ...
+// مسارات المستخدمين
+app.get('/api/users/me', authenticateToken, async (req, res) => {
+    try {
+        res.json({
+            success: true,
+            data: {
+                user: formatUserResponse(req.user)
+            }
+        });
+    } catch (error) {
+        console.error('❌ خطأ في جلب بيانات المستخدم:', error);
+        res.status(500).json({
+            success: false,
+            message: 'حدث خطأ في الخادم',
+            code: 'SERVER_ERROR'
+        });
+    }
+});
+
+app.get('/api/users', authenticateToken, async (req, res) => {
+    try {
+        const users = await localStorageService.getAllUsers();
+        res.json({
+            success: true,
+            data: {
+                users: users.map(user => formatUserResponse(user))
+            }
+        });
+    } catch (error) {
+        console.error('❌ خطأ في جلب المستخدمين:', error);
+        res.status(500).json({
+            success: false,
+            message: 'حدث خطأ في الخادم',
+            code: 'SERVER_ERROR'
+        });
+    }
+});
+
+// مسارات الدردشة
+app.get('/api/chat/conversations', authenticateToken, async (req, res) => {
+    try {
+        const conversations = await localStorageService.getConversationsByUserId(req.user._id);
+        res.json({
+            success: true,
+            data: {
+                conversations
+            }
+        });
+    } catch (error) {
+        console.error('❌ خطأ في جلب المحادثات:', error);
+        res.status(500).json({
+            success: false,
+            message: 'حدث خطأ في الخادم',
+            code: 'SERVER_ERROR'
+        });
+    }
+});
+
+app.get('/api/chat/conversations/:conversationId/messages', authenticateToken, async (req, res) => {
+    try {
+        const { conversationId } = req.params;
+        const messages = await localStorageService.getMessagesByConversation(conversationId);
+        res.json({
+            success: true,
+            data: {
+                messages
+            }
+        });
+    } catch (error) {
+        console.error('❌ خطأ في جلب الرسائل:', error);
+        res.status(500).json({
+            success: false,
+            message: 'حدث خطأ في الخادم',
+            code: 'SERVER_ERROR'
+        });
+    }
+});
+
+// مسارات القنوات
+app.get('/api/channels', authenticateToken, async (req, res) => {
+    try {
+        const channels = await localStorageService.getAllChannels();
+        res.json({
+            success: true,
+            data: {
+                channels
+            }
+        });
+    } catch (error) {
+        console.error('❌ خطأ في جلب القنوات:', error);
+        res.status(500).json({
+            success: false,
+            message: 'حدث خطأ في الخادم',
+            code: 'SERVER_ERROR'
+        });
+    }
+});
+
+app.get('/api/channels/:channelId/messages', authenticateToken, async (req, res) => {
+    try {
+        const { channelId } = req.params;
+        const messages = await localStorageService.getChannelMessages(channelId);
+        res.json({
+            success: true,
+            data: {
+                messages
+            }
+        });
+    } catch (error) {
+        console.error('❌ خطأ في جلب رسائل القناة:', error);
+        res.status(500).json({
+            success: false,
+            message: 'حدث خطأ في الخادم',
+            code: 'SERVER_ERROR'
+        });
+    }
+});
+
+// مسارات المجموعات
+app.get('/api/groups', authenticateToken, async (req, res) => {
+    try {
+        const groups = await localStorageService.getAllGroups();
+        res.json({
+            success: true,
+            data: {
+                groups
+            }
+        });
+    } catch (error) {
+        console.error('❌ خطأ في جلب المجموعات:', error);
+        res.status(500).json({
+            success: false,
+            message: 'حدث خطأ في الخادم',
+            code: 'SERVER_ERROR'
+        });
+    }
+});
+
+app.get('/api/groups/:groupId/messages', authenticateToken, async (req, res) => {
+    try {
+        const { groupId } = req.params;
+        const messages = await localStorageService.getGroupMessages(groupId);
+        res.json({
+            success: true,
+            data: {
+                messages
+            }
+        });
+    } catch (error) {
+        console.error('❌ خطأ في جلب رسائل المجموعة:', error);
+        res.status(500).json({
+            success: false,
+            message: 'حدث خطأ في الخادم',
+            code: 'SERVER_ERROR'
+        });
+    }
+});
+
+// مسار الحالة الصحية
+app.get('/api/health', (req, res) => {
+    res.json({
+        success: true,
+        data: {
+            status: 'healthy',
+            timestamp: new Date().toISOString(),
+            uptime: process.uptime(),
+            memory: process.memoryUsage(),
+            connectedUsers: connectedUsers.size
+        }
+    });
+});
+
+// ==================== نظام السوكت ====================
+
+io.on('connection', (socket) => {
+    console.log('🔌 مستخدم متصل:', socket.id);
+
+    // مصادقة المستخدم
+    socket.on('authenticate', async (data) => {
+        try {
+            const { token } = data;
+            if (!token) {
+                socket.emit('authentication_failed', { message: 'رمز المصادقة مطلوب' });
+                return;
+            }
+
+            const decoded = jwt.verify(token, JWT_SECRET);
+            const user = await localStorageService.findUserById(decoded.userId);
+            
+            if (!user) {
+                socket.emit('authentication_failed', { message: 'المستخدم غير موجود' });
+                return;
+            }
+
+            // تخزين معلومات الاتصال
+            socket.userId = user._id;
+            connectedUsers.set(user._id, {
+                socketId: socket.id,
+                user: formatUserResponse(user),
+                lastSeen: new Date().toISOString()
+            });
+            userSockets.set(socket.id, user._id);
+
+            // تحديث حالة المستخدم إلى متصل
+            await localStorageService.updateUser(user._id, {
+                isOnline: true,
+                lastSeen: new Date().toISOString()
+            });
+
+            // إعلام جميع العملاء بتحديث حالة المستخدم
+            io.emit('user_status_changed', {
+                userId: user._id,
+                isOnline: true,
+                lastSeen: new Date().toISOString()
+            });
+
+            socket.emit('authenticated', { 
+                user: formatUserResponse(user),
+                message: 'تم المصادقة بنجاح'
+            });
+
+            console.log(`✅ تم مصادقة المستخدم: ${user.fullName} (${socket.id})`);
+
+        } catch (error) {
+            console.error('❌ خطأ في مصادقة السوكت:', error);
+            socket.emit('authentication_failed', { message: 'فشل المصادقة' });
+        }
+    });
+
+    // إرسال رسالة دردشة
+    socket.on('send_message', async (data) => {
+        try {
+            if (!socket.userId) {
+                socket.emit('error', { message: 'غير مصرح به' });
+                return;
+            }
+
+            const { conversationId, content, type = 'text' } = data;
+            
+            if (!conversationId || !content) {
+                socket.emit('error', { message: 'معرف المحادثة والمحتوى مطلوبان' });
+                return;
+            }
+
+            // إنشاء الرسالة
+            const message = await localStorageService.createMessage({
+                conversationId,
+                senderId: socket.userId,
+                content,
+                type,
+                createdAt: new Date().toISOString()
+            });
+
+            // إرسال الرسالة إلى جميع المشاركين في المحادثة
+            io.emit('new_message', {
+                conversationId,
+                message
+            });
+
+            console.log(`💬 رسالة جديدة في المحادثة ${conversationId}: ${content.substring(0, 50)}...`);
+
+        } catch (error) {
+            console.error('❌ خطأ في إرسال الرسالة:', error);
+            socket.emit('error', { message: 'فشل إرسال الرسالة' });
+        }
+    });
+
+    // إرسال رسالة قناة
+    socket.on('send_channel_message', async (data) => {
+        try {
+            if (!socket.userId) {
+                socket.emit('error', { message: 'غير مصرح به' });
+                return;
+            }
+
+            const { channelId, content, type = 'text' } = data;
+            
+            if (!channelId || !content) {
+                socket.emit('error', { message: 'معرف القناة والمحتوى مطلوبان' });
+                return;
+            }
+
+            // التحقق من صلاحية المستخدم لإرسال رسائل في القناة
+            const channel = await localStorageService.getChannelById(channelId);
+            if (!channel) {
+                socket.emit('error', { message: 'القناة غير موجودة' });
+                return;
+            }
+
+            // إنشاء رسالة القناة
+            const message = await localStorageService.createChannelMessage({
+                channelId,
+                senderId: socket.userId,
+                content,
+                type,
+                createdAt: new Date().toISOString()
+            });
+
+            // إرسال الرسالة إلى جميع مشتركي القناة
+            io.emit('new_channel_message', {
+                channelId,
+                message
+            });
+
+            console.log(`📢 رسالة جديدة في القناة ${channelId}: ${content.substring(0, 50)}...`);
+
+        } catch (error) {
+            console.error('❌ خطأ في إرسال رسالة القناة:', error);
+            socket.emit('error', { message: 'فشل إرسال رسالة القناة' });
+        }
+    });
+
+    // إرسال رسالة مجموعة
+    socket.on('send_group_message', async (data) => {
+        try {
+            if (!socket.userId) {
+                socket.emit('error', { message: 'غير مصرح به' });
+                return;
+            }
+
+            const { groupId, content, type = 'text' } = data;
+            
+            if (!groupId || !content) {
+                socket.emit('error', { message: 'معرف المجموعة والمحتوى مطلوبان' });
+                return;
+            }
+
+            // التحقق من عضوية المستخدم في المجموعة
+            const group = await localStorageService.getGroupById(groupId);
+            if (!group) {
+                socket.emit('error', { message: 'المجموعة غير موجودة' });
+                return;
+            }
+
+            if (!group.members.includes(socket.userId)) {
+                socket.emit('error', { message: 'لست عضواً في هذه المجموعة' });
+                return;
+            }
+
+            // إنشاء رسالة المجموعة
+            const message = await localStorageService.createGroupMessage({
+                groupId,
+                senderId: socket.userId,
+                content,
+                type,
+                createdAt: new Date().toISOString()
+            });
+
+            // إرسال الرسالة إلى جميع أعضاء المجموعة
+            io.emit('new_group_message', {
+                groupId,
+                message
+            });
+
+            console.log(`👥 رسالة جديدة في المجموعة ${groupId}: ${content.substring(0, 50)}...`);
+
+        } catch (error) {
+            console.error('❌ خطأ في إرسال رسالة المجموعة:', error);
+            socket.emit('error', { message: 'فشل إرسال رسالة المجموعة' });
+        }
+    });
+
+    // كتابة رسالة
+    socket.on('typing_start', (data) => {
+        const { conversationId } = data;
+        if (conversationId && socket.userId) {
+            socket.to(conversationId).emit('user_typing', {
+                userId: socket.userId,
+                conversationId,
+                isTyping: true
+            });
+        }
+    });
+
+    socket.on('typing_stop', (data) => {
+        const { conversationId } = data;
+        if (conversationId && socket.userId) {
+            socket.to(conversationId).emit('user_typing', {
+                userId: socket.userId,
+                conversationId,
+                isTyping: false
+            });
+        }
+    });
+
+    // قراءة الرسائل
+    socket.on('mark_messages_read', async (data) => {
+        try {
+            const { conversationId, messageIds } = data;
+            // هنا يمكن إضافة منطق لتحديث حالة القراءة في قاعدة البيانات
+            socket.emit('messages_marked_read', { conversationId, messageIds });
+        } catch (error) {
+            console.error('❌ خطأ في تحديد الرسائل كمقروءة:', error);
+        }
+    });
+
+    // انضمام إلى غرفة
+    socket.on('join_room', (data) => {
+        const { roomId } = data;
+        socket.join(roomId);
+        console.log(`🚪 المستخدم ${socket.userId} انضم إلى الغرفة ${roomId}`);
+    });
+
+    // مغادرة غرفة
+    socket.on('leave_room', (data) => {
+        const { roomId } = data;
+        socket.leave(roomId);
+        console.log(`🚪 المستخدم ${socket.userId} غادر الغرفة ${roomId}`);
+    });
+
+    // فصل الاتصال
+    socket.on('disconnect', async () => {
+        console.log('🔌 مستخدم منفصل:', socket.id);
+        
+        const userId = userSockets.get(socket.id);
+        if (userId) {
+            // تحديث حالة المستخدم إلى غير متصل
+            await localStorageService.updateUser(userId, {
+                isOnline: false,
+                lastSeen: new Date().toISOString()
+            });
+
+            // إعلام جميع العملاء بتحديث حالة المستخدم
+            io.emit('user_status_changed', {
+                userId,
+                isOnline: false,
+                lastSeen: new Date().toISOString()
+            });
+
+            connectedUsers.delete(userId);
+            userSockets.delete(socket.id);
+        }
+    });
+});
 
 // بدء الخادم
 server.listen(PORT, '0.0.0.0', () => {
     console.log(`
-🚀 خادم المنصة التعليمية يعمل بنجاح! (التخزين المحلي)
+🚀 خادم المنصة التعليمية المحسن يعمل بنجاح!
 📍 العنوان: http://localhost:${PORT}
 📊 البيئة: ${NODE_ENV}
 ⏰ الوقت: ${new Date().toLocaleString('ar-SA')}
 🗄️  التخزين: محلي (JSON/CSV)
+👥 المستخدمون المتصلون: ${connectedUsers.size}
 💾 المسارات:
    📁 الجذر: ${__dirname}
    📁 الرفع: ${UPLOAD_DIR}
@@ -1031,8 +1598,16 @@ server.listen(PORT, '0.0.0.0', () => {
    📁 التصدير: ${EXPORT_DIR}
    
 🔐 حساب المدير الافتراضي:
-   📱 رقم الهاتف: 500000000
+   📧 البريد الإلكتروني: admin@platform.edu
    🔑 كلمة المرور: 77007700
+
+✨ المميزات المتاحة:
+   💬 دردشة فورية مع الإيموجي
+   📢 قنوات بث (مثل تليجرام)
+   👥 مجموعات تفاعلية
+   📁 رفع الملفات
+   🔔 إشعارات فورية
+   🌙 وضع ليلي
     `);
 });
 
