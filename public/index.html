@@ -94,7 +94,11 @@
                 <a href="#" class="nav-item" data-page="chat">
                     <i class="fab fa-whatsapp"></i>
                     الدردشة
-                    <span class="nav-item-badge">3</span>
+                    <span class="nav-item-badge" id="unreadMessagesCount">0</span>
+                </a>
+                <a href="#" class="nav-item" data-page="stories">
+                    <i class="fas fa-history"></i>
+                    القصص
                 </a>
                 <a href="#" class="nav-item" data-page="groups">
                     <i class="fas fa-users"></i>
@@ -127,12 +131,12 @@
             </nav>
 
             <div class="user-info hidden" id="userInfo">
-                <div class="user-avatar">
-                    <span>م</span>
+                <div class="user-avatar" id="userAvatar">
+                    <span>?</span>
                 </div>
                 <div class="user-details">
-                    <div class="user-name">محمد أحمد</div>
-                    <div class="user-role">طالب</div>
+                    <div class="user-name" id="userName">زائر</div>
+                    <div class="user-role" id="userRole">مستخدم</div>
                 </div>
             </div>
 
@@ -144,6 +148,7 @@
 
     <!-- القائمة المتنقلة -->
     <div class="mobile-menu" id="mobileMenu">
+        <!-- نفس محتوى القائمة الرئيسية -->
         <a href="#" class="nav-item" data-page="home">
             <i class="fas fa-home"></i>
             الرئيسية
@@ -155,7 +160,11 @@
         <a href="#" class="nav-item" data-page="chat">
             <i class="fab fa-whatsapp"></i>
             الدردشة
-            <span class="nav-item-badge">3</span>
+            <span class="nav-item-badge" id="mobileUnreadMessagesCount">0</span>
+        </a>
+        <a href="#" class="nav-item" data-page="stories">
+            <i class="fas fa-history"></i>
+            القصص
         </a>
         <a href="#" class="nav-item" data-page="groups">
             <i class="fas fa-users"></i>
@@ -349,7 +358,7 @@
                         <i class="fas fa-book"></i>
                     </div>
                     <div class="stat-info">
-                        <h3>12</h3>
+                        <h3 id="coursesCount">0</h3>
                         <span>المقررات المسجلة</span>
                     </div>
                 </div>
@@ -358,7 +367,7 @@
                         <i class="fas fa-tasks"></i>
                     </div>
                     <div class="stat-info">
-                        <h3>8</h3>
+                        <h3 id="assignmentsCount">0</h3>
                         <span>الواجبات المكتملة</span>
                     </div>
                 </div>
@@ -367,7 +376,7 @@
                         <i class="fas fa-chart-line"></i>
                     </div>
                     <div class="stat-info">
-                        <h3>94%</h3>
+                        <h3 id="progressPercentage">0%</h3>
                         <span>معدل التقدم</span>
                     </div>
                 </div>
@@ -376,7 +385,7 @@
                         <i class="fas fa-award"></i>
                     </div>
                     <div class="stat-info">
-                        <h3>3</h3>
+                        <h3 id="achievementsCount">0</h3>
                         <span>الإنجازات</span>
                     </div>
                 </div>
@@ -388,34 +397,8 @@
                         <i class="fas fa-bell"></i>
                         النشاط الأخير
                     </h3>
-                    <div class="activity-list">
-                        <div class="activity-item">
-                            <div class="activity-icon">
-                                <i class="fas fa-book"></i>
-                            </div>
-                            <div class="activity-content">
-                                <p>تم إكمال الواجب في مادة الرياضيات</p>
-                                <span class="activity-time">منذ ساعتين</span>
-                            </div>
-                        </div>
-                        <div class="activity-item">
-                            <div class="activity-icon">
-                                <i class="fas fa-comment"></i>
-                            </div>
-                            <div class="activity-content">
-                                <p>رسالة جديدة من الأستاذ أحمد</p>
-                                <span class="activity-time">منذ 5 ساعات</span>
-                            </div>
-                        </div>
-                        <div class="activity-item">
-                            <div class="activity-icon">
-                                <i class="fas fa-video"></i>
-                            </div>
-                            <div class="activity-content">
-                                <p>حضور محاضرة العلوم</p>
-                                <span class="activity-time">منذ يوم</span>
-                            </div>
-                        </div>
+                    <div class="activity-list" id="activityList">
+                        <!-- سيتم ملؤها ديناميكياً -->
                     </div>
                 </div>
                 
@@ -424,34 +407,8 @@
                         <i class="fas fa-users"></i>
                         الزملاء المتصلين
                     </h3>
-                    <div class="users-list">
-                        <div class="user-list-item">
-                            <div class="user-status"></div>
-                            <div class="user-avatar small">
-                                <span>ع</span>
-                            </div>
-                            <div class="user-details">
-                                <div class="user-name">علي محمد</div>
-                            </div>
-                        </div>
-                        <div class="user-list-item">
-                            <div class="user-status"></div>
-                            <div class="user-avatar small">
-                                <span>ف</span>
-                            </div>
-                            <div class="user-details">
-                                <div class="user-name">فاطمة أحمد</div>
-                            </div>
-                        </div>
-                        <div class="user-list-item">
-                            <div class="user-status offline"></div>
-                            <div class="user-avatar small">
-                                <span>خ</span>
-                            </div>
-                            <div class="user-details">
-                                <div class="user-name">خالد سعيد</div>
-                            </div>
-                        </div>
+                    <div class="users-list" id="onlineUsersList">
+                        <!-- سيتم ملؤها ديناميكياً -->
                     </div>
                 </div>
             </div>
@@ -459,13 +416,19 @@
 
         <!-- صفحة الدردشة -->
         <div class="page" id="chat-page">
-            <h1 class="section-title">
-                <i class="fab fa-whatsapp"></i>
-                نظام الدردشة
-            </h1>
+            <div class="chat-header-section">
+                <h1 class="section-title">
+                    <i class="fab fa-whatsapp"></i>
+                    نظام الدردشة
+                </h1>
+                <button class="btn btn-outline" id="newChatBtn">
+                    <i class="fas fa-plus"></i>
+                    محادثة جديدة
+                </button>
+            </div>
             
             <div class="chat-container">
-                <div class="chat-sidebar" id="chatSidebar">
+                <div class="chat-sidebar active" id="chatSidebar">
                     <div class="chat-header">
                         <h3>المحادثات</h3>
                         <button class="chat-toggle" id="chatToggle">
@@ -474,60 +437,23 @@
                     </div>
                     
                     <div class="chat-search">
-                        <input type="text" placeholder="بحث في المحادثات...">
+                        <input type="text" id="chatSearch" placeholder="بحث في المحادثات...">
                     </div>
                     
-                    <div class="conversations-list">
-                        <div class="conversation-item active">
-                            <div class="conversation-avatar">
-                                <span>أ</span>
-                            </div>
-                            <div class="conversation-info">
-                                <div class="conversation-name">الأستاذ أحمد</div>
-                                <div class="conversation-last-message">هل انتهيت من الواجب؟</div>
-                            </div>
-                            <div class="conversation-meta">
-                                <div class="conversation-time">10:45</div>
-                                <div class="conversation-unread">2</div>
-                            </div>
-                        </div>
-                        <div class="conversation-item">
-                            <div class="conversation-avatar">
-                                <span>ع</span>
-                            </div>
-                            <div class="conversation-info">
-                                <div class="conversation-name">علي محمد</div>
-                                <div class="conversation-last-message">شكراً على المساعدة</div>
-                            </div>
-                            <div class="conversation-meta">
-                                <div class="conversation-time">أمس</div>
-                            </div>
-                        </div>
-                        <div class="conversation-item">
-                            <div class="conversation-avatar">
-                                <span>م</span>
-                            </div>
-                            <div class="conversation-info">
-                                <div class="conversation-name">مجموعة الرياضيات</div>
-                                <div class="conversation-last-message">فاطمة: سأرفع الملف الآن</div>
-                            </div>
-                            <div class="conversation-meta">
-                                <div class="conversation-time">الجمعة</div>
-                                <div class="conversation-unread">5</div>
-                            </div>
-                        </div>
+                    <div class="conversations-list" id="conversationsList">
+                        <!-- سيتم ملؤها ديناميكياً -->
                     </div>
                 </div>
                 
                 <div class="chat-main">
-                    <div class="chat-header">
+                    <div class="chat-header" id="currentChatHeader">
                         <div class="chat-user-info">
                             <div class="conversation-avatar small">
-                                <span>أ</span>
+                                <i class="fas fa-comments"></i>
                             </div>
                             <div>
-                                <div class="conversation-name">الأستاذ أحمد</div>
-                                <div class="user-status-text">متصل الآن</div>
+                                <div class="conversation-name">اختر محادثة</div>
+                                <div class="user-status-text">اختر محادثة لبدء الدردشة</div>
                             </div>
                         </div>
                         <button class="chat-toggle" id="chatToggleMain">
@@ -536,31 +462,22 @@
                     </div>
                     
                     <div class="chat-messages" id="chatMessages">
-                        <div class="message received">
-                            <div class="message-text">مرحباً محمد، هل انتهيت من الواجب؟</div>
-                            <div class="message-time">10:30</div>
-                        </div>
-                        <div class="message sent">
-                            <div class="message-text">نعم سيدي، سأرفعه الآن</div>
-                            <div class="message-time">10:32</div>
-                            <div class="message-status">
-                                <i class="fas fa-check-double"></i>
-                            </div>
-                        </div>
-                        <div class="message received">
-                            <div class="message-text">ممتاز، هل واجهتك أي صعوبات؟</div>
-                            <div class="message-time">10:45</div>
+                        <div class="empty-chat-state">
+                            <i class="fas fa-comments fa-3x"></i>
+                            <h3>مرحباً في الدردشة!</h3>
+                            <p>اختر محادثة من القائمة لبدء المحادثة</p>
                         </div>
                     </div>
                     
-                    <div class="chat-input-container">
+                    <div class="chat-input-container" id="chatInputContainer" style="display: none;">
                         <div class="chat-input-tools">
-                            <button class="chat-tool-btn">
+                            <button class="chat-tool-btn" id="attachFileBtn">
                                 <i class="fas fa-paperclip"></i>
                             </button>
                             <button class="chat-tool-btn" id="emojiToggle">
                                 <i class="fas fa-smile"></i>
                             </button>
+                            <input type="file" id="fileInput" style="display: none;" accept="image/*,video/*,audio/*,.pdf,.doc,.docx">
                         </div>
                         
                         <div class="chat-input-wrapper">
@@ -579,185 +496,55 @@
             </div>
         </div>
 
-        <!-- صفحة المجموعات -->
-        <div class="page" id="groups-page">
+        <!-- صفحة القصص -->
+        <div class="page" id="stories-page">
             <h1 class="section-title">
-                <i class="fas fa-users"></i>
-                المجموعات التعليمية
+                <i class="fas fa-history"></i>
+                القصص
             </h1>
             
-            <div class="groups-grid">
-                <div class="group-card">
-                    <div class="group-header">
-                        <div class="group-avatar">
-                            <i class="fas fa-calculator"></i>
-                        </div>
-                        <h3>مجموعة الرياضيات</h3>
-                        <p>24 عضو</p>
-                    </div>
-                    <div class="group-info">
-                        <p>مجموعة مخصصة لدراسة مادة الرياضيات ومناقشة المسائل والحلول.</p>
-                        <div class="group-stats">
-                            <div class="group-stat">
-                                <div class="group-stat-number">12</div>
-                                <div class="group-stat-label">منشور جديد</div>
-                            </div>
-                            <div class="group-stat">
-                                <div class="group-stat-number">8</div>
-                                <div class="group-stat-label">أعضاء متصلين</div>
-                            </div>
-                        </div>
-                        <button class="btn btn-primary btn-block mt-3">
-                            <i class="fas fa-sign-in-alt"></i>
-                            الانضمام للمجموعة
-                        </button>
-                    </div>
-                </div>
-                
-                <div class="group-card">
-                    <div class="group-header">
-                        <div class="group-avatar">
-                            <i class="fas fa-flask"></i>
-                        </div>
-                        <h3>مجموعة العلوم</h3>
-                        <p>18 عضو</p>
-                    </div>
-                    <div class="group-info">
-                        <p>مناقشة تجارب العلوم والظواهر الطبيعية والمفاهيم العلمية.</p>
-                        <div class="group-stats">
-                            <div class="group-stat">
-                                <div class="group-stat-number">7</div>
-                                <div class="group-stat-label">منشور جديد</div>
-                            </div>
-                            <div class="group-stat">
-                                <div class="group-stat-number">5</div>
-                                <div class="group-stat-label">أعضاء متصلين</div>
-                            </div>
-                        </div>
-                        <button class="btn btn-primary btn-block mt-3">
-                            <i class="fas fa-sign-in-alt"></i>
-                            الانضمام للمجموعة
-                        </button>
-                    </div>
-                </div>
-                
-                <div class="group-card">
-                    <div class="group-header">
-                        <div class="group-avatar">
-                            <i class="fas fa-language"></i>
-                        </div>
-                        <h3>مجموعة اللغة العربية</h3>
-                        <p>32 عضو</p>
-                    </div>
-                    <div class="group-info">
-                        <p>تطوير مهارات اللغة العربية من خلال النقاشات والتمارين.</p>
-                        <div class="group-stats">
-                            <div class="group-stat">
-                                <div class="group-stat-number">15</div>
-                                <div class="group-stat-label">منشور جديد</div>
-                            </div>
-                            <div class="group-stat">
-                                <div class="group-stat-number">12</div>
-                                <div class="group-stat-label">أعضاء متصلين</div>
-                            </div>
-                        </div>
-                        <button class="btn btn-primary btn-block mt-3">
-                            <i class="fas fa-sign-in-alt"></i>
-                            الانضمام للمجموعة
-                        </button>
-                    </div>
-                </div>
+            <div class="stories-container" id="storiesContainer">
+                <!-- سيتم ملؤها ديناميكياً -->
+            </div>
+            
+            <div class="stories-feed" id="storiesFeed">
+                <!-- محتوى القصص -->
+            </div>
+        </div>
+
+        <!-- صفحة المجموعات -->
+        <div class="page" id="groups-page">
+            <div class="groups-header">
+                <h1 class="section-title">
+                    <i class="fas fa-users"></i>
+                    المجموعات التعليمية
+                </h1>
+                <button class="btn btn-primary" id="createGroupBtn">
+                    <i class="fas fa-plus"></i>
+                    إنشاء مجموعة
+                </button>
+            </div>
+            
+            <div class="groups-grid" id="groupsGrid">
+                <!-- سيتم ملؤها ديناميكياً -->
             </div>
         </div>
 
         <!-- صفحة القنوات -->
         <div class="page" id="channels-page">
-            <h1 class="section-title">
-                <i class="fas fa-broadcast-tower"></i>
-                القنوات التعليمية
-            </h1>
+            <div class="channels-header">
+                <h1 class="section-title">
+                    <i class="fas fa-broadcast-tower"></i>
+                    القنوات التعليمية
+                </h1>
+                <button class="btn btn-primary" id="createChannelBtn">
+                    <i class="fas fa-plus"></i>
+                    إنشاء قناة
+                </button>
+            </div>
             
-            <div class="channels-grid">
-                <div class="channel-card">
-                    <div class="channel-header">
-                        <div class="channel-avatar">
-                            <i class="fas fa-video"></i>
-                        </div>
-                        <h3>قناة الفيزياء</h3>
-                        <p>150 مشترك</p>
-                    </div>
-                    <div class="channel-info">
-                        <p>قناة تعليمية متخصصة في شرح مفاهيم الفيزياء وتطبيقاتها.</p>
-                        <div class="channel-stats">
-                            <div class="channel-stat">
-                                <div class="channel-stat-number">3</div>
-                                <div class="channel-stat-label">فيديوهات جديدة</div>
-                            </div>
-                            <div class="channel-stat">
-                                <div class="channel-stat-number">1.2K</div>
-                                <div class="channel-stat-label">مشاهدة</div>
-                            </div>
-                        </div>
-                        <button class="btn btn-primary btn-block mt-3">
-                            <i class="fas fa-bell"></i>
-                            الاشتراك في القناة
-                        </button>
-                    </div>
-                </div>
-                
-                <div class="channel-card">
-                    <div class="channel-header">
-                        <div class="channel-avatar">
-                            <i class="fas fa-history"></i>
-                        </div>
-                        <h3>قناة التاريخ</h3>
-                        <p>89 مشترك</p>
-                    </div>
-                    <div class="channel-info">
-                        <p>استكشاف الأحداث التاريخية والشخصيات المؤثرة عبر العصور.</p>
-                        <div class="channel-stats">
-                            <div class="channel-stat">
-                                <div class="channel-stat-number">5</div>
-                                <div class="channel-stat-label">فيديوهات جديدة</div>
-                            </div>
-                            <div class="channel-stat">
-                                <div class="channel-stat-number">856</div>
-                                <div class="channel-stat-label">مشاهدة</div>
-                            </div>
-                        </div>
-                        <button class="btn btn-primary btn-block mt-3">
-                            <i class="fas fa-bell"></i>
-                            الاشتراك في القناة
-                        </button>
-                    </div>
-                </div>
-                
-                <div class="channel-card">
-                    <div class="channel-header">
-                        <div class="channel-avatar">
-                            <i class="fas fa-paint-brush"></i>
-                        </div>
-                        <h3>قناة الفنون</h3>
-                        <p>210 مشترك</p>
-                    </div>
-                    <div class="channel-info">
-                        <p>تعلم تقنيات الرسم والتلوين ومبادئ التصميم والفنون المختلفة.</p>
-                        <div class="channel-stats">
-                            <div class="channel-stat">
-                                <div class="channel-stat-number">12</div>
-                                <div class="channel-stat-label">فيديوهات جديدة</div>
-                            </div>
-                            <div class="channel-stat">
-                                <div class="channel-stat-number">2.3K</div>
-                                <div class="channel-stat-label">مشاهدة</div>
-                            </div>
-                        </div>
-                        <button class="btn btn-primary btn-block mt-3">
-                            <i class="fas fa-bell"></i>
-                            الاشتراك في القناة
-                        </button>
-                    </div>
-                </div>
+            <div class="channels-grid" id="channelsGrid">
+                <!-- سيتم ملؤها ديناميكياً -->
             </div>
         </div>
 
@@ -768,54 +555,16 @@
                 الوسائط التعليمية
             </h1>
             
-            <div class="media-grid">
-                <div class="media-item">
-                    <img src="https://via.placeholder.com/300" alt="رسم بياني للدوال">
-                    <div class="media-overlay">
-                        <h4>رسم بياني للدوال</h4>
-                        <p>مادة الرياضيات</p>
-                    </div>
-                </div>
-                
-                <div class="media-item">
-                    <img src="https://via.placeholder.com/300" alt="خريطة المفاهيم">
-                    <div class="media-overlay">
-                        <h4>خريطة المفاهيم</h4>
-                        <p>مادة العلوم</p>
-                    </div>
-                </div>
-                
-                <div class="media-item">
-                    <img src="https://via.placeholder.com/300" alt="جدول العناصر">
-                    <div class="media-overlay">
-                        <h4>جدول العناصر</h4>
-                        <p>مادة الكيمياء</p>
-                    </div>
-                </div>
-                
-                <div class="media-item">
-                    <img src="https://via.placeholder.com/300" alt="دورة المياه">
-                    <div class="media-overlay">
-                        <h4>دورة المياه في الطبيعة</h4>
-                        <p>مادة العلوم</p>
-                    </div>
-                </div>
-                
-                <div class="media-item">
-                    <img src="https://via.placeholder.com/300" alt="خط الزمن">
-                    <div class="media-overlay">
-                        <h4>خط الزمن التاريخي</h4>
-                        <p>مادة التاريخ</p>
-                    </div>
-                </div>
-                
-                <div class="media-item">
-                    <img src="https://via.placeholder.com/300" alt="خريطة العالم">
-                    <div class="media-overlay">
-                        <h4>خريطة العالم السياسية</h4>
-                        <p>مادة الجغرافيا</p>
-                    </div>
-                </div>
+            <div class="media-actions">
+                <button class="btn btn-primary" id="uploadMediaBtn">
+                    <i class="fas fa-upload"></i>
+                    رفع وسائط
+                </button>
+                <input type="file" id="mediaUploadInput" multiple style="display: none;" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.ppt,.pptx">
+            </div>
+            
+            <div class="media-grid" id="mediaGrid">
+                <!-- سيتم ملؤها ديناميكياً -->
             </div>
         </div>
 
@@ -829,9 +578,9 @@
             <div class="settings-container">
                 <div class="settings-sidebar">
                     <ul class="settings-menu">
-                        <li class="settings-menu-item active" data-section="account">
+                        <li class="settings-menu-item active" data-section="profile">
                             <i class="fas fa-user"></i>
-                            الحساب
+                            الملف الشخصي
                         </li>
                         <li class="settings-menu-item" data-section="privacy">
                             <i class="fas fa-shield-alt"></i>
@@ -845,37 +594,29 @@
                             <i class="fas fa-palette"></i>
                             المظهر
                         </li>
-                        <li class="settings-menu-item" data-section="language">
-                            <i class="fas fa-language"></i>
-                            اللغة
-                        </li>
-                        <li class="settings-menu-item" data-section="about">
-                            <i class="fas fa-info-circle"></i>
-                            حول التطبيق
+                        <li class="settings-menu-item" data-section="chat-settings">
+                            <i class="fas fa-comments"></i>
+                            إعدادات الدردشة
                         </li>
                     </ul>
                 </div>
                 
                 <div class="settings-content">
-                    <div class="settings-section active" id="account-section">
-                        <h3>إعدادات الحساب</h3>
+                    <div class="settings-section active" id="profile-section">
+                        <h3>الملف الشخصي</h3>
                         <div class="form-group">
-                            <label for="userName">الاسم الكامل</label>
-                            <input type="text" id="userName" value="محمد أحمد">
+                            <label for="profileName">الاسم الكامل</label>
+                            <input type="text" id="profileName" class="form-control">
                         </div>
                         <div class="form-group">
-                            <label for="userEmail">البريد الإلكتروني</label>
-                            <input type="email" id="userEmail" value="mohamed@example.com">
+                            <label for="profileEmail">البريد الإلكتروني</label>
+                            <input type="email" id="profileEmail" class="form-control">
                         </div>
                         <div class="form-group">
-                            <label for="userRole">الدور</label>
-                            <select id="userRole">
-                                <option value="student">طالب</option>
-                                <option value="teacher">معلم</option>
-                                <option value="admin">مسؤول</option>
-                            </select>
+                            <label for="profileBio">نبذة عنك</label>
+                            <textarea id="profileBio" class="form-control" rows="3"></textarea>
                         </div>
-                        <button class="btn btn-primary">
+                        <button class="btn btn-primary" id="saveProfileBtn">
                             <i class="fas fa-save"></i>
                             حفظ التغييرات
                         </button>
@@ -883,109 +624,82 @@
                     
                     <div class="settings-section" id="privacy-section">
                         <h3>إعدادات الخصوصية</h3>
-                        <div class="form-group">
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <h4>الحساب الخاص</h4>
+                                <p>اجعل حسابك خاصاً بحيث لا يمكن للآخرين رؤية نشاطك</p>
+                            </div>
                             <label class="toggle-switch">
-                                <input type="checkbox" checked>
+                                <input type="checkbox" id="privateAccount">
                                 <span class="toggle-slider"></span>
-                                إظهار حالة الاتصال
                             </label>
                         </div>
-                        <div class="form-group">
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <h4>إظهار حالة الاتصال</h4>
+                                <p>السماح للآخرين برؤية ما إذا كنت متصلاً أم لا</p>
+                            </div>
                             <label class="toggle-switch">
-                                <input type="checkbox" checked>
+                                <input type="checkbox" id="showOnlineStatus" checked>
                                 <span class="toggle-slider"></span>
-                                السماح بالرسائل المباشرة
-                            </label>
-                        </div>
-                        <div class="form-group">
-                            <label class="toggle-switch">
-                                <input type="checkbox">
-                                <span class="toggle-slider"></span>
-                                الحساب الخاص
                             </label>
                         </div>
                     </div>
                     
                     <div class="settings-section" id="notifications-section">
                         <h3>إعدادات الإشعارات</h3>
-                        <div class="form-group">
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <h4>إشعارات الدردشة</h4>
+                                <p>تلقي إشعارات عند وصول رسائل جديدة</p>
+                            </div>
                             <label class="toggle-switch">
-                                <input type="checkbox" checked>
+                                <input type="checkbox" id="chatNotifications" checked>
                                 <span class="toggle-slider"></span>
-                                إشعارات الدردشة
                             </label>
                         </div>
-                        <div class="form-group">
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <h4>إشعارات المجموعات</h4>
+                                <p>تلقي إشعارات عند وجود نشاط جديد في مجموعاتك</p>
+                            </div>
                             <label class="toggle-switch">
-                                <input type="checkbox" checked>
+                                <input type="checkbox" id="groupNotifications" checked>
                                 <span class="toggle-slider"></span>
-                                إشعارات المجموعات
-                            </label>
-                        </div>
-                        <div class="form-group">
-                            <label class="toggle-switch">
-                                <input type="checkbox">
-                                <span class="toggle-slider"></span>
-                                إشعارات البريد الإلكتروني
                             </label>
                         </div>
                     </div>
                     
                     <div class="settings-section" id="appearance-section">
                         <h3>إعدادات المظهر</h3>
-                        <div class="form-group">
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <h4>الوضع الليلي</h4>
+                                <p>تفعيل الوضع الليلي لتجربة استخدام مريحة للعين</p>
+                            </div>
                             <label class="toggle-switch">
                                 <input type="checkbox" id="darkModeToggle">
                                 <span class="toggle-slider"></span>
-                                الوضع الليلي
                             </label>
                         </div>
+                    </div>
+                    
+                    <div class="settings-section" id="chat-settings-section">
+                        <h3>إعدادات الدردشة</h3>
                         <div class="form-group">
-                            <label for="themeColor">لون السمة</label>
-                            <select id="themeColor">
-                                <option value="blue">أزرق</option>
-                                <option value="green">أخضر</option>
-                                <option value="purple">بنفسجي</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="fontSize">حجم الخط</label>
-                            <select id="fontSize">
+                            <label for="chatFontSize">حجم خط الدردشة</label>
+                            <select id="chatFontSize" class="form-control">
                                 <option value="small">صغير</option>
                                 <option value="medium" selected>متوسط</option>
                                 <option value="large">كبير</option>
                             </select>
                         </div>
-                    </div>
-                    
-                    <div class="settings-section" id="language-section">
-                        <h3>إعدادات اللغة</h3>
                         <div class="form-group">
-                            <label for="interfaceLanguage">لغة الواجهة</label>
-                            <select id="interfaceLanguage">
-                                <option value="ar" selected>العربية</option>
-                                <option value="en">English</option>
-                                <option value="fr">Français</option>
+                            <label for="enterToSend">زر الإدخال للإرسال</label>
+                            <select id="enterToSend" class="form-control">
+                                <option value="true">نعم</option>
+                                <option value="false">لا</option>
                             </select>
-                        </div>
-                    </div>
-                    
-                    <div class="settings-section" id="about-section">
-                        <h3>حول التطبيق</h3>
-                        <div class="about-info">
-                            <p><strong>الإصدار:</strong> v2.1.0</p>
-                            <p><strong>تاريخ البناء:</strong> 2024</p>
-                            <p><strong>المطور:</strong> فريق المنصة التعليمية</p>
-                        </div>
-                        <div class="mt-4">
-                            <button class="btn btn-outline">
-                                <i class="fas fa-file-contract"></i>
-                                الشروط والأحكام
-                            </button>
-                            <button class="btn btn-outline">
-                                <i class="fas fa-shield-alt"></i>
-                                سياسة الخصوصية
-                            </button>
                         </div>
                     </div>
                 </div>
@@ -1003,6 +717,10 @@
             <i class="fab fa-whatsapp"></i>
             الدردشة
         </div>
+        <div class="quick-action" data-page="stories">
+            <i class="fas fa-history"></i>
+            القصص
+        </div>
         <div class="quick-action" data-page="groups">
             <i class="fas fa-users"></i>
             المجموعات
@@ -1011,10 +729,6 @@
             <i class="fas fa-photo-video"></i>
             الوسائط
         </div>
-        <div class="quick-action" data-page="settings">
-            <i class="fas fa-cog"></i>
-            الإعدادات
-        </div>
     </div>
 
     <!-- الزر العائم -->
@@ -1022,47 +736,56 @@
         <i class="fas fa-plus"></i>
     </button>
 
-    <!-- القصص -->
-    <div class="stories-container">
-        <div class="story-item" data-story="1">
-            <div class="story-avatar">
-                <img src="https://via.placeholder.com/70" alt="الأستاذ أحمد">
-            </div>
-            <div class="story-author">الأستاذ أحمد</div>
-        </div>
-        <div class="story-item" data-story="2">
-            <div class="story-avatar">
-                <img src="https://via.placeholder.com/70" alt="مجموعة الرياضيات">
-            </div>
-            <div class="story-author">مجموعة الرياضيات</div>
-        </div>
-        <div class="story-item" data-story="3">
-            <div class="story-avatar">
-                <img src="https://via.placeholder.com/70" alt="قناة العلوم">
-            </div>
-            <div class="story-author">قناة العلوم</div>
-        </div>
-    </div>
-
+    <!-- عارض القصص -->
     <div class="story-viewer" id="storyViewer">
         <button class="story-close" id="storyClose">
             <i class="fas fa-times"></i>
         </button>
         <div class="story-content">
-            <div class="story-progress">
-                <div class="story-progress-bar">
-                    <div class="story-progress-fill"></div>
+            <div class="story-progress" id="storyProgress">
+                <!-- سيتم ملؤها ديناميكياً -->
+            </div>
+            <img id="currentStoryImage" src="" alt="قصة">
+            <div class="story-info">
+                <div class="story-author-avatar">
+                    <img id="storyAuthorAvatar" src="" alt="صورة الناشر">
                 </div>
-                <div class="story-progress-bar">
-                    <div class="story-progress-fill"></div>
-                </div>
-                <div class="story-progress-bar">
-                    <div class="story-progress-fill"></div>
+                <div class="story-author-info">
+                    <div class="story-author-name" id="storyAuthorName"></div>
+                    <div class="story-time" id="storyTime"></div>
                 </div>
             </div>
-            <img src="https://via.placeholder.com/400x700" alt="قصة">
-            <div class="story-nav prev" id="storyPrev"></div>
-            <div class="story-nav next" id="storyNext"></div>
+            <div class="story-nav prev" id="storyPrev">
+                <i class="fas fa-chevron-right"></i>
+            </div>
+            <div class="story-nav next" id="storyNext">
+                <i class="fas fa-chevron-left"></i>
+            </div>
+        </div>
+    </div>
+
+    <!-- نافذة رفع الوسائط -->
+    <div class="modal" id="uploadModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>رفع وسائط</h3>
+                <button class="modal-close" id="uploadModalClose">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="upload-area" id="uploadArea">
+                    <i class="fas fa-cloud-upload-alt fa-3x"></i>
+                    <p>اسحب وأفلت الملفات هنا أو انقر للاختيار</p>
+                    <input type="file" id="bulkUploadInput" multiple accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.ppt,.pptx">
+                </div>
+                <div class="upload-progress" id="uploadProgress" style="display: none;">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                    <span id="progressText">0%</span>
+                </div>
+            </div>
         </div>
     </div>
 
