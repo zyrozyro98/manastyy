@@ -484,3 +484,78 @@
     cursor: pointer;
     z-index: 2;
 }
+// public/js/config.js
+const AppConfig = {
+    // إعدادات التطبيق
+    APP: {
+        NAME: "المنصة التعليمية",
+        VERSION: "2.1.0",
+        API_BASE_URL: window.location.origin,
+        SOCKET_URL: window.location.origin
+    },
+
+    // إعدادات الدردشة
+    CHAT: {
+        MESSAGE_MAX_LENGTH: 1000,
+        TYPING_TIMEOUT: 3000,
+        MESSAGE_DELAY: 1000,
+        FILE_MAX_SIZE: 10 * 1024 * 1024, // 10MB
+        ALLOWED_FILE_TYPES: [
+            'image/jpeg',
+            'image/png',
+            'image/gif',
+            'application/pdf',
+            'video/mp4',
+            'audio/mpeg'
+        ]
+    },
+
+    // إعدادات الوسائط
+    MEDIA: {
+        UPLOAD_ENDPOINT: '/api/upload',
+        MAX_FILE_SIZE: 50 * 1024 * 1024, // 50MB
+        ALLOWED_IMAGE_TYPES: ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
+        ALLOWED_VIDEO_TYPES: ['video/mp4', 'video/webm', 'video/ogg'],
+        ALLOWED_AUDIO_TYPES: ['audio/mpeg', 'audio/wav', 'audio/ogg']
+    },
+
+    // إعدادات القصص
+    STORIES: {
+        MAX_DURATION: 24 * 60 * 60 * 1000, // 24 ساعة
+        STORY_DISPLAY_TIME: 5000, // 5 ثواني
+        MAX_STORIES_PER_USER: 10
+    },
+
+    // إعدادات المجموعات
+    GROUPS: {
+        MAX_MEMBERS: 100,
+        MAX_ADMINS: 5,
+        MAX_GROUP_NAME_LENGTH: 50,
+        MAX_DESCRIPTION_LENGTH: 500
+    },
+
+    // إعدادات القنوات
+    CHANNELS: {
+        MAX_SUBSCRIBERS: 10000,
+        MAX_CHANNEL_NAME_LENGTH: 50,
+        MAX_DESCRIPTION_LENGTH: 500
+    },
+
+    // إعدادات التخزين
+    STORAGE: {
+        USER_DATA_KEY: 'currentUser',
+        AUTH_TOKEN_KEY: 'authToken',
+        THEME_KEY: 'appTheme',
+        LANGUAGE_KEY: 'appLanguage'
+    },
+
+    // الإشعارات
+    NOTIFICATIONS: {
+        POSITION: 'top-right',
+        DURATION: 5000,
+        MAX_VISIBLE: 3
+    }
+};
+
+// جعل الإعدادات متاحة globally
+window.AppConfig = AppConfig;
