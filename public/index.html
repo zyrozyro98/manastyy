@@ -6,2116 +6,9 @@
     <title>المنصة التعليمية المتطورة - نظام الإدارة المتكامل</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/emoji-picker-element@1.14.0/index.min.css">
+    <link rel="stylesheet" href="css/css.css">
     <script src="/socket.io/socket.io.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/emoji-picker-element@1.14.0/index.min.js"></script>
-    <style>
-        :root {
-            --primary: #2c5aa0;
-            --primary-dark: #1e3d72;
-            --primary-light: #4a7bc8;
-            --secondary: #00b4d8;
-            --accent: #ff6b6b;
-            --success: #28a745;
-            --warning: #ffc107;
-            --danger: #dc3545;
-            --info: #17a2b8;
-            --dark: #2d3748;
-            --light: #f8f9fa;
-            --gray-100: #f8f9fa;
-            --gray-200: #e9ecef;
-            --gray-300: #dee2e6;
-            --gray-400: #ced4da;
-            --gray-500: #adb5bd;
-            --gray-600: #6c757d;
-            --gray-700: #495057;
-            --gray-800: #343a40;
-            --gray-900: #212529;
-            --border: #e2e8f0;
-            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-            --shadow-md: 0 6px 10px -1px rgba(0, 0, 0, 0.1), 0 4px 6px -1px rgba(0, 0, 0, 0.06);
-            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-            --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-            --gradient-primary: linear-gradient(135deg, var(--primary), var(--primary-light));
-            --gradient-secondary: linear-gradient(135deg, var(--secondary), #0099cc);
-            --gradient-accent: linear-gradient(135deg, var(--accent), #ff5252);
-            --gradient-success: linear-gradient(135deg, var(--success), #20c997);
-            --story-gradient: linear-gradient(45deg, #ff6b6b, #4ecdc4, #45b7d1, #96ceb4, #feca57);
-            --group-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            --channel-gradient: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-            --sidebar-width: 280px;
-            --header-height: 70px;
-            --border-radius: 12px;
-            --border-radius-lg: 16px;
-            --border-radius-xl: 20px;
-            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            --transition-fast: all 0.15s ease;
-            --backdrop-blur: blur(12px);
-            --whatsapp-green: #25D366;
-            --whatsapp-dark: #075E54;
-            --telegram-blue: #0088cc;
-            --android-green: #3DDC84;
-        }
-
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        html {
-            scroll-behavior: smooth;
-            font-size: 16px;
-        }
-
-        body {
-            font-family: 'Segoe UI', 'Tahoma', 'Geneva', 'Verdana', 'Arial', sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: var(--dark);
-            line-height: 1.6;
-            min-height: 100vh;
-            overflow-x: hidden;
-            font-weight: 400;
-            -webkit-font-smoothing: antialiased;
-            -moz-osx-font-smoothing: grayscale;
-        }
-
-        /* تحسينات التمرير */
-        ::-webkit-scrollbar {
-            width: 8px;
-            height: 8px;
-        }
-
-        ::-webkit-scrollbar-track {
-            background: var(--gray-100);
-            border-radius: 10px;
-        }
-
-        ::-webkit-scrollbar-thumb {
-            background: var(--primary);
-            border-radius: 10px;
-            transition: var(--transition);
-        }
-
-        ::-webkit-scrollbar-thumb:hover {
-            background: var(--primary-dark);
-        }
-
-        /* تحسينات التصميم العامة */
-        .app-container {
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            position: relative;
-        }
-
-        .connection-status {
-            position: fixed;
-            top: 15px;
-            left: 15px;
-            background: var(--success);
-            color: white;
-            padding: 8px 16px;
-            border-radius: 25px;
-            font-size: 0.85rem;
-            font-weight: 600;
-            z-index: 10000;
-            display: none;
-            align-items: center;
-            gap: 8px;
-            box-shadow: var(--shadow-lg);
-            backdrop-filter: var(--backdrop-blur);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            transition: var(--transition);
-        }
-        
-        .connection-status.offline {
-            background: var(--danger);
-            animation: pulse 2s infinite;
-        }
-
-        .connection-status.reconnecting {
-            background: var(--warning);
-            color: var(--dark);
-        }
-
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.7; }
-        }
-
-        /* تحسينات الهيدر */
-        .header {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: var(--backdrop-blur);
-            box-shadow: var(--shadow);
-            position: sticky;
-            top: 0;
-            z-index: 1000;
-            border-bottom: 1px solid var(--border);
-            height: var(--header-height);
-            transition: var(--transition);
-        }
-
-        .header.scrolled {
-            background: rgba(255, 255, 255, 0.98);
-            box-shadow: var(--shadow-lg);
-        }
-
-        .header-content {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 0 2rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            height: 100%;
-            gap: 1.5rem;
-        }
-
-        .logo {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            flex-shrink: 0;
-            text-decoration: none;
-            transition: var(--transition);
-        }
-
-        .logo:hover {
-            transform: translateY(-1px);
-        }
-
-        .logo-icon {
-            width: 42px;
-            height: 42px;
-            background: var(--gradient-primary);
-            border-radius: var(--border-radius);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 1.3rem;
-            box-shadow: var(--shadow);
-            transition: var(--transition);
-        }
-
-        .logo:hover .logo-icon {
-            transform: scale(1.05);
-            box-shadow: var(--shadow-lg);
-        }
-
-        .logo-text {
-            font-size: 1.4rem;
-            font-weight: 800;
-            color: var(--primary);
-            letter-spacing: -0.5px;
-        }
-
-        .logo-subtitle {
-            font-size: 0.75rem;
-            color: var(--gray-600);
-            font-weight: 500;
-            margin-top: -2px;
-        }
-
-        /* تحسينات التنقل */
-        .nav {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            flex-wrap: wrap;
-        }
-
-        .nav-item {
-            color: var(--dark);
-            text-decoration: none;
-            font-weight: 600;
-            padding: 0.6rem 1.2rem;
-            border-radius: var(--border-radius);
-            transition: var(--transition);
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            white-space: nowrap;
-            font-size: 0.95rem;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .nav-item::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            right: 0;
-            width: 0;
-            height: 100%;
-            background: var(--gradient-primary);
-            transition: var(--transition);
-            z-index: -1;
-        }
-
-        .nav-item:hover {
-            color: white;
-            transform: translateY(-2px);
-            box-shadow: var(--shadow);
-        }
-
-        .nav-item:hover::before {
-            width: 100%;
-        }
-
-        .nav-item.active {
-            background: var(--gradient-primary);
-            color: white;
-            box-shadow: var(--shadow);
-        }
-
-        .nav-item.hidden {
-            display: none;
-        }
-
-        .nav-item-badge {
-            background: var(--accent);
-            color: white;
-            border-radius: 10px;
-            padding: 0.2rem 0.5rem;
-            font-size: 0.75rem;
-            font-weight: 700;
-            min-width: 20px;
-            text-align: center;
-        }
-
-        /* تحسينات معلومات المستخدم */
-        .user-info {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-            padding: 0.5rem 1rem;
-            background: var(--gray-100);
-            border-radius: var(--border-radius);
-            font-weight: 600;
-            transition: var(--transition);
-            border: 1px solid var(--border);
-        }
-
-        .user-info:hover {
-            background: var(--gray-200);
-            transform: translateY(-1px);
-            box-shadow: var(--shadow);
-        }
-
-        .user-avatar {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            background: var(--gradient-primary);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-weight: 700;
-            font-size: 1.1rem;
-            border: 2px solid white;
-            box-shadow: var(--shadow);
-            transition: var(--transition);
-        }
-
-        .user-avatar img {
-            width: 100%;
-            height: 100%;
-            border-radius: 50%;
-            object-fit: cover;
-        }
-
-        .user-details {
-            display: flex;
-            flex-direction: column;
-            gap: 0.1rem;
-        }
-
-        .user-name {
-            font-weight: 700;
-            color: var(--dark);
-        }
-
-        .user-role {
-            font-size: 0.8rem;
-            color: var(--gray-600);
-            font-weight: 500;
-        }
-
-        /* تحسينات المحتوى الرئيسي */
-        .main-content {
-            flex: 1;
-            padding: 2rem;
-            max-width: 1400px;
-            margin: 0 auto;
-            width: 100%;
-            animation: fadeInUp 0.6s ease-out;
-        }
-
-        @keyframes fadeInUp {
-            from {
-                opacity: 0;
-                transform: translateY(30px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        .page {
-            display: none;
-            animation: fadeIn 0.5s ease-in;
-            min-height: 60vh;
-        }
-
-        .page.active {
-            display: block;
-        }
-
-        @keyframes fadeIn {
-            from { 
-                opacity: 0; 
-                transform: translateY(20px); 
-            }
-            to { 
-                opacity: 1; 
-                transform: translateY(0); 
-            }
-        }
-
-        /* تحسينات الصفحات */
-        .hero-section {
-            padding: 3rem 0;
-            text-align: center;
-        }
-        
-        .hero-title {
-            font-size: 3rem;
-            font-weight: 800;
-            margin-bottom: 1rem;
-            background: var(--gradient-primary);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-        
-        .hero-description {
-            font-size: 1.2rem;
-            color: var(--gray-600);
-            margin-bottom: 2rem;
-            max-width: 600px;
-            margin-left: auto;
-            margin-right: auto;
-        }
-        
-        .hero-actions {
-            display: flex;
-            gap: 1rem;
-            justify-content: center;
-            flex-wrap: wrap;
-            margin-bottom: 4rem;
-        }
-        
-        .feature-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 2rem;
-            margin-top: 3rem;
-        }
-        
-        .feature-card {
-            background: white;
-            padding: 2rem;
-            border-radius: var(--border-radius-lg);
-            box-shadow: var(--shadow);
-            text-align: center;
-            transition: var(--transition);
-        }
-        
-        .feature-card:hover {
-            transform: translateY(-5px);
-            box-shadow: var(--shadow-lg);
-        }
-        
-        .feature-icon {
-            width: 80px;
-            height: 80px;
-            margin: 0 auto 1.5rem;
-            background: var(--gradient-primary);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 2rem;
-            color: white;
-        }
-        
-        /* تحسينات صفحات المصادقة */
-        .auth-container {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 70vh;
-            padding: 2rem;
-        }
-        
-        .auth-card {
-            background: white;
-            padding: 3rem;
-            border-radius: var(--border-radius-lg);
-            box-shadow: var(--shadow-xl);
-            width: 100%;
-            max-width: 450px;
-        }
-        
-        .auth-header {
-            text-align: center;
-            margin-bottom: 2rem;
-        }
-        
-        .auth-header h2 {
-            color: var(--primary);
-            margin-bottom: 0.5rem;
-        }
-        
-        .form-group {
-            margin-bottom: 1.5rem;
-        }
-        
-        .form-group label {
-            display: block;
-            margin-bottom: 0.5rem;
-            font-weight: 600;
-            color: var(--dark);
-        }
-        
-        .form-group input, .form-group select {
-            width: 100%;
-            padding: 0.75rem 1rem;
-            border: 2px solid var(--border);
-            border-radius: var(--border-radius);
-            font-size: 1rem;
-            transition: var(--transition);
-        }
-        
-        .form-group input:focus, .form-group select:focus {
-            border-color: var(--primary);
-            outline: none;
-            box-shadow: 0 0 0 3px rgba(44, 90, 160, 0.1);
-        }
-        
-        .auth-footer {
-            text-align: center;
-            margin-top: 2rem;
-            padding-top: 2rem;
-            border-top: 1px solid var(--border);
-        }
-        
-        /* تحسينات لوحة التحكم */
-        .dashboard-header {
-            margin-bottom: 2rem;
-        }
-        
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 1.5rem;
-            margin-bottom: 3rem;
-        }
-        
-        .stat-card {
-            background: white;
-            padding: 1.5rem;
-            border-radius: var(--border-radius-lg);
-            box-shadow: var(--shadow);
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-        }
-        
-        .stat-icon {
-            width: 60px;
-            height: 60px;
-            background: var(--gradient-primary);
-            border-radius: var(--border-radius);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 1.5rem;
-        }
-        
-        .stat-info h3 {
-            font-size: 2rem;
-            font-weight: 800;
-            color: var(--primary);
-            margin-bottom: 0.25rem;
-        }
-        
-        .content-grid {
-            display: grid;
-            grid-template-columns: 2fr 1fr;
-            gap: 2rem;
-        }
-        
-        .content-card {
-            background: white;
-            padding: 1.5rem;
-            border-radius: var(--border-radius-lg);
-            box-shadow: var(--shadow);
-        }
-        
-        /* تحسينات الأزرار */
-        .btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            padding: 0.75rem 1.5rem;
-            border: none;
-            border-radius: var(--border-radius);
-            font-weight: 600;
-            text-decoration: none;
-            cursor: pointer;
-            transition: var(--transition);
-            font-size: 0.95rem;
-        }
-        
-        .btn-primary {
-            background: var(--gradient-primary);
-            color: white;
-        }
-        
-        .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: var(--shadow-lg);
-        }
-        
-        .btn-outline {
-            background: transparent;
-            color: var(--primary);
-            border: 2px solid var(--primary);
-        }
-        
-        .btn-outline:hover {
-            background: var(--primary);
-            color: white;
-        }
-        
-        .btn-block {
-            width: 100%;
-            justify-content: center;
-        }
-        
-        .btn-lg {
-            padding: 1rem 2rem;
-            font-size: 1.1rem;
-        }
-        
-        .btn-sm {
-            padding: 0.5rem 1rem;
-            font-size: 0.85rem;
-        }
-
-        /* تحسينات شاشة الترحيب */
-        .welcome-screen {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
-            z-index: 9999;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-        }
-
-        .welcome-content {
-            text-align: center;
-            max-width: 500px;
-            padding: 2rem;
-        }
-
-        .welcome-logo .logo-icon.large {
-            width: 100px;
-            height: 100px;
-            font-size: 3rem;
-            margin: 0 auto 1.5rem;
-        }
-
-        .welcome-logo h1 {
-            font-size: 2.5rem;
-            margin-bottom: 0.5rem;
-            font-weight: 800;
-        }
-
-        .welcome-features {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-            gap: 1.5rem;
-            margin: 3rem 0;
-        }
-
-        .feature {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .feature i {
-            font-size: 2rem;
-            opacity: 0.9;
-        }
-
-        /* تحسينات شريط الأدوات السريع */
-        .quick-actions-bar {
-            position: fixed;
-            bottom: 80px;
-            left: 20px;
-            background: white;
-            border-radius: var(--border-radius-lg);
-            box-shadow: var(--shadow-xl);
-            padding: 1rem;
-            display: none;
-            flex-direction: column;
-            gap: 0.5rem;
-            z-index: 1000;
-            animation: slideInUp 0.3s ease-out;
-        }
-        
-        .quick-actions-bar.active {
-            display: flex;
-        }
-        
-        .quick-action {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            padding: 0.75rem 1rem;
-            border-radius: var(--border-radius);
-            cursor: pointer;
-            transition: var(--transition);
-            white-space: nowrap;
-        }
-        
-        .quick-action:hover {
-            background: var(--gray-100);
-        }
-        
-        .quick-action i {
-            width: 20px;
-            text-align: center;
-            color: var(--primary);
-        }
-
-        /* تحسينات الزر العائم */
-        .floating-action-btn {
-            position: fixed;
-            bottom: 20px;
-            left: 20px;
-            width: 60px;
-            height: 60px;
-            background: var(--gradient-primary);
-            border: none;
-            border-radius: 50%;
-            color: white;
-            font-size: 1.5rem;
-            cursor: pointer;
-            box-shadow: var(--shadow-xl);
-            z-index: 1000;
-            transition: var(--transition);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        
-        .floating-action-btn:hover {
-            transform: scale(1.1);
-            box-shadow: var(--shadow-2xl);
-        }
-
-        /* تحسينات إشعار التحديث */
-        .update-notification {
-            position: fixed;
-            top: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: white;
-            padding: 1rem 1.5rem;
-            border-radius: var(--border-radius);
-            box-shadow: var(--shadow-xl);
-            z-index: 5000;
-            display: none;
-            align-items: center;
-            gap: 1rem;
-            border-right: 4px solid var(--info);
-            animation: slideInDown 0.3s ease-out;
-        }
-        
-        .update-notification.active {
-            display: flex;
-        }
-        
-        .update-content {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-            flex: 1;
-        }
-        
-        .update-info {
-            flex: 1;
-        }
-        
-        .update-info strong {
-            display: block;
-            margin-bottom: 0.25rem;
-        }
-        
-        .update-info span {
-            font-size: 0.9rem;
-            color: var(--gray-600);
-        }
-
-        @keyframes slideInUp {
-            from {
-                opacity: 0;
-                transform: translateY(30px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-        
-        @keyframes slideInDown {
-            from {
-                opacity: 0;
-                transform: translateY(-30px) translateX(-50%);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0) translateX(-50%);
-            }
-        }
-
-        /* تحسينات قائمة النشاط */
-        .activity-list {
-            max-height: 300px;
-            overflow-y: auto;
-        }
-        
-        .activity-item {
-            padding: 1rem;
-            border-bottom: 1px solid var(--border);
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-        }
-        
-        .activity-item:last-child {
-            border-bottom: none;
-        }
-        
-        .activity-icon {
-            width: 40px;
-            height: 40px;
-            background: var(--gray-100);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: var(--primary);
-        }
-        
-        .activity-content {
-            flex: 1;
-        }
-        
-        .activity-content p {
-            margin: 0;
-            font-weight: 500;
-        }
-        
-        .activity-time {
-            font-size: 0.8rem;
-            color: var(--gray-600);
-        }
-
-        /* تحسينات قائمة المستخدمين */
-        .users-list {
-            max-height: 300px;
-            overflow-y: auto;
-        }
-        
-        .user-list-item {
-            padding: 1rem;
-            border-bottom: 1px solid var(--border);
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-        }
-        
-        .user-list-item:last-child {
-            border-bottom: none;
-        }
-        
-        .user-status {
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            background: var(--success);
-        }
-        
-        .user-status.offline {
-            background: var(--gray-400);
-        }
-
-        /* ============ تحسينات نظام الدردشة (واتساب) ============ */
-        .chat-container {
-            display: grid;
-            grid-template-columns: 350px 1fr;
-            height: 80vh;
-            background: white;
-            border-radius: var(--border-radius-lg);
-            box-shadow: var(--shadow);
-            overflow: hidden;
-        }
-        
-        .chat-sidebar {
-            border-left: 1px solid var(--border);
-            display: flex;
-            flex-direction: column;
-            background: var(--gray-100);
-        }
-        
-        .chat-header {
-            padding: 1rem;
-            border-bottom: 1px solid var(--border);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            background: var(--whatsapp-dark);
-            color: white;
-        }
-        
-        .chat-search {
-            padding: 1rem;
-            border-bottom: 1px solid var(--border);
-            background: white;
-        }
-        
-        .chat-search input {
-            width: 100%;
-            padding: 0.5rem 1rem;
-            border: 1px solid var(--border);
-            border-radius: 20px;
-        }
-        
-        .conversations-list {
-            flex: 1;
-            overflow-y: auto;
-        }
-        
-        .conversation-item {
-            display: flex;
-            align-items: center;
-            padding: 1rem;
-            border-bottom: 1px solid var(--border);
-            cursor: pointer;
-            transition: var(--transition);
-        }
-        
-        .conversation-item:hover {
-            background: var(--gray-200);
-        }
-        
-        .conversation-item.active {
-            background: var(--whatsapp-green);
-            color: white;
-        }
-        
-        .conversation-avatar {
-            width: 50px;
-            height: 50px;
-            border-radius: 50%;
-            background: var(--gradient-primary);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 1.2rem;
-            margin-left: 1rem;
-        }
-        
-        .conversation-info {
-            flex: 1;
-        }
-        
-        .conversation-name {
-            font-weight: 600;
-            margin-bottom: 0.25rem;
-        }
-        
-        .conversation-last-message {
-            font-size: 0.85rem;
-            color: var(--gray-600);
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-        
-        .conversation-meta {
-            display: flex;
-            flex-direction: column;
-            align-items: flex-end;
-            gap: 0.25rem;
-        }
-        
-        .conversation-time {
-            font-size: 0.75rem;
-            color: var(--gray-500);
-        }
-        
-        .conversation-unread {
-            background: var(--whatsapp-green);
-            color: white;
-            border-radius: 50%;
-            width: 20px;
-            height: 20px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 0.7rem;
-            font-weight: 600;
-        }
-        
-        .chat-main {
-            display: flex;
-            flex-direction: column;
-            background: #e5ddd5;
-            background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M11 18c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm48 25c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm-43-7c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm63 31c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM34 90c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm56-76c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM12 86c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm28-65c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm23-11c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-6 60c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm29 22c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zM32 63c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm57-13c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-9-21c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM60 91c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM35 41c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM12 60c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2z' fill='%239C92AC' fill-opacity='0.05' fill-rule='evenodd'/%3E%3C/svg%3E");
-        }
-        
-        .chat-messages {
-            flex: 1;
-            padding: 1rem;
-            overflow-y: auto;
-            display: flex;
-            flex-direction: column;
-            gap: 0.5rem;
-        }
-        
-        .message {
-            max-width: 70%;
-            padding: 0.75rem 1rem;
-            border-radius: 7.5px;
-            position: relative;
-            animation: messageIn 0.3s ease-out;
-            word-wrap: break-word;
-        }
-        
-        @keyframes messageIn {
-            from {
-                opacity: 0;
-                transform: translateY(10px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-        
-        .message.sent {
-            background: var(--whatsapp-green);
-            color: white;
-            align-self: flex-end;
-            border-bottom-right-radius: 0;
-        }
-        
-        .message.received {
-            background: white;
-            color: var(--dark);
-            align-self: flex-start;
-            border-bottom-left-radius: 0;
-            box-shadow: 0 1px 0.5px rgba(0, 0, 0, 0.13);
-        }
-        
-        .message-time {
-            font-size: 0.7rem;
-            opacity: 0.7;
-            margin-top: 0.5rem;
-            text-align: right;
-        }
-        
-        .message.received .message-time {
-            text-align: left;
-        }
-        
-        .message-status {
-            position: absolute;
-            bottom: 5px;
-            left: 5px;
-            font-size: 0.7rem;
-            opacity: 0.7;
-        }
-        
-        .chat-input-container {
-            padding: 1rem;
-            background: white;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-        
-        .chat-input-tools {
-            display: flex;
-            gap: 0.5rem;
-        }
-        
-        .chat-tool-btn {
-            background: none;
-            border: none;
-            padding: 0.5rem;
-            border-radius: var(--border-radius);
-            color: var(--gray-600);
-            cursor: pointer;
-            font-size: 1.2rem;
-        }
-        
-        .chat-input-wrapper {
-            flex: 1;
-            display: flex;
-            align-items: center;
-            background: white;
-            border: 1px solid var(--border);
-            border-radius: 25px;
-            padding: 0.5rem 1rem;
-        }
-        
-        .chat-input-container input {
-            flex: 1;
-            border: none;
-            outline: none;
-            padding: 0.5rem;
-            font-size: 1rem;
-        }
-        
-        .emoji-picker-container {
-            position: absolute;
-            bottom: 70px;
-            left: 20px;
-            z-index: 1000;
-            display: none;
-        }
-        
-        .emoji-picker-container.active {
-            display: block;
-        }
-        
-        .emoji-btn {
-            background: none;
-            border: none;
-            font-size: 1.2rem;
-            cursor: pointer;
-            color: var(--gray-600);
-        }
-        
-        .send-btn {
-            background: var(--whatsapp-green);
-            border: none;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            cursor: pointer;
-        }
-
-        /* ============ تحسينات القصص ============ */
-        .stories-container {
-            display: flex;
-            gap: 1rem;
-            padding: 1rem;
-            overflow-x: auto;
-            margin-bottom: 2rem;
-        }
-        
-        .story-item {
-            flex: 0 0 auto;
-            width: 100px;
-            text-align: center;
-            cursor: pointer;
-        }
-        
-        .story-avatar {
-            width: 70px;
-            height: 70px;
-            border-radius: 50%;
-            margin: 0 auto 0.5rem;
-            padding: 3px;
-            background: var(--story-gradient);
-            position: relative;
-        }
-        
-        .story-avatar img {
-            width: 100%;
-            height: 100%;
-            border-radius: 50%;
-            object-fit: cover;
-            border: 3px solid white;
-        }
-        
-        .story-author {
-            font-size: 0.85rem;
-            font-weight: 500;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-        
-        .story-viewer {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.9);
-            z-index: 10000;
-            display: none;
-            align-items: center;
-            justify-content: center;
-        }
-        
-        .story-viewer.active {
-            display: flex;
-        }
-        
-        .story-content {
-            max-width: 400px;
-            width: 100%;
-            height: 80%;
-            position: relative;
-            border-radius: var(--border-radius);
-            overflow: hidden;
-        }
-        
-        .story-content img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-        
-        .story-progress {
-            position: absolute;
-            top: 10px;
-            left: 10px;
-            right: 10px;
-            display: flex;
-            gap: 5px;
-        }
-        
-        .story-progress-bar {
-            flex: 1;
-            height: 3px;
-            background: rgba(255, 255, 255, 0.4);
-            border-radius: 2px;
-            overflow: hidden;
-        }
-        
-        .story-progress-fill {
-            height: 100%;
-            background: white;
-            width: 0%;
-            transition: width 0.1s linear;
-        }
-        
-        .story-nav {
-            position: absolute;
-            top: 0;
-            bottom: 0;
-            width: 50%;
-            cursor: pointer;
-        }
-        
-        .story-nav.prev {
-            right: 0;
-        }
-        
-        .story-nav.next {
-            left: 0;
-        }
-        
-        .story-close {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            color: white;
-            background: rgba(0, 0, 0, 0.5);
-            border: none;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            z-index: 10;
-        }
-
-        /* ============ تحسينات المجموعات ============ */
-        .groups-container {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-            gap: 1.5rem;
-        }
-        
-        .group-card {
-            background: white;
-            border-radius: var(--border-radius-lg);
-            overflow: hidden;
-            box-shadow: var(--shadow);
-            transition: var(--transition);
-        }
-        
-        .group-card:hover {
-            transform: translateY(-5px);
-            box-shadow: var(--shadow-lg);
-        }
-        
-        .group-header {
-            padding: 1.5rem;
-            background: var(--group-gradient);
-            color: white;
-            position: relative;
-        }
-        
-        .group-avatar {
-            width: 70px;
-            height: 70px;
-            border-radius: 50%;
-            background: white;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: var(--primary);
-            font-size: 1.8rem;
-            margin-bottom: 1rem;
-            border: 3px solid white;
-        }
-        
-        .group-name {
-            font-size: 1.3rem;
-            font-weight: 700;
-            margin-bottom: 0.5rem;
-        }
-        
-        .group-members {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            font-size: 0.9rem;
-            opacity: 0.9;
-        }
-        
-        .group-body {
-            padding: 1.5rem;
-        }
-        
-        .group-description {
-            color: var(--gray-600);
-            margin-bottom: 1rem;
-            line-height: 1.5;
-        }
-        
-        .group-stats {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 1.5rem;
-            font-size: 0.9rem;
-            color: var(--gray-600);
-        }
-        
-        .group-actions {
-            display: flex;
-            gap: 0.5rem;
-        }
-        
-        .group-action-btn {
-            flex: 1;
-            padding: 0.5rem;
-            border: none;
-            border-radius: var(--border-radius);
-            cursor: pointer;
-            transition: var(--transition);
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
-        }
-        
-        .group-action-btn.join {
-            background: var(--gradient-primary);
-            color: white;
-        }
-        
-        .group-action-btn.info {
-            background: var(--gray-100);
-            color: var(--dark);
-        }
-        
-        .group-action-btn:hover {
-            transform: translateY(-2px);
-        }
-
-        /* ============ تحسينات القنوات ============ */
-        .channels-container {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-            gap: 1.5rem;
-        }
-        
-        .channel-card {
-            background: white;
-            border-radius: var(--border-radius-lg);
-            overflow: hidden;
-            box-shadow: var(--shadow);
-            transition: var(--transition);
-        }
-        
-        .channel-card:hover {
-            transform: translateY(-5px);
-            box-shadow: var(--shadow-lg);
-        }
-        
-        .channel-header {
-            padding: 1.5rem;
-            background: var(--channel-gradient);
-            color: white;
-            position: relative;
-        }
-        
-        .channel-avatar {
-            width: 70px;
-            height: 70px;
-            border-radius: 50%;
-            background: white;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: var(--primary);
-            font-size: 1.8rem;
-            margin-bottom: 1rem;
-            border: 3px solid white;
-        }
-        
-        .channel-name {
-            font-size: 1.3rem;
-            font-weight: 700;
-            margin-bottom: 0.5rem;
-        }
-        
-        .channel-subscribers {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            font-size: 0.9rem;
-            opacity: 0.9;
-        }
-        
-        .channel-body {
-            padding: 1.5rem;
-        }
-        
-        .channel-description {
-            color: var(--gray-600);
-            margin-bottom: 1rem;
-            line-height: 1.5;
-        }
-        
-        .channel-stats {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 1.5rem;
-            font-size: 0.9rem;
-            color: var(--gray-600);
-        }
-        
-        .channel-actions {
-            display: flex;
-            gap: 0.5rem;
-        }
-        
-        .channel-action-btn {
-            flex: 1;
-            padding: 0.5rem;
-            border: none;
-            border-radius: var(--border-radius);
-            cursor: pointer;
-            transition: var(--transition);
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
-        }
-        
-        .channel-action-btn.subscribe {
-            background: var(--gradient-primary);
-            color: white;
-        }
-        
-        .channel-action-btn.info {
-            background: var(--gray-100);
-            color: var(--dark);
-        }
-        
-        .channel-action-btn:hover {
-            transform: translateY(-2px);
-        }
-
-        /* ============ تحسينات الوسائط ============ */
-        .media-container {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-            gap: 1rem;
-        }
-        
-        .media-item {
-            border-radius: var(--border-radius);
-            overflow: hidden;
-            position: relative;
-            aspect-ratio: 1;
-            cursor: pointer;
-            transition: var(--transition);
-        }
-        
-        .media-item:hover {
-            transform: scale(1.03);
-        }
-        
-        .media-item img, .media-item video {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-        
-        .media-overlay {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            background: linear-gradient(transparent, rgba(0, 0, 0, 0.7));
-            color: white;
-            padding: 1rem;
-            transform: translateY(100%);
-            transition: var(--transition);
-        }
-        
-        .media-item:hover .media-overlay {
-            transform: translateY(0);
-        }
-        
-        .media-type {
-            position: absolute;
-            top: 10px;
-            left: 10px;
-            background: rgba(0, 0, 0, 0.7);
-            color: white;
-            padding: 0.25rem 0.5rem;
-            border-radius: var(--border-radius);
-            font-size: 0.8rem;
-        }
-
-        /* ============ تحسينات الإعدادات ============ */
-        .settings-container {
-            display: grid;
-            grid-template-columns: 250px 1fr;
-            gap: 2rem;
-        }
-        
-        .settings-sidebar {
-            background: white;
-            border-radius: var(--border-radius-lg);
-            box-shadow: var(--shadow);
-            overflow: hidden;
-        }
-        
-        .settings-menu {
-            list-style: none;
-        }
-        
-        .settings-menu-item {
-            padding: 1rem 1.5rem;
-            border-bottom: 1px solid var(--border);
-            cursor: pointer;
-            transition: var(--transition);
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-        }
-        
-        .settings-menu-item:hover {
-            background: var(--gray-100);
-        }
-        
-        .settings-menu-item.active {
-            background: var(--primary);
-            color: white;
-        }
-        
-        .settings-content {
-            background: white;
-            border-radius: var(--border-radius-lg);
-            box-shadow: var(--shadow);
-            padding: 2rem;
-        }
-        
-        .settings-section {
-            display: none;
-        }
-        
-        .settings-section.active {
-            display: block;
-            animation: fadeIn 0.5s ease-in;
-        }
-        
-        .setting-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 1rem 0;
-            border-bottom: 1px solid var(--border);
-        }
-        
-        .setting-item:last-child {
-            border-bottom: none;
-        }
-        
-        .setting-info h4 {
-            margin-bottom: 0.25rem;
-        }
-        
-        .setting-info p {
-            color: var(--gray-600);
-            font-size: 0.9rem;
-        }
-        
-        .toggle-switch {
-            position: relative;
-            display: inline-block;
-            width: 50px;
-            height: 24px;
-        }
-        
-        .toggle-switch input {
-            opacity: 0;
-            width: 0;
-            height: 0;
-        }
-        
-        .toggle-slider {
-            position: absolute;
-            cursor: pointer;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background-color: var(--gray-300);
-            transition: var(--transition);
-            border-radius: 34px;
-        }
-        
-        .toggle-slider:before {
-            position: absolute;
-            content: "";
-            height: 16px;
-            width: 16px;
-            right: 4px;
-            bottom: 4px;
-            background-color: white;
-            transition: var(--transition);
-            border-radius: 50%;
-        }
-        
-        input:checked + .toggle-slider {
-            background-color: var(--primary);
-        }
-        
-        input:checked + .toggle-slider:before {
-            transform: translateX(-26px);
-        }
-
-        /* ============ تحسينات التكيف مع الشاشات المختلفة ============ */
-        @media (max-width: 1200px) {
-            .content-grid {
-                grid-template-columns: 1fr;
-            }
-            
-            .settings-container {
-                grid-template-columns: 1fr;
-            }
-            
-            .settings-sidebar {
-                order: 2;
-            }
-            
-            .settings-content {
-                order: 1;
-            }
-        }
-
-        @media (max-width: 992px) {
-            .header-content {
-                padding: 0 1rem;
-            }
-            
-            .nav {
-                gap: 0.25rem;
-            }
-            
-            .nav-item {
-                padding: 0.5rem 1rem;
-                font-size: 0.9rem;
-            }
-            
-            .user-info {
-                padding: 0.5rem;
-            }
-            
-            .user-details {
-                display: none;
-            }
-            
-            .chat-container {
-                grid-template-columns: 1fr;
-            }
-            
-            .chat-sidebar {
-                display: none;
-            }
-            
-            .chat-sidebar.active {
-                display: flex;
-            }
-            
-            .chat-toggle {
-                display: block;
-            }
-        }
-
-        @media (max-width: 768px) {
-            .hero-title {
-                font-size: 2.2rem;
-            }
-            
-            .hero-actions {
-                flex-direction: column;
-                align-items: center;
-            }
-            
-            .stats-grid {
-                grid-template-columns: repeat(2, 1fr);
-            }
-            
-            .feature-grid {
-                grid-template-columns: 1fr;
-            }
-            
-            .nav {
-                display: none;
-            }
-            
-            .mobile-menu-btn {
-                display: block;
-            }
-            
-            .mobile-menu {
-                display: flex;
-                flex-direction: column;
-                position: fixed;
-                top: var(--header-height);
-                right: 0;
-                width: 280px;
-                height: calc(100vh - var(--header-height));
-                background: white;
-                box-shadow: var(--shadow-xl);
-                z-index: 999;
-                transform: translateX(100%);
-                transition: var(--transition);
-                padding: 1rem;
-            }
-            
-            .mobile-menu.active {
-                transform: translateX(0);
-            }
-            
-            .mobile-menu .nav-item {
-                padding: 1rem;
-                border-radius: var(--border-radius);
-                margin-bottom: 0.5rem;
-            }
-            
-            .overlay {
-                position: fixed;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 100%;
-                background: rgba(0, 0, 0, 0.5);
-                z-index: 998;
-                display: none;
-            }
-            
-            .overlay.active {
-                display: block;
-            }
-        }
-
-        @media (max-width: 576px) {
-            .main-content {
-                padding: 1rem;
-            }
-            
-            .stats-grid {
-                grid-template-columns: 1fr;
-            }
-            
-            .hero-title {
-                font-size: 1.8rem;
-            }
-            
-            .auth-card {
-                padding: 2rem 1.5rem;
-            }
-            
-            .floating-action-btn {
-                width: 50px;
-                height: 50px;
-                bottom: 15px;
-                left: 15px;
-            }
-            
-            .quick-actions-bar {
-                bottom: 70px;
-                left: 15px;
-            }
-        }
-
-        /* ============ تحسينات إضافية ============ */
-        .mobile-menu-btn {
-            display: none;
-            background: none;
-            border: none;
-            font-size: 1.5rem;
-            color: var(--dark);
-            cursor: pointer;
-            padding: 0.5rem;
-            border-radius: var(--border-radius);
-            transition: var(--transition);
-        }
-        
-        .mobile-menu-btn:hover {
-            background: var(--gray-100);
-        }
-        
-        .chat-toggle {
-            display: none;
-            background: none;
-            border: none;
-            font-size: 1.2rem;
-            color: var(--dark);
-            cursor: pointer;
-            padding: 0.5rem;
-            border-radius: var(--border-radius);
-            transition: var(--transition);
-        }
-        
-        .chat-toggle:hover {
-            background: var(--gray-100);
-        }
-        
-        .overlay {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.5);
-            z-index: 998;
-        }
-        
-        .overlay.active {
-            display: block;
-        }
-        
-        .section-title {
-            font-size: 1.5rem;
-            font-weight: 700;
-            margin-bottom: 1.5rem;
-            color: var(--dark);
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-        }
-        
-        .section-title i {
-            color: var(--primary);
-        }
-        
-        .empty-state {
-            text-align: center;
-            padding: 3rem 1rem;
-            color: var(--gray-600);
-        }
-        
-        .empty-state i {
-            font-size: 3rem;
-            margin-bottom: 1rem;
-            opacity: 0.5;
-        }
-        
-        .empty-state h3 {
-            margin-bottom: 0.5rem;
-            color: var(--gray-700);
-        }
-        
-        .loading {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            padding: 2rem;
-        }
-        
-        .spinner {
-            width: 40px;
-            height: 40px;
-            border: 4px solid rgba(0, 0, 0, 0.1);
-            border-left-color: var(--primary);
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-        
-        @keyframes spin {
-            to {
-                transform: rotate(360deg);
-            }
-        }
-        
-        .badge {
-            display: inline-block;
-            padding: 0.25rem 0.5rem;
-            border-radius: 20px;
-            font-size: 0.75rem;
-            font-weight: 600;
-        }
-        
-        .badge-primary {
-            background: var(--primary);
-            color: white;
-        }
-        
-        .badge-success {
-            background: var(--success);
-            color: white;
-        }
-        
-        .badge-warning {
-            background: var(--warning);
-            color: var(--dark);
-        }
-        
-        .badge-danger {
-            background: var(--danger);
-            color: white;
-        }
-        
-        .badge-info {
-            background: var(--info);
-            color: white;
-        }
-        
-        .divider {
-            height: 1px;
-            background: var(--border);
-            margin: 1.5rem 0;
-        }
-        
-        .text-center {
-            text-align: center;
-        }
-        
-        .text-right {
-            text-align: left;
-        }
-        
-        .text-muted {
-            color: var(--gray-600);
-        }
-        
-        .mt-1 { margin-top: 0.5rem; }
-        .mt-2 { margin-top: 1rem; }
-        .mt-3 { margin-top: 1.5rem; }
-        .mt-4 { margin-top: 2rem; }
-        .mt-5 { margin-top: 3rem; }
-        
-        .mb-1 { margin-bottom: 0.5rem; }
-        .mb-2 { margin-bottom: 1rem; }
-        .mb-3 { margin-bottom: 1.5rem; }
-        .mb-4 { margin-bottom: 2rem; }
-        .mb-5 { margin-bottom: 3rem; }
-        
-        .p-1 { padding: 0.5rem; }
-        .p-2 { padding: 1rem; }
-        .p-3 { padding: 1.5rem; }
-        .p-4 { padding: 2rem; }
-        .p-5 { padding: 3rem; }
-
-        /* ============ تحسينات الوضع الليلي ============ */
-        body.dark-mode {
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-            color: var(--gray-200);
-        }
-        
-        body.dark-mode .header {
-            background: rgba(30, 30, 46, 0.95);
-            border-bottom-color: #2d3748;
-        }
-        
-        body.dark-mode .header.scrolled {
-            background: rgba(30, 30, 46, 0.98);
-        }
-        
-        body.dark-mode .logo-text {
-            color: var(--primary-light);
-        }
-        
-        body.dark-mode .nav-item {
-            color: var(--gray-200);
-        }
-        
-        body.dark-mode .user-info {
-            background: #2d3748;
-            color: var(--gray-200);
-            border-color: #4a5568;
-        }
-        
-        body.dark-mode .user-name {
-            color: var(--gray-200);
-        }
-        
-        body.dark-mode .feature-card,
-        body.dark-mode .auth-card,
-        body.dark-mode .stat-card,
-        body.dark-mode .content-card,
-        body.dark-mode .group-card,
-        body.dark-mode .channel-card,
-        body.dark-mode .settings-sidebar,
-        body.dark-mode .settings-content,
-        body.dark-mode .chat-sidebar,
-        body.dark-mode .chat-search,
-        body.dark-mode .chat-input-container {
-            background: #2d3748;
-            color: var(--gray-200);
-        }
-        
-        body.dark-mode .form-group input,
-        body.dark-mode .form-group select,
-        body.dark-mode .chat-search input,
-        body.dark-mode .chat-input-wrapper {
-            background: #1a202c;
-            border-color: #4a5568;
-            color: var(--gray-200);
-        }
-        
-        body.dark-mode .form-group input:focus,
-        body.dark-mode .form-group select:focus {
-            border-color: var(--primary-light);
-            box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.1);
-        }
-        
-        body.dark-mode .quick-actions-bar {
-            background: #2d3748;
-        }
-        
-        body.dark-mode .quick-action:hover {
-            background: #4a5568;
-        }
-        
-        body.dark-mode .message.received {
-            background: #4a5568;
-            color: var(--gray-200);
-        }
-        
-        body.dark-mode .chat-main {
-            background: #1a202c;
-        }
-        
-        body.dark-mode .conversation-item:hover {
-            background: #4a5568;
-        }
-        
-        body.dark-mode .setting-item {
-            border-bottom-color: #4a5568;
-        }
-        
-        body.dark-mode .settings-menu-item:hover {
-            background: #4a5568;
-        }
-        
-        body.dark-mode .empty-state {
-            color: var(--gray-400);
-        }
-        
-        body.dark-mode .empty-state h3 {
-            color: var(--gray-300);
-        }
-        
-        body.dark-mode .section-title {
-            color: var(--gray-200);
-        }
-        
-        body.dark-mode .hero-description,
-        body.dark-mode .text-muted,
-        body.dark-mode .user-role,
-        body.dark-mode .conversation-last-message,
-        body.dark-mode .conversation-time,
-        body.dark-mode .group-description,
-        body.dark-mode .channel-description,
-        body.dark-mode .setting-info p {
-            color: var(--gray-400);
-        }
-
-        /* ============ تحسينات الوضع المدمج ============ */
-        body.embedded {
-            background: white;
-        }
-        
-        body.embedded .header {
-            background: white;
-            box-shadow: none;
-            border-bottom: 1px solid var(--border);
-        }
-        
-        body.embedded .main-content {
-            padding: 1rem;
-        }
-        
-        body.embedded .floating-action-btn,
-        body.embedded .quick-actions-bar,
-        body.embedded .update-notification {
-            display: none;
-        }
-    </style>
 </head>
 <body>
     <!-- شاشة الترحيب -->
@@ -2363,12 +256,12 @@
                     <form id="loginForm">
                         <div class="form-group">
                             <label for="loginEmail">البريد الإلكتروني</label>
-                            <input type="email" id="loginEmail" required>
+                            <input type="email" id="loginEmail" required placeholder="example@email.com">
                         </div>
                         
                         <div class="form-group">
                             <label for="loginPassword">كلمة المرور</label>
-                            <input type="password" id="loginPassword" required>
+                            <input type="password" id="loginPassword" required placeholder="أدخل كلمة المرور">
                         </div>
                         
                         <div class="form-group">
@@ -2400,17 +293,17 @@
                     <form id="registerForm">
                         <div class="form-group">
                             <label for="registerName">الاسم الكامل</label>
-                            <input type="text" id="registerName" required>
+                            <input type="text" id="registerName" required placeholder="أدخل اسمك الكامل">
                         </div>
                         
                         <div class="form-group">
                             <label for="registerEmail">البريد الإلكتروني</label>
-                            <input type="email" id="registerEmail" required>
+                            <input type="email" id="registerEmail" required placeholder="example@email.com">
                         </div>
                         
                         <div class="form-group">
                             <label for="registerPassword">كلمة المرور</label>
-                            <input type="password" id="registerPassword" required>
+                            <input type="password" id="registerPassword" required placeholder="أنشئ كلمة مرور قوية">
                         </div>
                         
                         <div class="form-group">
@@ -2693,36 +586,31 @@
                 المجموعات التعليمية
             </h1>
             
-            <div class="groups-container">
+            <div class="groups-grid">
                 <div class="group-card">
                     <div class="group-header">
                         <div class="group-avatar">
                             <i class="fas fa-calculator"></i>
                         </div>
-                        <h3 class="group-name">مجموعة الرياضيات</h3>
-                        <div class="group-members">
-                            <i class="fas fa-users"></i>
-                            24 عضو
-                        </div>
+                        <h3>مجموعة الرياضيات</h3>
+                        <p>24 عضو</p>
                     </div>
-                    <div class="group-body">
-                        <p class="group-description">
-                            مجموعة مخصصة لدراسة مادة الرياضيات ومناقشة المسائل والحلول.
-                        </p>
+                    <div class="group-info">
+                        <p>مجموعة مخصصة لدراسة مادة الرياضيات ومناقشة المسائل والحلول.</p>
                         <div class="group-stats">
-                            <span>آخر نشاط: منذ ساعة</span>
-                            <span>12 منشور جديد</span>
+                            <div class="group-stat">
+                                <div class="group-stat-number">12</div>
+                                <div class="group-stat-label">منشور جديد</div>
+                            </div>
+                            <div class="group-stat">
+                                <div class="group-stat-number">8</div>
+                                <div class="group-stat-label">أعضاء متصلين</div>
+                            </div>
                         </div>
-                        <div class="group-actions">
-                            <button class="group-action-btn join">
-                                <i class="fas fa-sign-in-alt"></i>
-                                انضم
-                            </button>
-                            <button class="group-action-btn info">
-                                <i class="fas fa-info-circle"></i>
-                                معلومات
-                            </button>
-                        </div>
+                        <button class="btn btn-primary btn-block mt-3">
+                            <i class="fas fa-sign-in-alt"></i>
+                            الانضمام للمجموعة
+                        </button>
                     </div>
                 </div>
                 
@@ -2731,30 +619,25 @@
                         <div class="group-avatar">
                             <i class="fas fa-flask"></i>
                         </div>
-                        <h3 class="group-name">مجموعة العلوم</h3>
-                        <div class="group-members">
-                            <i class="fas fa-users"></i>
-                            18 عضو
-                        </div>
+                        <h3>مجموعة العلوم</h3>
+                        <p>18 عضو</p>
                     </div>
-                    <div class="group-body">
-                        <p class="group-description">
-                            مناقشة تجارب العلوم والظواهر الطبيعية والمفاهيم العلمية.
-                        </p>
+                    <div class="group-info">
+                        <p>مناقشة تجارب العلوم والظواهر الطبيعية والمفاهيم العلمية.</p>
                         <div class="group-stats">
-                            <span>آخر نشاط: منذ 3 ساعات</span>
-                            <span>7 منشور جديد</span>
+                            <div class="group-stat">
+                                <div class="group-stat-number">7</div>
+                                <div class="group-stat-label">منشور جديد</div>
+                            </div>
+                            <div class="group-stat">
+                                <div class="group-stat-number">5</div>
+                                <div class="group-stat-label">أعضاء متصلين</div>
+                            </div>
                         </div>
-                        <div class="group-actions">
-                            <button class="group-action-btn join">
-                                <i class="fas fa-sign-in-alt"></i>
-                                انضم
-                            </button>
-                            <button class="group-action-btn info">
-                                <i class="fas fa-info-circle"></i>
-                                معلومات
-                            </button>
-                        </div>
+                        <button class="btn btn-primary btn-block mt-3">
+                            <i class="fas fa-sign-in-alt"></i>
+                            الانضمام للمجموعة
+                        </button>
                     </div>
                 </div>
                 
@@ -2763,30 +646,25 @@
                         <div class="group-avatar">
                             <i class="fas fa-language"></i>
                         </div>
-                        <h3 class="group-name">مجموعة اللغة العربية</h3>
-                        <div class="group-members">
-                            <i class="fas fa-users"></i>
-                            32 عضو
-                        </div>
+                        <h3>مجموعة اللغة العربية</h3>
+                        <p>32 عضو</p>
                     </div>
-                    <div class="group-body">
-                        <p class="group-description">
-                            تطوير مهارات اللغة العربية من خلال النقاشات والتمارين.
-                        </p>
+                    <div class="group-info">
+                        <p>تطوير مهارات اللغة العربية من خلال النقاشات والتمارين.</p>
                         <div class="group-stats">
-                            <span>آخر نشاط: منذ يوم</span>
-                            <span>15 منشور جديد</span>
+                            <div class="group-stat">
+                                <div class="group-stat-number">15</div>
+                                <div class="group-stat-label">منشور جديد</div>
+                            </div>
+                            <div class="group-stat">
+                                <div class="group-stat-number">12</div>
+                                <div class="group-stat-label">أعضاء متصلين</div>
+                            </div>
                         </div>
-                        <div class="group-actions">
-                            <button class="group-action-btn join">
-                                <i class="fas fa-sign-in-alt"></i>
-                                انضم
-                            </button>
-                            <button class="group-action-btn info">
-                                <i class="fas fa-info-circle"></i>
-                                معلومات
-                            </button>
-                        </div>
+                        <button class="btn btn-primary btn-block mt-3">
+                            <i class="fas fa-sign-in-alt"></i>
+                            الانضمام للمجموعة
+                        </button>
                     </div>
                 </div>
             </div>
@@ -2799,36 +677,31 @@
                 القنوات التعليمية
             </h1>
             
-            <div class="channels-container">
+            <div class="channels-grid">
                 <div class="channel-card">
                     <div class="channel-header">
                         <div class="channel-avatar">
                             <i class="fas fa-video"></i>
                         </div>
-                        <h3 class="channel-name">قناة الفيزياء</h3>
-                        <div class="channel-subscribers">
-                            <i class="fas fa-users"></i>
-                            150 مشترك
-                        </div>
+                        <h3>قناة الفيزياء</h3>
+                        <p>150 مشترك</p>
                     </div>
-                    <div class="channel-body">
-                        <p class="channel-description">
-                            قناة تعليمية متخصصة في شرح مفاهيم الفيزياء وتطبيقاتها.
-                        </p>
+                    <div class="channel-info">
+                        <p>قناة تعليمية متخصصة في شرح مفاهيم الفيزياء وتطبيقاتها.</p>
                         <div class="channel-stats">
-                            <span>آخر بث: منذ يومين</span>
-                            <span>3 فيديوهات جديدة</span>
+                            <div class="channel-stat">
+                                <div class="channel-stat-number">3</div>
+                                <div class="channel-stat-label">فيديوهات جديدة</div>
+                            </div>
+                            <div class="channel-stat">
+                                <div class="channel-stat-number">1.2K</div>
+                                <div class="channel-stat-label">مشاهدة</div>
+                            </div>
                         </div>
-                        <div class="channel-actions">
-                            <button class="channel-action-btn subscribe">
-                                <i class="fas fa-bell"></i>
-                                اشترك
-                            </button>
-                            <button class="channel-action-btn info">
-                                <i class="fas fa-info-circle"></i>
-                                معلومات
-                            </button>
-                        </div>
+                        <button class="btn btn-primary btn-block mt-3">
+                            <i class="fas fa-bell"></i>
+                            الاشتراك في القناة
+                        </button>
                     </div>
                 </div>
                 
@@ -2837,30 +710,25 @@
                         <div class="channel-avatar">
                             <i class="fas fa-history"></i>
                         </div>
-                        <h3 class="channel-name">قناة التاريخ</h3>
-                        <div class="channel-subscribers">
-                            <i class="fas fa-users"></i>
-                            89 مشترك
-                        </div>
+                        <h3>قناة التاريخ</h3>
+                        <p>89 مشترك</p>
                     </div>
-                    <div class="channel-body">
-                        <p class="channel-description">
-                            استكشاف الأحداث التاريخية والشخصيات المؤثرة عبر العصور.
-                        </p>
+                    <div class="channel-info">
+                        <p>استكشاف الأحداث التاريخية والشخصيات المؤثرة عبر العصور.</p>
                         <div class="channel-stats">
-                            <span>آخر بث: منذ أسبوع</span>
-                            <span>5 فيديوهات جديدة</span>
+                            <div class="channel-stat">
+                                <div class="channel-stat-number">5</div>
+                                <div class="channel-stat-label">فيديوهات جديدة</div>
+                            </div>
+                            <div class="channel-stat">
+                                <div class="channel-stat-number">856</div>
+                                <div class="channel-stat-label">مشاهدة</div>
+                            </div>
                         </div>
-                        <div class="channel-actions">
-                            <button class="channel-action-btn subscribe">
-                                <i class="fas fa-bell"></i>
-                                اشترك
-                            </button>
-                            <button class="channel-action-btn info">
-                                <i class="fas fa-info-circle"></i>
-                                معلومات
-                            </button>
-                        </div>
+                        <button class="btn btn-primary btn-block mt-3">
+                            <i class="fas fa-bell"></i>
+                            الاشتراك في القناة
+                        </button>
                     </div>
                 </div>
                 
@@ -2869,30 +737,25 @@
                         <div class="channel-avatar">
                             <i class="fas fa-paint-brush"></i>
                         </div>
-                        <h3 class="channel-name">قناة الفنون</h3>
-                        <div class="channel-subscribers">
-                            <i class="fas fa-users"></i>
-                            210 مشترك
-                        </div>
+                        <h3>قناة الفنون</h3>
+                        <p>210 مشترك</p>
                     </div>
-                    <div class="channel-body">
-                        <p class="channel-description">
-                            تعلم تقنيات الرسم والتلوين ومبادئ التصميم والفنون المختلفة.
-                        </p>
+                    <div class="channel-info">
+                        <p>تعلم تقنيات الرسم والتلوين ومبادئ التصميم والفنون المختلفة.</p>
                         <div class="channel-stats">
-                            <span>آخر بث: مباشر الآن</span>
-                            <span>12 فيديو جديد</span>
+                            <div class="channel-stat">
+                                <div class="channel-stat-number">12</div>
+                                <div class="channel-stat-label">فيديوهات جديدة</div>
+                            </div>
+                            <div class="channel-stat">
+                                <div class="channel-stat-number">2.3K</div>
+                                <div class="channel-stat-label">مشاهدة</div>
+                            </div>
                         </div>
-                        <div class="channel-actions">
-                            <button class="channel-action-btn subscribe">
-                                <i class="fas fa-bell"></i>
-                                اشترك
-                            </button>
-                            <button class="channel-action-btn info">
-                                <i class="fas fa-info-circle"></i>
-                                معلومات
-                            </button>
-                        </div>
+                        <button class="btn btn-primary btn-block mt-3">
+                            <i class="fas fa-bell"></i>
+                            الاشتراك في القناة
+                        </button>
                     </div>
                 </div>
             </div>
@@ -2905,10 +768,9 @@
                 الوسائط التعليمية
             </h1>
             
-            <div class="media-container">
+            <div class="media-grid">
                 <div class="media-item">
-                    <img src="https://via.placeholder.com/300" alt="صورة تعليمية">
-                    <div class="media-type">صورة</div>
+                    <img src="https://via.placeholder.com/300" alt="رسم بياني للدوال">
                     <div class="media-overlay">
                         <h4>رسم بياني للدوال</h4>
                         <p>مادة الرياضيات</p>
@@ -2916,8 +778,7 @@
                 </div>
                 
                 <div class="media-item">
-                    <img src="https://via.placeholder.com/300" alt="صورة تعليمية">
-                    <div class="media-type">صورة</div>
+                    <img src="https://via.placeholder.com/300" alt="خريطة المفاهيم">
                     <div class="media-overlay">
                         <h4>خريطة المفاهيم</h4>
                         <p>مادة العلوم</p>
@@ -2925,8 +786,7 @@
                 </div>
                 
                 <div class="media-item">
-                    <img src="https://via.placeholder.com/300" alt="صورة تعليمية">
-                    <div class="media-type">صورة</div>
+                    <img src="https://via.placeholder.com/300" alt="جدول العناصر">
                     <div class="media-overlay">
                         <h4>جدول العناصر</h4>
                         <p>مادة الكيمياء</p>
@@ -2934,20 +794,7 @@
                 </div>
                 
                 <div class="media-item">
-                    <video controls>
-                        <source src="#" type="video/mp4">
-                        متصفحك لا يدعم تشغيل الفيديو
-                    </video>
-                    <div class="media-type">فيديو</div>
-                    <div class="media-overlay">
-                        <h4>شرح نظرية فيثاغورس</h4>
-                        <p>مادة الرياضيات</p>
-                    </div>
-                </div>
-                
-                <div class="media-item">
-                    <img src="https://via.placeholder.com/300" alt="صورة تعليمية">
-                    <div class="media-type">صورة</div>
+                    <img src="https://via.placeholder.com/300" alt="دورة المياه">
                     <div class="media-overlay">
                         <h4>دورة المياه في الطبيعة</h4>
                         <p>مادة العلوم</p>
@@ -2955,11 +802,18 @@
                 </div>
                 
                 <div class="media-item">
-                    <img src="https://via.placeholder.com/300" alt="صورة تعليمية">
-                    <div class="media-type">صورة</div>
+                    <img src="https://via.placeholder.com/300" alt="خط الزمن">
                     <div class="media-overlay">
                         <h4>خط الزمن التاريخي</h4>
                         <p>مادة التاريخ</p>
+                    </div>
+                </div>
+                
+                <div class="media-item">
+                    <img src="https://via.placeholder.com/300" alt="خريطة العالم">
+                    <div class="media-overlay">
+                        <h4>خريطة العالم السياسية</h4>
+                        <p>مادة الجغرافيا</p>
                     </div>
                 </div>
             </div>
@@ -3005,171 +859,133 @@
                 <div class="settings-content">
                     <div class="settings-section active" id="account-section">
                         <h3>إعدادات الحساب</h3>
-                        <div class="setting-item">
-                            <div class="setting-info">
-                                <h4>المعلومات الشخصية</h4>
-                                <p>عدل معلوماتك الشخصية مثل الاسم والبريد الإلكتروني</p>
-                            </div>
-                            <button class="btn btn-outline">تعديل</button>
+                        <div class="form-group">
+                            <label for="userName">الاسم الكامل</label>
+                            <input type="text" id="userName" value="محمد أحمد">
                         </div>
-                        <div class="setting-item">
-                            <div class="setting-info">
-                                <h4>كلمة المرور</h4>
-                                <p>قم بتغيير كلمة المرور الخاصة بحسابك</p>
-                            </div>
-                            <button class="btn btn-outline">تغيير</button>
+                        <div class="form-group">
+                            <label for="userEmail">البريد الإلكتروني</label>
+                            <input type="email" id="userEmail" value="mohamed@example.com">
                         </div>
-                        <div class="setting-item">
-                            <div class="setting-info">
-                                <h4>حذف الحساب</h4>
-                                <p>احذف حسابك بشكل دائم من المنصة</p>
-                            </div>
-                            <button class="btn btn-outline" style="color: var(--danger);">حذف</button>
+                        <div class="form-group">
+                            <label for="userRole">الدور</label>
+                            <select id="userRole">
+                                <option value="student">طالب</option>
+                                <option value="teacher">معلم</option>
+                                <option value="admin">مسؤول</option>
+                            </select>
                         </div>
+                        <button class="btn btn-primary">
+                            <i class="fas fa-save"></i>
+                            حفظ التغييرات
+                        </button>
                     </div>
                     
                     <div class="settings-section" id="privacy-section">
                         <h3>إعدادات الخصوصية</h3>
-                        <div class="setting-item">
-                            <div class="setting-info">
-                                <h4>الحساب الخاص</h4>
-                                <p>اجعل حسابك خاصاً بحيث لا يمكن للآخرين رؤية نشاطك</p>
-                            </div>
+                        <div class="form-group">
+                            <label class="toggle-switch">
+                                <input type="checkbox" checked>
+                                <span class="toggle-slider"></span>
+                                إظهار حالة الاتصال
+                            </label>
+                        </div>
+                        <div class="form-group">
+                            <label class="toggle-switch">
+                                <input type="checkbox" checked>
+                                <span class="toggle-slider"></span>
+                                السماح بالرسائل المباشرة
+                            </label>
+                        </div>
+                        <div class="form-group">
                             <label class="toggle-switch">
                                 <input type="checkbox">
                                 <span class="toggle-slider"></span>
-                            </label>
-                        </div>
-                        <div class="setting-item">
-                            <div class="setting-info">
-                                <h4>إظهار حالة الاتصال</h4>
-                                <p>السماح للآخرين برؤية ما إذا كنت متصلاً أم لا</p>
-                            </div>
-                            <label class="toggle-switch">
-                                <input type="checkbox" checked>
-                                <span class="toggle-slider"></span>
-                            </label>
-                        </div>
-                        <div class="setting-item">
-                            <div class="setting-info">
-                                <h4>السماح بالرسائل المباشرة</h4>
-                                <p>السماح لأعضاء المنصة بإرسال رسائل مباشرة لك</p>
-                            </div>
-                            <label class="toggle-switch">
-                                <input type="checkbox" checked>
-                                <span class="toggle-slider"></span>
+                                الحساب الخاص
                             </label>
                         </div>
                     </div>
                     
                     <div class="settings-section" id="notifications-section">
                         <h3>إعدادات الإشعارات</h3>
-                        <div class="setting-item">
-                            <div class="setting-info">
-                                <h4>إشعارات الدردشة</h4>
-                                <p>تلقي إشعارات عند وصول رسائل جديدة</p>
-                            </div>
+                        <div class="form-group">
                             <label class="toggle-switch">
                                 <input type="checkbox" checked>
                                 <span class="toggle-slider"></span>
+                                إشعارات الدردشة
                             </label>
                         </div>
-                        <div class="setting-item">
-                            <div class="setting-info">
-                                <h4>إشعارات المجموعات</h4>
-                                <p>تلقي إشعارات عند وجود نشاط جديد في مجموعاتك</p>
-                            </div>
-                                <label class="toggle-switch">
+                        <div class="form-group">
+                            <label class="toggle-switch">
                                 <input type="checkbox" checked>
                                 <span class="toggle-slider"></span>
+                                إشعارات المجموعات
                             </label>
                         </div>
-                        <div class="setting-item">
-                            <div class="setting-info">
-                                <h4>إشعارات البريد الإلكتروني</h4>
-                                <p>إرسال إشعارات إلى بريدك الإلكتروني</p>
-                            </div>
+                        <div class="form-group">
                             <label class="toggle-switch">
                                 <input type="checkbox">
                                 <span class="toggle-slider"></span>
+                                إشعارات البريد الإلكتروني
                             </label>
                         </div>
                     </div>
                     
                     <div class="settings-section" id="appearance-section">
                         <h3>إعدادات المظهر</h3>
-                        <div class="setting-item">
-                            <div class="setting-info">
-                                <h4>الوضع الليلي</h4>
-                                <p>تفعيل الوضع الليلي لتجربة استخدام مريحة للعين</p>
-                            </div>
+                        <div class="form-group">
                             <label class="toggle-switch">
                                 <input type="checkbox" id="darkModeToggle">
                                 <span class="toggle-slider"></span>
+                                الوضع الليلي
                             </label>
                         </div>
-                        <div class="setting-item">
-                            <div class="setting-info">
-                                <h4>كثافة العناصر</h4>
-                                <p>ضبط المسافات بين العناصر في الواجهة</p>
-                            </div>
-                            <select>
-                                <option>مدمج</option>
-                                <option>معتدل</option>
-                                <option>واسع</option>
+                        <div class="form-group">
+                            <label for="themeColor">لون السمة</label>
+                            <select id="themeColor">
+                                <option value="blue">أزرق</option>
+                                <option value="green">أخضر</option>
+                                <option value="purple">بنفسجي</option>
                             </select>
                         </div>
-                        <div class="setting-item">
-                            <div class="setting-info">
-                                <h4>حجم الخط</h4>
-                                <p>تغيير حجم النص في الواجهة</p>
-                            </div>
-                            <select>
-                                <option>صغير</option>
-                                <option selected>متوسط</option>
-                                <option>كبير</option>
-                                <option>كبير جداً</option>
+                        <div class="form-group">
+                            <label for="fontSize">حجم الخط</label>
+                            <select id="fontSize">
+                                <option value="small">صغير</option>
+                                <option value="medium" selected>متوسط</option>
+                                <option value="large">كبير</option>
                             </select>
                         </div>
                     </div>
                     
                     <div class="settings-section" id="language-section">
                         <h3>إعدادات اللغة</h3>
-                        <div class="setting-item">
-                            <div class="setting-info">
-                                <h4>لغة الواجهة</h4>
-                                <p>اختر اللغة المعروضة في واجهة المنصة</p>
-                            </div>
-                            <select>
-                                <option selected>العربية</option>
-                                <option>English</option>
-                                <option>Français</option>
+                        <div class="form-group">
+                            <label for="interfaceLanguage">لغة الواجهة</label>
+                            <select id="interfaceLanguage">
+                                <option value="ar" selected>العربية</option>
+                                <option value="en">English</option>
+                                <option value="fr">Français</option>
                             </select>
                         </div>
                     </div>
                     
                     <div class="settings-section" id="about-section">
                         <h3>حول التطبيق</h3>
-                        <div class="setting-item">
-                            <div class="setting-info">
-                                <h4>الإصدار</h4>
-                                <p>الإصدار الحالي من المنصة التعليمية</p>
-                            </div>
-                            <span>v2.1.0</span>
+                        <div class="about-info">
+                            <p><strong>الإصدار:</strong> v2.1.0</p>
+                            <p><strong>تاريخ البناء:</strong> 2024</p>
+                            <p><strong>المطور:</strong> فريق المنصة التعليمية</p>
                         </div>
-                        <div class="setting-item">
-                            <div class="setting-info">
-                                <h4>الشروط والأحكام</h4>
-                                <p>اطلع على شروط استخدام المنصة</p>
-                            </div>
-                            <button class="btn btn-outline">عرض</button>
-                        </div>
-                        <div class="setting-item">
-                            <div class="setting-info">
-                                <h4>سياسة الخصوصية</h4>
-                                <p>تعرف على كيفية تعاملنا مع بياناتك</p>
-                            </div>
-                            <button class="btn btn-outline">عرض</button>
+                        <div class="mt-4">
+                            <button class="btn btn-outline">
+                                <i class="fas fa-file-contract"></i>
+                                الشروط والأحكام
+                            </button>
+                            <button class="btn btn-outline">
+                                <i class="fas fa-shield-alt"></i>
+                                سياسة الخصوصية
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -3207,6 +1023,27 @@
     </button>
 
     <!-- القصص -->
+    <div class="stories-container">
+        <div class="story-item" data-story="1">
+            <div class="story-avatar">
+                <img src="https://via.placeholder.com/70" alt="الأستاذ أحمد">
+            </div>
+            <div class="story-author">الأستاذ أحمد</div>
+        </div>
+        <div class="story-item" data-story="2">
+            <div class="story-avatar">
+                <img src="https://via.placeholder.com/70" alt="مجموعة الرياضيات">
+            </div>
+            <div class="story-author">مجموعة الرياضيات</div>
+        </div>
+        <div class="story-item" data-story="3">
+            <div class="story-avatar">
+                <img src="https://via.placeholder.com/70" alt="قناة العلوم">
+            </div>
+            <div class="story-author">قناة العلوم</div>
+        </div>
+    </div>
+
     <div class="story-viewer" id="storyViewer">
         <button class="story-close" id="storyClose">
             <i class="fas fa-times"></i>
@@ -3229,793 +1066,6 @@
         </div>
     </div>
 
-    <script>
-        // ============ المتغيرات العامة ============
-        let currentUser = null;
-        let isOnline = navigator.onLine;
-        let socket = null;
-        let emojiPicker = null;
-        let currentStoryIndex = 0;
-        let stories = [
-            { id: 1, author: "الأستاذ أحمد", image: "https://via.placeholder.com/400x700" },
-            { id: 2, author: "مجموعة الرياضيات", image: "https://via.placeholder.com/400x700" },
-            { id: 3, author: "قناة العلوم", image: "https://via.placeholder.com/400x700" }
-        ];
-
-        // ============ تهيئة التطبيق ============
-        document.addEventListener('DOMContentLoaded', function() {
-            initializeApp();
-            setupEventListeners();
-            checkAuthentication();
-            setupServiceWorker();
-            initializeSocketConnection();
-        });
-
-        // ============ الدوال الأساسية ============
-
-        // تهيئة التطبيق
-        function initializeApp() {
-            // تهيئة منتقي الإيموجي
-            emojiPicker = document.querySelector('emoji-picker');
-            if (emojiPicker) {
-                emojiPicker.addEventListener('emoji-click', event => {
-                    const chatInput = document.getElementById('chatInput');
-                    chatInput.value += event.detail.unicode;
-                    chatInput.focus();
-                });
-            }
-
-            // التحقق من حالة الاتصال
-            updateConnectionStatus();
-            window.addEventListener('online', updateConnectionStatus);
-            window.addEventListener('offline', updateConnectionStatus);
-
-            // إعداد قصص
-            initializeStories();
-
-            console.log('تم تهيئة التطبيق بنجاح');
-        }
-
-        // إعداد مستمعي الأحداث
-        function setupEventListeners() {
-            // التنقل بين الصفحات
-            document.querySelectorAll('[data-page]').forEach(element => {
-                element.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    const pageName = this.getAttribute('data-page');
-                    navigateToPage(pageName);
-                });
-            });
-
-            // إعدادات القائمة
-            document.querySelectorAll('.settings-menu-item').forEach(item => {
-                item.addEventListener('click', function() {
-                    const section = this.getAttribute('data-section');
-                    showSettingsSection(section);
-                });
-            });
-
-            // النماذج
-            document.getElementById('loginForm')?.addEventListener('submit', handleLogin);
-            document.getElementById('registerForm')?.addEventListener('submit', handleRegister);
-
-            // الزر العائم
-            document.getElementById('floatingActionBtn')?.addEventListener('click', toggleQuickActions);
-
-            // زر بدء التطبيق
-            document.getElementById('startAppBtn')?.addEventListener('click', startApp);
-
-            // زر التحديث
-            document.getElementById('reloadBtn')?.addEventListener('click', reloadApp);
-
-            // القائمة المتنقلة
-            document.getElementById('mobileMenuBtn')?.addEventListener('click', toggleMobileMenu);
-            document.getElementById('overlay')?.addEventListener('click', closeMobileMenu);
-
-            // الدردشة
-            document.getElementById('sendMessageBtn')?.addEventListener('click', sendMessage);
-            document.getElementById('chatInput')?.addEventListener('keypress', function(e) {
-                if (e.key === 'Enter') sendMessage();
-            });
-            document.getElementById('emojiToggle')?.addEventListener('click', toggleEmojiPicker);
-            document.getElementById('chatToggle')?.addEventListener('click', toggleChatSidebar);
-            document.getElementById('chatToggleMain')?.addEventListener('click', toggleChatSidebar);
-
-            // القصص
-            document.getElementById('storyClose')?.addEventListener('click', closeStoryViewer);
-            document.getElementById('storyPrev')?.addEventListener('click', showPreviousStory);
-            document.getElementById('storyNext')?.addEventListener('click', showNextStory);
-
-            // الوضع الليلي
-            document.getElementById('darkModeToggle')?.addEventListener('change', toggleDarkMode);
-
-            // التمرير في الهيدر
-            window.addEventListener('scroll', handleHeaderScroll);
-        }
-
-        // التحقق من المصادقة
-        function checkAuthentication() {
-            const userData = localStorage.getItem('currentUser');
-            if (userData) {
-                currentUser = JSON.parse(userData);
-                showAuthenticatedUI();
-                navigateToPage('dashboard');
-            } else {
-                showUnauthenticatedUI();
-                navigateToPage('home');
-            }
-        }
-
-        // ============ التنقل والعرض ============
-
-        // التنقل بين الصفحات
-        function navigateToPage(pageName) {
-            // إخفاء جميع الصفحات
-            document.querySelectorAll('.page').forEach(page => {
-                page.classList.remove('active');
-            });
-
-            // إخفاء القائمة المتنقلة
-            closeMobileMenu();
-
-            // إخفاء شريط الأدوات السريع
-            document.getElementById('quickActionsBar').classList.remove('active');
-
-            // إخفاء منتقي الإيموجي
-            document.getElementById('emojiPickerContainer').classList.remove('active');
-
-            // إخفاء شاشة الترحيب إذا كانت مرئية
-            if (pageName !== 'welcome') {
-                document.getElementById('welcomeScreen').style.display = 'none';
-            }
-
-            // عرض الصفحة المطلوبة
-            const targetPage = document.getElementById(`${pageName}-page`);
-            if (targetPage) {
-                targetPage.classList.add('active');
-
-                // تحديث حالة التنقل النشط
-                document.querySelectorAll('.nav-item').forEach(item => {
-                    item.classList.remove('active');
-                    if (item.getAttribute('data-page') === pageName) {
-                        item.classList.add('active');
-                    }
-                });
-
-                // تحديث عنوان الصفحة
-                document.title = getPageTitle(pageName);
-            }
-
-            // إخفاء شاشة الترحيب بعد التنقل
-            if (pageName !== 'welcome' && document.getElementById('welcomeScreen').style.display !== 'none') {
-                setTimeout(() => {
-                    document.getElementById('welcomeScreen').style.display = 'none';
-                }, 500);
-            }
-        }
-
-        // الحصول على عنوان الصفحة
-        function getPageTitle(pageName) {
-            const titles = {
-                'home': 'الرئيسية - المنصة التعليمية',
-                'login': 'تسجيل الدخول - المنصة التعليمية',
-                'register': 'إنشاء حساب - المنصة التعليمية',
-                'dashboard': 'لوحة التحكم - المنصة التعليمية',
-                'chat': 'الدردشة - المنصة التعليمية',
-                'groups': 'المجموعات - المنصة التعليمية',
-                'channels': 'القنوات - المنصة التعليمية',
-                'media': 'الوسائط - المنصة التعليمية',
-                'settings': 'الإعدادات - المنصة التعليمية'
-            };
-            return titles[pageName] || 'المنصة التعليمية';
-        }
-
-        // عرض واجهة المستخدم للمستخدم المصادق
-        function showAuthenticatedUI() {
-            document.querySelectorAll('.nav-item.hidden').forEach(item => {
-                if (item.id === 'logoutBtn') {
-                    item.classList.remove('hidden');
-                } else if (item.id === 'loginBtn' || item.id === 'registerBtn') {
-                    item.classList.add('hidden');
-                }
-            });
-
-            document.getElementById('userInfo').classList.remove('hidden');
-            document.getElementById('mobileLoginBtn').classList.add('hidden');
-            document.getElementById('mobileRegisterBtn').classList.add('hidden');
-            document.getElementById('mobileLogoutBtn').classList.remove('hidden');
-        }
-
-        // عرض واجهة المستخدم للزائر
-        function showUnauthenticatedUI() {
-            document.querySelectorAll('.nav-item.hidden').forEach(item => {
-                if (item.id === 'loginBtn' || item.id === 'registerBtn') {
-                    item.classList.remove('hidden');
-                } else if (item.id === 'logoutBtn') {
-                    item.classList.add('hidden');
-                }
-            });
-
-            document.getElementById('userInfo').classList.add('hidden');
-            document.getElementById('mobileLoginBtn').classList.remove('hidden');
-            document.getElementById('mobileRegisterBtn').classList.remove('hidden');
-            document.getElementById('mobileLogoutBtn').classList.add('hidden');
-        }
-
-        // عرض قسم الإعدادات
-        function showSettingsSection(sectionName) {
-            // إخفاء جميع الأقسام
-            document.querySelectorAll('.settings-section').forEach(section => {
-                section.classList.remove('active');
-            });
-
-            // تحديث القائمة النشطة
-            document.querySelectorAll('.settings-menu-item').forEach(item => {
-                item.classList.remove('active');
-                if (item.getAttribute('data-section') === sectionName) {
-                    item.classList.add('active');
-                }
-            });
-
-            // عرض القسم المطلوب
-            const targetSection = document.getElementById(`${sectionName}-section`);
-            if (targetSection) {
-                targetSection.classList.add('active');
-            }
-        }
-
-        // ============ إدارة الحالة ============
-
-        // تحديث حالة الاتصال
-        function updateConnectionStatus() {
-            const statusElement = document.getElementById('connectionStatus');
-            isOnline = navigator.onLine;
-
-            if (isOnline) {
-                statusElement.innerHTML = '<i class="fas fa-wifi"></i><span>متصل بالإنترنت</span>';
-                statusElement.className = 'connection-status';
-                setTimeout(() => {
-                    statusElement.style.display = 'none';
-                }, 3000);
-            } else {
-                statusElement.innerHTML = '<i class="fas fa-wifi-slash"></i><span>غير متصل بالإنترنت</span>';
-                statusElement.className = 'connection-status offline';
-                statusElement.style.display = 'flex';
-            }
-        }
-
-        // التعامل مع التمرير في الهيدر
-        function handleHeaderScroll() {
-            const header = document.getElementById('header');
-            if (window.scrollY > 50) {
-                header.classList.add('scrolled');
-            } else {
-                header.classList.remove('scrolled');
-            }
-        }
-
-        // ============ إدارة المصادقة ============
-
-        // معالجة تسجيل الدخول
-        function handleLogin(e) {
-            e.preventDefault();
-            const email = document.getElementById('loginEmail').value;
-            const password = document.getElementById('loginPassword').value;
-
-            // محاكاة عملية تسجيل الدخول
-            if (email && password) {
-                currentUser = {
-                    id: 1,
-                    name: 'محمد أحمد',
-                    email: email,
-                    role: 'student'
-                };
-
-                localStorage.setItem('currentUser', JSON.stringify(currentUser));
-                showAuthenticatedUI();
-                navigateToPage('dashboard');
-                showNotification('تم تسجيل الدخول بنجاح', 'success');
-            } else {
-                showNotification('يرجى ملء جميع الحقول', 'error');
-            }
-        }
-
-        // معالجة إنشاء الحساب
-        function handleRegister(e) {
-            e.preventDefault();
-            const name = document.getElementById('registerName').value;
-            const email = document.getElementById('registerEmail').value;
-            const password = document.getElementById('registerPassword').value;
-            const role = document.getElementById('registerRole').value;
-
-            // محاكاة عملية إنشاء الحساب
-            if (name && email && password && role) {
-                currentUser = {
-                    id: Date.now(),
-                    name: name,
-                    email: email,
-                    role: role
-                };
-
-                localStorage.setItem('currentUser', JSON.stringify(currentUser));
-                showAuthenticatedUI();
-                navigateToPage('dashboard');
-                showNotification('تم إنشاء الحساب بنجاح', 'success');
-            } else {
-                showNotification('يرجى ملء جميع الحقول', 'error');
-            }
-        }
-
-        // تسجيل الخروج
-        function handleLogout() {
-            currentUser = null;
-            localStorage.removeItem('currentUser');
-            showUnauthenticatedUI();
-            navigateToPage('home');
-            showNotification('تم تسجيل الخروج بنجاح', 'info');
-        }
-
-        // ============ الميزات التفاعلية ============
-
-        // تبديل شريط الأدوات السريع
-        function toggleQuickActions() {
-            const quickActionsBar = document.getElementById('quickActionsBar');
-            quickActionsBar.classList.toggle('active');
-        }
-
-        // بدء التطبيق (إخفاء شاشة الترحيب)
-        function startApp() {
-            document.getElementById('welcomeScreen').style.opacity = '0';
-            setTimeout(() => {
-                document.getElementById('welcomeScreen').style.display = 'none';
-                navigateToPage('home');
-            }, 500);
-        }
-
-        // تحديث التطبيق
-        function reloadApp() {
-            window.location.reload();
-        }
-
-        // تبديل القائمة المتنقلة
-        function toggleMobileMenu() {
-            const mobileMenu = document.getElementById('mobileMenu');
-            const overlay = document.getElementById('overlay');
-            mobileMenu.classList.toggle('active');
-            overlay.classList.toggle('active');
-        }
-
-        // إغلاق القائمة المتنقلة
-        function closeMobileMenu() {
-            const mobileMenu = document.getElementById('mobileMenu');
-            const overlay = document.getElementById('overlay');
-            mobileMenu.classList.remove('active');
-            overlay.classList.remove('active');
-        }
-
-        // ============ نظام الدردشة ============
-
-        // إرسال رسالة
-        function sendMessage() {
-            const chatInput = document.getElementById('chatInput');
-            const message = chatInput.value.trim();
-
-            if (message) {
-                const chatMessages = document.getElementById('chatMessages');
-                const messageElement = document.createElement('div');
-                messageElement.className = 'message sent';
-                messageElement.innerHTML = `
-                    <div class="message-text">${message}</div>
-                    <div class="message-time">${new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}</div>
-                    <div class="message-status">
-                        <i class="fas fa-check-double"></i>
-                    </div>
-                `;
-
-                chatMessages.appendChild(messageElement);
-                chatInput.value = '';
-
-                // محاكاة الرد
-                setTimeout(() => {
-                    const replyElement = document.createElement('div');
-                    replyElement.className = 'message received';
-                    replyElement.innerHTML = `
-                        <div class="message-text">شكراً على رسالتك، سأرد عليك قريباً</div>
-                        <div class="message-time">${new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}</div>
-                    `;
-                    chatMessages.appendChild(replyElement);
-                    chatMessages.scrollTop = chatMessages.scrollHeight;
-                }, 2000);
-
-                chatMessages.scrollTop = chatMessages.scrollHeight;
-            }
-        }
-
-        // تبديل منتقي الإيموجي
-        function toggleEmojiPicker() {
-            const emojiPickerContainer = document.getElementById('emojiPickerContainer');
-            emojiPickerContainer.classList.toggle('active');
-        }
-
-        // تبديل الشريط الجانبي للدردشة
-        function toggleChatSidebar() {
-            const chatSidebar = document.getElementById('chatSidebar');
-            chatSidebar.classList.toggle('active');
-        }
-
-        // ============ نظام القصص ============
-
-        // تهيئة القصص
-        function initializeStories() {
-            const storiesContainer = document.querySelector('.stories-container');
-            if (!storiesContainer) return;
-
-            stories.forEach((story, index) => {
-                const storyElement = document.createElement('div');
-                storyElement.className = 'story-item';
-                storyElement.innerHTML = `
-                    <div class="story-avatar">
-                        <img src="https://via.placeholder.com/70" alt="${story.author}">
-                    </div>
-                    <div class="story-author">${story.author}</div>
-                `;
-                storyElement.addEventListener('click', () => openStoryViewer(index));
-                storiesContainer.appendChild(storyElement);
-            });
-        }
-
-        // فتح عارض القصص
-        function openStoryViewer(index) {
-            currentStoryIndex = index;
-            const storyViewer = document.getElementById('storyViewer');
-            const storyContent = storyViewer.querySelector('.story-content img');
-            
-            storyContent.src = stories[index].image;
-            storyViewer.classList.add('active');
-            
-            startStoryProgress();
-        }
-
-        // إغلاق عارض القصص
-        function closeStoryViewer() {
-            const storyViewer = document.getElementById('storyViewer');
-            storyViewer.classList.remove('active');
-            resetStoryProgress();
-        }
-
-        // عرض القصة السابقة
-        function showPreviousStory() {
-            if (currentStoryIndex > 0) {
-                currentStoryIndex--;
-                openStoryViewer(currentStoryIndex);
-            }
-        }
-
-        // عرض القصة التالية
-        function showNextStory() {
-            if (currentStoryIndex < stories.length - 1) {
-                currentStoryIndex++;
-                openStoryViewer(currentStoryIndex);
-            } else {
-                closeStoryViewer();
-            }
-        }
-
-        // بدء تقدم القصة
-        function startStoryProgress() {
-            resetStoryProgress();
-            const progressBars = document.querySelectorAll('.story-progress-fill');
-            if (progressBars[currentStoryIndex]) {
-                progressBars[currentStoryIndex].style.width = '100%';
-                progressBars[currentStoryIndex].style.transition = 'width 5s linear';
-            }
-            
-            setTimeout(() => {
-                showNextStory();
-            }, 5000);
-        }
-
-        // إعادة تعيين تقدم القصة
-        function resetStoryProgress() {
-            const progressBars = document.querySelectorAll('.story-progress-fill');
-            progressBars.forEach(bar => {
-                bar.style.width = '0%';
-                bar.style.transition = 'none';
-            });
-        }
-
-        // ============ المظهر والثيم ============
-
-        // تبديل الوضع الليلي
-        function toggleDarkMode() {
-            document.body.classList.toggle('dark-mode');
-            localStorage.setItem('darkMode', document.body.classList.contains('dark-mode'));
-        }
-
-        // التحقق من إعدادات الوضع الليلي المحفوظة
-        function checkDarkModePreference() {
-            const darkMode = localStorage.getItem('darkMode');
-            if (darkMode === 'true') {
-                document.body.classList.add('dark-mode');
-                document.getElementById('darkModeToggle').checked = true;
-            }
-        }
-
-        // ============ الإشعارات ============
-
-        // عرض الإشعارات
-        function showNotification(message, type = 'info') {
-            // إنشاء عنصر الإشعار
-            const notification = document.createElement('div');
-            notification.className = `notification notification-${type}`;
-            notification.innerHTML = `
-                <div class="notification-content">
-                    <i class="fas fa-${getNotificationIcon(type)}"></i>
-                    <span>${message}</span>
-                </div>
-                <button class="notification-close">
-                    <i class="fas fa-times"></i>
-                </button>
-            `;
-
-            // إضافة styles للإشعار
-            const style = document.createElement('style');
-            style.textContent = `
-                .notification {
-                    position: fixed;
-                    top: 20px;
-                    left: 50%;
-                    transform: translateX(-50%);
-                    background: white;
-                    padding: 1rem 1.5rem;
-                    border-radius: var(--border-radius);
-                    box-shadow: var(--shadow-xl);
-                    z-index: 10000;
-                    display: flex;
-                    align-items: center;
-                    gap: 1rem;
-                    border-right: 4px solid var(--${type});
-                    animation: slideInDown 0.3s ease-out;
-                    max-width: 400px;
-                }
-                .notification-content {
-                    display: flex;
-                    align-items: center;
-                    gap: 0.75rem;
-                    flex: 1;
-                }
-                .notification-close {
-                    background: none;
-                    border: none;
-                    cursor: pointer;
-                    color: var(--gray-500);
-                    padding: 0.25rem;
-                    border-radius: var(--border-radius);
-                }
-                .notification-close:hover {
-                    background: var(--gray-100);
-                }
-                @keyframes slideInDown {
-                    from {
-                        opacity: 0;
-                        transform: translateY(-30px) translateX(-50%);
-                    }
-                    to {
-                        opacity: 1;
-                        transform: translateY(0) translateX(-50%);
-                    }
-                }
-            `;
-            document.head.appendChild(style);
-
-            // إضافة الإشعار إلى الصفحة
-            document.body.appendChild(notification);
-
-            // إضافة مستمع حدث للإغلاق
-            notification.querySelector('.notification-close').addEventListener('click', () => {
-                notification.remove();
-            });
-
-            // إزالة الإشعار تلقائياً بعد 5 ثوان
-            setTimeout(() => {
-                if (notification.parentNode) {
-                    notification.remove();
-                }
-            }, 5000);
-        }
-
-        // الحصول على أيقونة الإشعار
-        function getNotificationIcon(type) {
-            const icons = {
-                'success': 'check-circle',
-                'error': 'exclamation-circle',
-                'warning': 'exclamation-triangle',
-                'info': 'info-circle'
-            };
-            return icons[type] || 'info-circle';
-        }
-
-        // ============ اتصال السوكيت ============
-
-        // تهيئة اتصال السوكيت
-        function initializeSocketConnection() {
-            try {
-                // محاكاة اتصال السوكيت
-                socket = {
-                    on: (event, callback) => {
-                        console.log(`تم إعداد مستمع لحدث: ${event}`);
-                    },
-                    emit: (event, data) => {
-                        console.log(`تم إرسال حدث: ${event}`, data);
-                    }
-                };
-
-                // محاكاة الأحداث
-                simulateSocketEvents();
-            } catch (error) {
-                console.error('خطأ في اتصال السوكيت:', error);
-            }
-        }
-
-        // محاكاة أحداث السوكيت
-        function simulateSocketEvents() {
-            // محاكاة رسالة جديدة
-            setTimeout(() => {
-                if (socket) {
-                    const event = new CustomEvent('socketMessage', {
-                        detail: {
-                            type: 'new_message',
-                            data: {
-                                from: 'الأستاذ أحمد',
-                                message: 'هل تحتاج إلى مساعدة في الواجب؟',
-                                time: new Date()
-                            }
-                        }
-                    });
-                    window.dispatchEvent(event);
-                }
-            }, 10000);
-
-            // محاكاة تحديث التطبيق
-            setTimeout(() => {
-                showUpdateNotification();
-            }, 30000);
-        }
-
-        // عرض إشعار التحديث
-        function showUpdateNotification() {
-            const updateNotification = document.getElementById('updateNotification');
-            updateNotification.classList.add('active');
-            
-            setTimeout(() => {
-                updateNotification.classList.remove('active');
-            }, 10000);
-        }
-
-        // ============ Service Worker ============
-
-        // إعداد Service Worker
-        function setupServiceWorker() {
-            if ('serviceWorker' in navigator) {
-                navigator.serviceWorker.register('/sw.js')
-                    .then(registration => {
-                        console.log('تم تسجيل Service Worker بنجاح:', registration);
-                    })
-                    .catch(error => {
-                        console.log('فشل تسجيل Service Worker:', error);
-                    });
-            }
-        }
-
-        // ============ وظائف مساعدة إضافية ============
-
-        // نسخ النص إلى الحافظة
-        function copyToClipboard(text) {
-            navigator.clipboard.writeText(text)
-                .then(() => {
-                    showNotification('تم نسخ النص', 'success');
-                })
-                .catch(err => {
-                    console.error('فشل نسخ النص: ', err);
-                    showNotification('فشل نسخ النص', 'error');
-                });
-        }
-
-        // تنزيل الملف
-        function downloadFile(url, filename) {
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = filename;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-        }
-
-        // فتح النافذة المنبثقة
-        function openPopup(url, title, width = 800, height = 600) {
-            const left = (screen.width - width) / 2;
-            const top = (screen.height - height) / 2;
-            window.open(url, title, `width=${width},height=${height},left=${left},top=${top}`);
-        }
-
-        // إضافة تأثير الاهتزاز
-        function shakeElement(element) {
-            element.classList.add('shake');
-            setTimeout(() => {
-                element.classList.remove('shake');
-            }, 500);
-        }
-
-        // إضافة تأثير التوهج
-        function glowElement(element, color = 'var(--primary)') {
-            element.style.boxShadow = `0 0 10px ${color}`;
-            setTimeout(() => {
-                element.style.boxShadow = '';
-            }, 1000);
-        }
-
-        // ============ تهيئة إضافية عند التحميل ============
-        window.addEventListener('load', function() {
-            // التحقق من تفضيلات الوضع الليلي
-            checkDarkModePreference();
-
-            // إظهار إشعار ترحيب
-            setTimeout(() => {
-                if (currentUser) {
-                    showNotification(`مرحباً بعودتك، ${currentUser.name}`, 'success');
-                }
-            }, 1000);
-
-            // إضافة تأثيرات للعناصر
-            document.querySelectorAll('.feature-card').forEach((card, index) => {
-                setTimeout(() => {
-                    card.style.opacity = '1';
-                    card.style.transform = 'translateY(0)';
-                }, index * 200);
-            });
-        });
-
-        // ============ إعدادات إضافية للتحسين ============
-
-        // تحسين أداء التمرير
-        let scrollTimeout;
-        window.addEventListener('scroll', function() {
-            if (scrollTimeout) {
-                clearTimeout(scrollTimeout);
-            }
-            scrollTimeout = setTimeout(handleHeaderScroll, 10);
-        });
-
-        // تحسين استهلاك الذاكرة
-        window.addEventListener('beforeunload', function() {
-            if (socket) {
-                socket.disconnect();
-            }
-        });
-
-        // تحميل باهظ للبيانات
-        function lazyLoadImages() {
-            const images = document.querySelectorAll('img[data-src]');
-            const imageObserver = new IntersectionObserver((entries, observer) => {
-                entries.forEach(entry => {
-                    if (entry.isIntersecting) {
-                        const img = entry.target;
-                        img.src = img.getAttribute('data-src');
-                        img.removeAttribute('data-src');
-                        imageObserver.unobserve(img);
-                    }
-                });
-            });
-
-            images.forEach(img => imageObserver.observe(img));
-        }
-
-        // تهيئة التحميل الباهظ عند التحميل
-        if ('IntersectionObserver' in window) {
-            lazyLoadImages();
-        }
-
-        console.log('تم تحميل التطبيق بالكامل وجاهز للاستخدام');
-    </script>
+    <script src="js/app.js"></script>
 </body>
 </html>
