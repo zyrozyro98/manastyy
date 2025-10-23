@@ -131,12 +131,12 @@
             </nav>
 
             <div class="user-info hidden" id="userInfo">
-                <div class="user-avatar" id="userAvatar">
-                    <span>?</span>
+                <div class="user-avatar">
+                    <span id="userAvatarText">م</span>
                 </div>
                 <div class="user-details">
-                    <div class="user-name" id="userName">زائر</div>
-                    <div class="user-role" id="userRole">مستخدم</div>
+                    <div class="user-name" id="userNameDisplay">محمد أحمد</div>
+                    <div class="user-role" id="userRoleDisplay">طالب</div>
                 </div>
             </div>
 
@@ -148,52 +148,7 @@
 
     <!-- القائمة المتنقلة -->
     <div class="mobile-menu" id="mobileMenu">
-        <!-- نفس محتوى القائمة الرئيسية -->
-        <a href="#" class="nav-item" data-page="home">
-            <i class="fas fa-home"></i>
-            الرئيسية
-        </a>
-        <a href="#" class="nav-item" data-page="dashboard">
-            <i class="fas fa-tachometer-alt"></i>
-            لوحة التحكم
-        </a>
-        <a href="#" class="nav-item" data-page="chat">
-            <i class="fab fa-whatsapp"></i>
-            الدردشة
-            <span class="nav-item-badge" id="mobileUnreadMessagesCount">0</span>
-        </a>
-        <a href="#" class="nav-item" data-page="stories">
-            <i class="fas fa-history"></i>
-            القصص
-        </a>
-        <a href="#" class="nav-item" data-page="groups">
-            <i class="fas fa-users"></i>
-            المجموعات
-        </a>
-        <a href="#" class="nav-item" data-page="channels">
-            <i class="fas fa-broadcast-tower"></i>
-            القنوات
-        </a>
-        <a href="#" class="nav-item" data-page="media">
-            <i class="fas fa-photo-video"></i>
-            الوسائط
-        </a>
-        <a href="#" class="nav-item" data-page="settings">
-            <i class="fas fa-cog"></i>
-            الإعدادات
-        </a>
-        <a href="#" class="nav-item hidden" id="mobileLoginBtn" data-page="login">
-            <i class="fas fa-sign-in-alt"></i>
-            تسجيل الدخول
-        </a>
-        <a href="#" class="nav-item hidden" id="mobileRegisterBtn" data-page="register">
-            <i class="fas fa-user-plus"></i>
-            إنشاء حساب
-        </a>
-        <a href="#" class="nav-item hidden" id="mobileLogoutBtn">
-            <i class="fas fa-sign-out-alt"></i>
-            تسجيل الخروج
-        </a>
+        <!-- نفس محتوى nav -->
     </div>
 
     <!-- طبقة التعتيم -->
@@ -203,230 +158,26 @@
     <main class="main-content">
         <!-- الصفحة الرئيسية -->
         <div class="page active" id="home-page">
-            <div class="hero-section">
-                <h1 class="hero-title">المنصة التعليمية المتطورة</h1>
-                <p class="hero-description">
-                    نظام تعليمي متكامل يجمع بين أحدث التقنيات وأساليب التعليم التفاعلي 
-                    لتقديم تجربة تعليمية فريدة ومتميزة للطلاب والمعلمين على حد سواء.
-                </p>
-                <div class="hero-actions">
-                    <button class="btn btn-primary btn-lg" data-page="register">
-                        <i class="fas fa-user-plus"></i>
-                        انضم إلينا الآن
-                    </button>
-                    <button class="btn btn-outline btn-lg" data-page="login">
-                        <i class="fas fa-sign-in-alt"></i>
-                        تسجيل الدخول
-                    </button>
-                </div>
-            </div>
-
-            <div class="feature-grid">
-                <div class="feature-card">
-                    <div class="feature-icon">
-                        <i class="fas fa-comments"></i>
-                    </div>
-                    <h3>دردشة مباشرة</h3>
-                    <p>تواصل فوري مع المعلمين والزملاء عبر نظام دردشة متطور</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">
-                        <i class="fas fa-users"></i>
-                    </div>
-                    <h3>مجموعات تعليمية</h3>
-                    <p>انضم لمجموعات الدراسة والتعلم التعاوني مع زملائك</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">
-                        <i class="fas fa-video"></i>
-                    </div>
-                    <h3>فصول افتراضية</h3>
-                    <p>حضور الدروس عبر الفصول الافتراضية التفاعلية</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">
-                        <i class="fas fa-chart-line"></i>
-                    </div>
-                    <h3>تتبع التقدم</h3>
-                    <p>مراقبة تقدمك التعليمي عبر تقارير وتحليلات مفصلة</p>
-                </div>
-            </div>
+            <!-- محتوى الصفحة الرئيسية -->
         </div>
 
         <!-- صفحة تسجيل الدخول -->
         <div class="page" id="login-page">
-            <div class="auth-container">
-                <div class="auth-card">
-                    <div class="auth-header">
-                        <h2>تسجيل الدخول</h2>
-                        <p class="text-muted">ادخل بياناتك للوصول إلى حسابك</p>
-                    </div>
-                    
-                    <form id="loginForm">
-                        <div class="form-group">
-                            <label for="loginEmail">البريد الإلكتروني</label>
-                            <input type="email" id="loginEmail" required placeholder="example@email.com">
-                        </div>
-                        
-                        <div class="form-group">
-                            <label for="loginPassword">كلمة المرور</label>
-                            <input type="password" id="loginPassword" required placeholder="أدخل كلمة المرور">
-                        </div>
-                        
-                        <div class="form-group">
-                            <button type="submit" class="btn btn-primary btn-block">
-                                <i class="fas fa-sign-in-alt"></i>
-                                تسجيل الدخول
-                            </button>
-                        </div>
-                    </form>
-                    
-                    <div class="auth-footer">
-                        <p class="text-muted">ليس لديك حساب؟ 
-                            <a href="#" data-page="register">إنشاء حساب جديد</a>
-                        </p>
-                    </div>
-                </div>
-            </div>
+            <!-- محتوى تسجيل الدخول -->
         </div>
 
         <!-- صفحة إنشاء حساب -->
         <div class="page" id="register-page">
-            <div class="auth-container">
-                <div class="auth-card">
-                    <div class="auth-header">
-                        <h2>إنشاء حساب جديد</h2>
-                        <p class="text-muted">املأ البيانات التالية لإنشاء حسابك</p>
-                    </div>
-                    
-                    <form id="registerForm">
-                        <div class="form-group">
-                            <label for="registerName">الاسم الكامل</label>
-                            <input type="text" id="registerName" required placeholder="أدخل اسمك الكامل">
-                        </div>
-                        
-                        <div class="form-group">
-                            <label for="registerEmail">البريد الإلكتروني</label>
-                            <input type="email" id="registerEmail" required placeholder="example@email.com">
-                        </div>
-                        
-                        <div class="form-group">
-                            <label for="registerPassword">كلمة المرور</label>
-                            <input type="password" id="registerPassword" required placeholder="أنشئ كلمة مرور قوية">
-                        </div>
-                        
-                        <div class="form-group">
-                            <label for="registerRole">الدور</label>
-                            <select id="registerRole" required>
-                                <option value="">اختر دورك</option>
-                                <option value="student">طالب</option>
-                                <option value="teacher">معلم</option>
-                                <option value="admin">مسؤول</option>
-                            </select>
-                        </div>
-                        
-                        <div class="form-group">
-                            <button type="submit" class="btn btn-primary btn-block">
-                                <i class="fas fa-user-plus"></i>
-                                إنشاء حساب
-                            </button>
-                        </div>
-                    </form>
-                    
-                    <div class="auth-footer">
-                        <p class="text-muted">لديك حساب بالفعل؟ 
-                            <a href="#" data-page="login">تسجيل الدخول</a>
-                        </p>
-                    </div>
-                </div>
-            </div>
+            <!-- محتوى إنشاء حساب -->
         </div>
 
         <!-- صفحة لوحة التحكم -->
         <div class="page" id="dashboard-page">
-            <div class="dashboard-header">
-                <h1 class="section-title">
-                    <i class="fas fa-tachometer-alt"></i>
-                    لوحة التحكم
-                </h1>
-                <p class="text-muted">نظرة عامة على نشاطك التعليمي وتقدمك</p>
-            </div>
-            
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <div class="stat-icon">
-                        <i class="fas fa-book"></i>
-                    </div>
-                    <div class="stat-info">
-                        <h3 id="coursesCount">0</h3>
-                        <span>المقررات المسجلة</span>
-                    </div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon">
-                        <i class="fas fa-tasks"></i>
-                    </div>
-                    <div class="stat-info">
-                        <h3 id="assignmentsCount">0</h3>
-                        <span>الواجبات المكتملة</span>
-                    </div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon">
-                        <i class="fas fa-chart-line"></i>
-                    </div>
-                    <div class="stat-info">
-                        <h3 id="progressPercentage">0%</h3>
-                        <span>معدل التقدم</span>
-                    </div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon">
-                        <i class="fas fa-award"></i>
-                    </div>
-                    <div class="stat-info">
-                        <h3 id="achievementsCount">0</h3>
-                        <span>الإنجازات</span>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="content-grid">
-                <div class="content-card">
-                    <h3 class="section-title">
-                        <i class="fas fa-bell"></i>
-                        النشاط الأخير
-                    </h3>
-                    <div class="activity-list" id="activityList">
-                        <!-- سيتم ملؤها ديناميكياً -->
-                    </div>
-                </div>
-                
-                <div class="content-card">
-                    <h3 class="section-title">
-                        <i class="fas fa-users"></i>
-                        الزملاء المتصلين
-                    </h3>
-                    <div class="users-list" id="onlineUsersList">
-                        <!-- سيتم ملؤها ديناميكياً -->
-                    </div>
-                </div>
-            </div>
+            <!-- محتوى لوحة التحكم -->
         </div>
 
         <!-- صفحة الدردشة -->
         <div class="page" id="chat-page">
-            <div class="chat-header-section">
-                <h1 class="section-title">
-                    <i class="fab fa-whatsapp"></i>
-                    نظام الدردشة
-                </h1>
-                <button class="btn btn-outline" id="newChatBtn">
-                    <i class="fas fa-plus"></i>
-                    محادثة جديدة
-                </button>
-            </div>
-            
             <div class="chat-container">
                 <div class="chat-sidebar active" id="chatSidebar">
                     <div class="chat-header">
@@ -437,44 +188,52 @@
                     </div>
                     
                     <div class="chat-search">
-                        <input type="text" id="chatSearch" placeholder="بحث في المحادثات...">
+                        <input type="text" id="chatSearchInput" placeholder="بحث في المحادثات...">
                     </div>
                     
                     <div class="conversations-list" id="conversationsList">
-                        <!-- سيتم ملؤها ديناميكياً -->
+                        <!-- سيتم ملء المحادثات ديناميكياً -->
                     </div>
                 </div>
                 
                 <div class="chat-main">
-                    <div class="chat-header" id="currentChatHeader">
+                    <div class="chat-header" id="activeChatHeader">
                         <div class="chat-user-info">
                             <div class="conversation-avatar small">
-                                <i class="fas fa-comments"></i>
+                                <span id="activeChatAvatar">?</span>
                             </div>
                             <div>
-                                <div class="conversation-name">اختر محادثة</div>
-                                <div class="user-status-text">اختر محادثة لبدء الدردشة</div>
+                                <div class="conversation-name" id="activeChatName">اختر محادثة</div>
+                                <div class="user-status-text" id="activeChatStatus">غير متصل</div>
                             </div>
                         </div>
-                        <button class="chat-toggle" id="chatToggleMain">
-                            <i class="fas fa-bars"></i>
-                        </button>
+                        <div class="chat-actions">
+                            <button class="chat-tool-btn" id="voiceCallBtn" title="مكالمة صوتية">
+                                <i class="fas fa-phone"></i>
+                            </button>
+                            <button class="chat-tool-btn" id="videoCallBtn" title="مكالمة فيديو">
+                                <i class="fas fa-video"></i>
+                            </button>
+                            <button class="chat-toggle" id="chatToggleMain">
+                                <i class="fas fa-bars"></i>
+                            </button>
+                        </div>
                     </div>
                     
                     <div class="chat-messages" id="chatMessages">
-                        <div class="empty-chat-state">
-                            <i class="fas fa-comments fa-3x"></i>
-                            <h3>مرحباً في الدردشة!</h3>
-                            <p>اختر محادثة من القائمة لبدء المحادثة</p>
+                        <div class="empty-chat" id="emptyChat">
+                            <i class="fas fa-comments"></i>
+                            <h3>مرحباً في الدردشة</h3>
+                            <p>اختر محادثة لبدء التحدث</p>
                         </div>
                     </div>
                     
                     <div class="chat-input-container" id="chatInputContainer" style="display: none;">
                         <div class="chat-input-tools">
-                            <button class="chat-tool-btn" id="attachFileBtn">
+                            <button class="chat-tool-btn" id="attachFileBtn" title="إرفاق ملف">
                                 <i class="fas fa-paperclip"></i>
                             </button>
-                            <button class="chat-tool-btn" id="emojiToggle">
+                            <button class="chat-tool-btn" id="emojiToggle" title="إدراج إيموجي">
                                 <i class="fas fa-smile"></i>
                             </button>
                             <input type="file" id="fileInput" style="display: none;" accept="image/*,video/*,audio/*,.pdf,.doc,.docx">
@@ -504,11 +263,30 @@
             </h1>
             
             <div class="stories-container" id="storiesContainer">
-                <!-- سيتم ملؤها ديناميكياً -->
+                <!-- سيتم ملء القصص ديناميكياً -->
             </div>
-            
-            <div class="stories-feed" id="storiesFeed">
-                <!-- محتوى القصص -->
+
+            <div class="story-viewer" id="storyViewer">
+                <button class="story-close" id="storyClose">
+                    <i class="fas fa-times"></i>
+                </button>
+                <div class="story-content">
+                    <div class="story-progress" id="storyProgress">
+                        <!-- سيتم ملء شريط التقدم ديناميكياً -->
+                    </div>
+                    <img id="currentStoryImage" src="" alt="قصة">
+                    <div class="story-info">
+                        <div class="story-author-avatar">
+                            <span id="storyAuthorAvatar">?</span>
+                        </div>
+                        <div class="story-author-info">
+                            <div class="story-author-name" id="storyAuthorName"></div>
+                            <div class="story-time" id="storyTime"></div>
+                        </div>
+                    </div>
+                    <div class="story-nav prev" id="storyPrev"></div>
+                    <div class="story-nav next" id="storyNext"></div>
+                </div>
             </div>
         </div>
 
@@ -526,7 +304,7 @@
             </div>
             
             <div class="groups-grid" id="groupsGrid">
-                <!-- سيتم ملؤها ديناميكياً -->
+                <!-- سيتم ملء المجموعات ديناميكياً -->
             </div>
         </div>
 
@@ -544,7 +322,7 @@
             </div>
             
             <div class="channels-grid" id="channelsGrid">
-                <!-- سيتم ملؤها ديناميكياً -->
+                <!-- سيتم ملء القنوات ديناميكياً -->
             </div>
         </div>
 
@@ -555,180 +333,20 @@
                 الوسائط التعليمية
             </h1>
             
-            <div class="media-actions">
-                <button class="btn btn-primary" id="uploadMediaBtn">
-                    <i class="fas fa-upload"></i>
-                    رفع وسائط
-                </button>
-                <input type="file" id="mediaUploadInput" multiple style="display: none;" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.ppt,.pptx">
-            </div>
-            
             <div class="media-grid" id="mediaGrid">
-                <!-- سيتم ملؤها ديناميكياً -->
+                <!-- سيتم ملء الوسائط ديناميكياً -->
             </div>
         </div>
 
         <!-- صفحة الإعدادات -->
         <div class="page" id="settings-page">
-            <h1 class="section-title">
-                <i class="fas fa-cog"></i>
-                الإعدادات
-            </h1>
-            
-            <div class="settings-container">
-                <div class="settings-sidebar">
-                    <ul class="settings-menu">
-                        <li class="settings-menu-item active" data-section="profile">
-                            <i class="fas fa-user"></i>
-                            الملف الشخصي
-                        </li>
-                        <li class="settings-menu-item" data-section="privacy">
-                            <i class="fas fa-shield-alt"></i>
-                            الخصوصية
-                        </li>
-                        <li class="settings-menu-item" data-section="notifications">
-                            <i class="fas fa-bell"></i>
-                            الإشعارات
-                        </li>
-                        <li class="settings-menu-item" data-section="appearance">
-                            <i class="fas fa-palette"></i>
-                            المظهر
-                        </li>
-                        <li class="settings-menu-item" data-section="chat-settings">
-                            <i class="fas fa-comments"></i>
-                            إعدادات الدردشة
-                        </li>
-                    </ul>
-                </div>
-                
-                <div class="settings-content">
-                    <div class="settings-section active" id="profile-section">
-                        <h3>الملف الشخصي</h3>
-                        <div class="form-group">
-                            <label for="profileName">الاسم الكامل</label>
-                            <input type="text" id="profileName" class="form-control">
-                        </div>
-                        <div class="form-group">
-                            <label for="profileEmail">البريد الإلكتروني</label>
-                            <input type="email" id="profileEmail" class="form-control">
-                        </div>
-                        <div class="form-group">
-                            <label for="profileBio">نبذة عنك</label>
-                            <textarea id="profileBio" class="form-control" rows="3"></textarea>
-                        </div>
-                        <button class="btn btn-primary" id="saveProfileBtn">
-                            <i class="fas fa-save"></i>
-                            حفظ التغييرات
-                        </button>
-                    </div>
-                    
-                    <div class="settings-section" id="privacy-section">
-                        <h3>إعدادات الخصوصية</h3>
-                        <div class="setting-item">
-                            <div class="setting-info">
-                                <h4>الحساب الخاص</h4>
-                                <p>اجعل حسابك خاصاً بحيث لا يمكن للآخرين رؤية نشاطك</p>
-                            </div>
-                            <label class="toggle-switch">
-                                <input type="checkbox" id="privateAccount">
-                                <span class="toggle-slider"></span>
-                            </label>
-                        </div>
-                        <div class="setting-item">
-                            <div class="setting-info">
-                                <h4>إظهار حالة الاتصال</h4>
-                                <p>السماح للآخرين برؤية ما إذا كنت متصلاً أم لا</p>
-                            </div>
-                            <label class="toggle-switch">
-                                <input type="checkbox" id="showOnlineStatus" checked>
-                                <span class="toggle-slider"></span>
-                            </label>
-                        </div>
-                    </div>
-                    
-                    <div class="settings-section" id="notifications-section">
-                        <h3>إعدادات الإشعارات</h3>
-                        <div class="setting-item">
-                            <div class="setting-info">
-                                <h4>إشعارات الدردشة</h4>
-                                <p>تلقي إشعارات عند وصول رسائل جديدة</p>
-                            </div>
-                            <label class="toggle-switch">
-                                <input type="checkbox" id="chatNotifications" checked>
-                                <span class="toggle-slider"></span>
-                            </label>
-                        </div>
-                        <div class="setting-item">
-                            <div class="setting-info">
-                                <h4>إشعارات المجموعات</h4>
-                                <p>تلقي إشعارات عند وجود نشاط جديد في مجموعاتك</p>
-                            </div>
-                            <label class="toggle-switch">
-                                <input type="checkbox" id="groupNotifications" checked>
-                                <span class="toggle-slider"></span>
-                            </label>
-                        </div>
-                    </div>
-                    
-                    <div class="settings-section" id="appearance-section">
-                        <h3>إعدادات المظهر</h3>
-                        <div class="setting-item">
-                            <div class="setting-info">
-                                <h4>الوضع الليلي</h4>
-                                <p>تفعيل الوضع الليلي لتجربة استخدام مريحة للعين</p>
-                            </div>
-                            <label class="toggle-switch">
-                                <input type="checkbox" id="darkModeToggle">
-                                <span class="toggle-slider"></span>
-                            </label>
-                        </div>
-                    </div>
-                    
-                    <div class="settings-section" id="chat-settings-section">
-                        <h3>إعدادات الدردشة</h3>
-                        <div class="form-group">
-                            <label for="chatFontSize">حجم خط الدردشة</label>
-                            <select id="chatFontSize" class="form-control">
-                                <option value="small">صغير</option>
-                                <option value="medium" selected>متوسط</option>
-                                <option value="large">كبير</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="enterToSend">زر الإدخال للإرسال</label>
-                            <select id="enterToSend" class="form-control">
-                                <option value="true">نعم</option>
-                                <option value="false">لا</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            <!-- محتوى الإعدادات -->
         </div>
     </main>
 
     <!-- شريط الأدوات السريع -->
     <div class="quick-actions-bar" id="quickActionsBar">
-        <div class="quick-action" data-page="dashboard">
-            <i class="fas fa-tachometer-alt"></i>
-            لوحة التحكم
-        </div>
-        <div class="quick-action" data-page="chat">
-            <i class="fab fa-whatsapp"></i>
-            الدردشة
-        </div>
-        <div class="quick-action" data-page="stories">
-            <i class="fas fa-history"></i>
-            القصص
-        </div>
-        <div class="quick-action" data-page="groups">
-            <i class="fas fa-users"></i>
-            المجموعات
-        </div>
-        <div class="quick-action" data-page="media">
-            <i class="fas fa-photo-video"></i>
-            الوسائط
-        </div>
+        <!-- محتوى شريط الأدوات -->
     </div>
 
     <!-- الزر العائم -->
@@ -736,59 +354,74 @@
         <i class="fas fa-plus"></i>
     </button>
 
-    <!-- عارض القصص -->
-    <div class="story-viewer" id="storyViewer">
-        <button class="story-close" id="storyClose">
-            <i class="fas fa-times"></i>
-        </button>
-        <div class="story-content">
-            <div class="story-progress" id="storyProgress">
-                <!-- سيتم ملؤها ديناميكياً -->
-            </div>
-            <img id="currentStoryImage" src="" alt="قصة">
-            <div class="story-info">
-                <div class="story-author-avatar">
-                    <img id="storyAuthorAvatar" src="" alt="صورة الناشر">
-                </div>
-                <div class="story-author-info">
-                    <div class="story-author-name" id="storyAuthorName"></div>
-                    <div class="story-time" id="storyTime"></div>
-                </div>
-            </div>
-            <div class="story-nav prev" id="storyPrev">
-                <i class="fas fa-chevron-right"></i>
-            </div>
-            <div class="story-nav next" id="storyNext">
-                <i class="fas fa-chevron-left"></i>
-            </div>
-        </div>
-    </div>
-
-    <!-- نافذة رفع الوسائط -->
-    <div class="modal" id="uploadModal">
+    <!-- نافذة إنشاء مجموعة -->
+    <div class="modal" id="createGroupModal">
         <div class="modal-content">
             <div class="modal-header">
-                <h3>رفع وسائط</h3>
-                <button class="modal-close" id="uploadModalClose">
-                    <i class="fas fa-times"></i>
-                </button>
+                <h3>إنشاء مجموعة جديدة</h3>
+                <button class="modal-close" id="closeGroupModal">&times;</button>
             </div>
             <div class="modal-body">
-                <div class="upload-area" id="uploadArea">
-                    <i class="fas fa-cloud-upload-alt fa-3x"></i>
-                    <p>اسحب وأفلت الملفات هنا أو انقر للاختيار</p>
-                    <input type="file" id="bulkUploadInput" multiple accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.ppt,.pptx">
-                </div>
-                <div class="upload-progress" id="uploadProgress" style="display: none;">
-                    <div class="progress-bar">
-                        <div class="progress-fill" id="progressFill"></div>
+                <form id="createGroupForm">
+                    <div class="form-group">
+                        <label for="groupName">اسم المجموعة</label>
+                        <input type="text" id="groupName" required>
                     </div>
-                    <span id="progressText">0%</span>
-                </div>
+                    <div class="form-group">
+                        <label for="groupDescription">وصف المجموعة</label>
+                        <textarea id="groupDescription" rows="3"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="groupPrivacy">خصوصية المجموعة</label>
+                        <select id="groupPrivacy">
+                            <option value="public">عامة</option>
+                            <option value="private">خاصة</option>
+                        </select>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" class="btn btn-outline" id="cancelGroupBtn">إلغاء</button>
+                        <button type="submit" class="btn btn-primary">إنشاء المجموعة</button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
 
+    <!-- نافذة إنشاء قناة -->
+    <div class="modal" id="createChannelModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>إنشاء قناة جديدة</h3>
+                <button class="modal-close" id="closeChannelModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="createChannelForm">
+                    <div class="form-group">
+                        <label for="channelName">اسم القناة</label>
+                        <input type="text" id="channelName" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="channelDescription">وصف القناة</label>
+                        <textarea id="channelDescription" rows="3"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="channelCategory">تصنيف القناة</label>
+                        <select id="channelCategory">
+                            <option value="education">تعليمي</option>
+                            <option value="entertainment">ترفيهي</option>
+                            <option value="news">أخباري</option>
+                        </select>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" class="btn btn-outline" id="cancelChannelBtn">إلغاء</button>
+                        <button type="submit" class="btn btn-primary">إنشاء القناة</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/config.js"></script>
     <script src="js/app.js"></script>
 </body>
 </html>
