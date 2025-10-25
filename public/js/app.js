@@ -1,4 +1,4 @@
-// public/js/app.js - الملف الرئيسي للتطبيق الكامل
+// public/js/app.js - الملف الرئيسي للتطبيق الكامل (محدث)
 class EducationalPlatform {
     constructor() {
         this.currentUser = null;
@@ -10,6 +10,7 @@ class EducationalPlatform {
         this.currentStoryIndex = 0;
         this.storyInterval = null;
         this.isInitialized = false;
+        this.allUsers = [];
         
         this.init();
     }
@@ -151,6 +152,7 @@ class EducationalPlatform {
         switch (pageName) {
             case 'chat':
                 await this.loadConversations();
+                this.setupNewChatButton();
                 break;
             case 'stories':
                 await this.loadStories();
@@ -249,6 +251,7 @@ class EducationalPlatform {
         document.getElementById('storyClose')?.addEventListener('click', () => this.closeStoryViewer());
         document.getElementById('storyPrev')?.addEventListener('click', () => this.showPreviousStory());
         document.getElementById('storyNext')?.addEventListener('click', () => this.showNextStory());
+        document.getElementById('createStoryBtn')?.addEventListener('click', () => this.showCreateStoryModal());
     }
 
     setupGroupsChannelsEventListeners() {
@@ -407,11 +410,33 @@ class EducationalPlatform {
 
     async loadInitialData() {
         if (this.currentUser) {
+            await this.loadUsers();
             await this.loadConversations();
             await this.loadStories();
             await this.loadGroups();
             await this.loadChannels();
             await this.loadMedia();
+        }
+    }
+
+    async loadUsers() {
+        try {
+            const token = localStorage.getItem('authToken');
+            if (!token) return;
+
+            const response = await fetch('/api/users', {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                this.allUsers = data.data.users || [];
+            }
+        } catch (error) {
+            console.error('خطأ في تحميل المستخدمين:', error);
         }
     }
 
@@ -484,6 +509,117 @@ class EducationalPlatform {
 
         div.addEventListener('click', () => this.selectConversation(conversation._id));
         return div;
+    }
+
+    setupNewChatButton() {
+        const chatHeader = document.querySelector('.chat-sidebar .chat-header');
+        if (!chatHeader) return;
+
+        // إزالة زر إنشاء محادثة إذا كان موجوداً
+        const existingButton = document.getElementById('newChatBtn');
+        if (existingButton) {
+            existingButton.remove();
+        }
+
+        // إنشاء زر جديد
+        const newChatBtn = document.createElement('button');
+        newChatBtn.id = 'newChatBtn';
+        newChatBtn.className = 'btn btn-primary btn-sm';
+        newChatBtn.innerHTML = '<i class="fas fa-plus"></i> محادثة جديدة';
+        newChatBtn.style.marginRight = '10px';
+        
+        newChatBtn.addEventListener('click', () => this.showNewChatModal());
+        
+        chatHeader.appendChild(newChatBtn);
+    }
+
+    showNewChatModal() {
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.style.display = 'flex';
+        modal.innerHTML = `
+            <div class="modal-content" style="max-width: 500px;">
+                <div class="modal-header">
+                    <h3>بدء محادثة جديدة</h3>
+                    <button class="modal-close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label>اختر مستخدم للدردشة:</label>
+                        <div class="users-list" style="max-height: 300px; overflow-y: auto; margin-top: 1rem;">
+                            ${this.allUsers.filter(user => user._id !== this.currentUser._id).map(user => `
+                                <div class="user-item" data-user-id="${user._id}" style="display: flex; align-items: center; padding: 10px; border-bottom: 1px solid #eee; cursor: pointer;">
+                                    <div class="user-avatar" style="width: 40px; height: 40px; background: #4361ee; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; margin-left: 10px;">
+                                        ${user.fullName.charAt(0)}
+                                    </div>
+                                    <div>
+                                        <div style="font-weight: bold;">${user.fullName}</div>
+                                        <div style="font-size: 0.8rem; color: #666;">${user.role}</div>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                    <div class="modal-actions" style="margin-top: 1rem;">
+                        <button type="button" class="btn btn-outline" id="cancelNewChat">إلغاء</button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        // إضافة مستمعي الأحداث
+        modal.querySelector('.modal-close').addEventListener('click', () => modal.remove());
+        modal.querySelector('#cancelNewChat').addEventListener('click', () => modal.remove());
+        
+        // اختيار مستخدم
+        modal.querySelectorAll('.user-item').forEach(item => {
+            item.addEventListener('click', async () => {
+                const userId = item.dataset.userId;
+                await this.startNewChat(userId);
+                modal.remove();
+            });
+        });
+
+        // إغلاق عند النقر خارج المحتوى
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.remove();
+            }
+        });
+    }
+
+    async startNewChat(userId) {
+        try {
+            const token = localStorage.getItem('authToken');
+            const response = await fetch('/api/chat/conversations', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    participantId: userId
+                })
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                this.showNotification('تم بدء المحادثة بنجاح', 'success');
+                await this.loadConversations();
+                
+                // تحديد المحادثة الجديدة
+                if (data.data.conversation) {
+                    this.selectConversation(data.data.conversation._id);
+                }
+            } else {
+                this.showNotification('فشل في بدء المحادثة', 'error');
+            }
+        } catch (error) {
+            console.error('خطأ في بدء المحادثة:', error);
+            this.showNotification('خطأ في بدء المحادثة', 'error');
+        }
     }
 
     selectConversation(conversationId) {
@@ -612,32 +748,10 @@ class EducationalPlatform {
                 this.socket.emit('send_message', messageData);
             }
 
-            // إرسال الرسالة عبر API
-            const token = localStorage.getItem('authToken');
-            const response = await fetch('/api/chat/conversations', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({
-                    participantId: this.getOtherParticipant()
-                })
-            });
-
-            if (!response.ok) {
-                console.error('فشل في إنشاء المحادثة:', response.status);
-            }
-
         } catch (error) {
             console.error('خطأ في إرسال الرسالة:', error);
             this.showNotification('فشل في إرسال الرسالة', 'error');
         }
-    }
-
-    getOtherParticipant() {
-        if (!this.currentChat || !this.currentChat.participants) return null;
-        return this.currentChat.participants.find(id => id !== this.currentUser._id);
     }
 
     addMessageToUI(message, isSent) {
@@ -848,6 +962,10 @@ class EducationalPlatform {
         }
     }
 
+    showCreateStoryModal() {
+        this.showNotification('ميزة إنشاء القصص قريباً', 'info');
+    }
+
     // ============ إدارة المجموعات ============
     async loadGroups() {
         try {
@@ -891,13 +1009,15 @@ class EducationalPlatform {
         const div = document.createElement('div');
         div.className = 'group-card';
         
+        const isMember = group.members?.includes(this.currentUser._id);
+        
         div.innerHTML = `
             <div class="group-header">
                 <div class="group-avatar">
                     <i class="fas fa-users"></i>
                 </div>
                 <h3>${this.escapeHtml(group.name)}</h3>
-                <p>${group.stats?.memberCount || 0} عضو</p>
+                <p>${group.stats?.memberCount || group.members?.length || 0} عضو</p>
             </div>
             <div class="group-info">
                 <p>${this.escapeHtml(group.description || 'لا يوجد وصف')}</p>
@@ -913,12 +1033,18 @@ class EducationalPlatform {
                 </div>
                 <button class="btn btn-primary btn-block mt-3 join-group-btn" data-group-id="${group._id}">
                     <i class="fas fa-sign-in-alt"></i>
-                    ${group.members?.includes(this.currentUser._id) ? 'الدخول' : 'الانضمام'}
+                    ${isMember ? 'الدخول' : 'الانضمام'}
                 </button>
             </div>
         `;
 
-        div.querySelector('.join-group-btn').addEventListener('click', () => this.joinGroup(group._id));
+        div.querySelector('.join-group-btn').addEventListener('click', () => {
+            if (isMember) {
+                this.enterGroup(group._id);
+            } else {
+                this.joinGroup(group._id);
+            }
+        });
         return div;
     }
 
@@ -945,6 +1071,11 @@ class EducationalPlatform {
             console.error('خطأ في الانضمام للمجموعة:', error);
             this.showNotification('فشل في الانضمام للمجموعة', 'error');
         }
+    }
+
+    enterGroup(groupId) {
+        this.showNotification('تم الدخول إلى المجموعة', 'success');
+        // هنا يمكنك إضافة منطق للدخول إلى دردشة المجموعة
     }
 
     async createGroup(event) {
@@ -1028,13 +1159,15 @@ class EducationalPlatform {
         const div = document.createElement('div');
         div.className = 'channel-card';
         
+        const isMember = channel.members?.includes(this.currentUser._id);
+        
         div.innerHTML = `
             <div class="channel-header">
                 <div class="channel-avatar">
                     <i class="fas fa-broadcast-tower"></i>
                 </div>
                 <h3>${this.escapeHtml(channel.name)}</h3>
-                <p>${channel.stats?.memberCount || 0} مشترك</p>
+                <p>${channel.stats?.memberCount || channel.members?.length || 0} مشترك</p>
             </div>
             <div class="channel-info">
                 <p>${this.escapeHtml(channel.description || 'لا يوجد وصف')}</p>
@@ -1050,12 +1183,18 @@ class EducationalPlatform {
                 </div>
                 <button class="btn btn-primary btn-block mt-3 subscribe-channel-btn" data-channel-id="${channel._id}">
                     <i class="fas fa-bell"></i>
-                    ${channel.members?.includes(this.currentUser._id) ? 'مشترك' : 'اشترك'}
+                    ${isMember ? 'مشترك' : 'اشترك'}
                 </button>
             </div>
         `;
 
-        div.querySelector('.subscribe-channel-btn').addEventListener('click', () => this.subscribeChannel(channel._id));
+        div.querySelector('.subscribe-channel-btn').addEventListener('click', () => {
+            if (isMember) {
+                this.enterChannel(channel._id);
+            } else {
+                this.subscribeChannel(channel._id);
+            }
+        });
         return div;
     }
 
@@ -1082,6 +1221,11 @@ class EducationalPlatform {
             console.error('خطأ في الاشتراك بالقناة:', error);
             this.showNotification('فشل في الاشتراك بالقناة', 'error');
         }
+    }
+
+    enterChannel(channelId) {
+        this.showNotification('تم الدخول إلى القناة', 'success');
+        // هنا يمكنك إضافة منطق للدخول إلى قناة البث
     }
 
     async createChannel(event) {
@@ -1155,7 +1299,7 @@ class EducationalPlatform {
                                 <i class="fas fa-users"></i>
                             </div>
                             <div class="stat-info">
-                                <div class="stat-number" id="totalUsers">0</div>
+                                <div class="stat-number" id="totalUsers">${this.allUsers.length}</div>
                                 <div class="stat-label">إجمالي المستخدمين</div>
                             </div>
                         </div>
@@ -1164,8 +1308,8 @@ class EducationalPlatform {
                                 <i class="fas fa-comments"></i>
                             </div>
                             <div class="stat-info">
-                                <div class="stat-number" id="totalMessages">0</div>
-                                <div class="stat-label">الرسائل</div>
+                                <div class="stat-number" id="totalMessages">${this.conversations.size}</div>
+                                <div class="stat-label">المحادثات</div>
                             </div>
                         </div>
                         <div class="stat-card">
@@ -1173,7 +1317,7 @@ class EducationalPlatform {
                                 <i class="fas fa-history"></i>
                             </div>
                             <div class="stat-info">
-                                <div class="stat-number" id="totalStories">0</div>
+                                <div class="stat-number" id="totalStories">${this.stories.length}</div>
                                 <div class="stat-label">القصص النشطة</div>
                             </div>
                         </div>
@@ -1510,14 +1654,3 @@ document.addEventListener('DOMContentLoaded', () => {
 window.addEventListener('error', (event) => {
     console.error('❌ خطأ في الصفحة:', event.error);
 });
-
-// إظهار تحديث الخدمة عند توفرها
-if ('serviceWorker' in navigator) {
-    window.addEventListener('load', function() {
-        navigator.serviceWorker.register('/sw.js').then(function(registration) {
-            console.log('✅ ServiceWorker مسجل بنجاح:', registration.scope);
-        }, function(err) {
-            console.log('❌ فشل تسجيل ServiceWorker:', err);
-        });
-    });
-}
