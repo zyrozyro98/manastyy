@@ -1,2130 +1,1117 @@
-// server.js - الخادم الكامل للمنصة التعليمية
-import express from 'express';
-import http from 'http';
-import { Server } from 'socket.io';
-import cors from 'cors';
-import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
-import multer from 'multer';
-import path from 'path';
-import fs from 'fs';
-import { fileURLToPath } from 'url';
-import { v4 as uuidv4 } from 'uuid';
-import rateLimit from 'express-rate-limit';
-import helmet from 'helmet';
-import compression from 'compression';
-import morgan from 'morgan';
-
-// حل مشكلة __dirname في ES modules
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-const app = express();
-const server = http.createServer(app);
-const io = new Server(server, {
-    cors: {
-        origin: "*",
-        methods: ["GET", "POST", "PUT", "DELETE"],
-        credentials: true
-    },
-    pingTimeout: 60000,
-    pingInterval: 25000,
-    transports: ['websocket', 'polling']
-});
-
-// إعدادات البيئة
-const PORT = process.env.PORT || 3000;
-const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key-2024-change-in-production';
-const NODE_ENV = process.env.NODE_ENV || 'development';
-const BACKUP_DIR = path.join(__dirname, 'backups');
-const EXPORT_DIR = path.join(__dirname, 'exports');
-const UPLOAD_DIR = path.join(__dirname, 'uploads');
-
-// إنشاء المجلدات اللازمة
-const requiredDirs = [
-    UPLOAD_DIR, 
-    path.join(UPLOAD_DIR, 'profiles'), 
-    path.join(UPLOAD_DIR, 'stories'), 
-    path.join(UPLOAD_DIR, 'channels'), 
-    path.join(UPLOAD_DIR, 'files'), 
-    path.join(UPLOAD_DIR, 'groups'),
-    BACKUP_DIR, 
-    EXPORT_DIR,
-    path.join(__dirname, 'public')
-];
-
-requiredDirs.forEach(dir => {
-    if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-        console.log(`📁 تم إنشاء المجلد: ${dir}`);
-    }
-});
-
-// إعداد trust proxy لـ Render
-app.set('trust proxy', 1);
-
-// وسائط الأمان والتحسين
-app.use(helmet({
-    crossOriginEmbedderPolicy: false,
-    contentSecurityPolicy: false
-}));
-app.use(compression({
-    level: 6,
-    threshold: 0
-}));
-app.use(morgan(NODE_ENV === 'production' ? 'combined' : 'dev'));
-
-// Rate Limiting
-const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: NODE_ENV === 'production' ? 100 : 1000,
-    message: {
-        success: false,
-        message: 'تم تجاوز عدد الطلبات المسموح بها، يرجى المحاولة لاحقاً'
-    }
-});
-app.use(limiter);
-
-// وسائط middleware الأساسية
-app.use(cors({
-    origin: process.env.CLIENT_URL || "*",
-    credentials: true
-}));
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
-app.use('/uploads', express.static(UPLOAD_DIR, {
-    maxAge: '1d',
-    etag: true
-}));
-app.use('/exports', express.static(EXPORT_DIR));
-app.use(express.static(path.join(__dirname, 'public'), {
-    maxAge: '1h',
-    etag: true
-}));
-
-// إعداد multer للتحميلات
-const storage = multer.diskStorage({
-    destination: function (req, file, cb) {
-        let uploadPath = UPLOAD_DIR;
-        if (file.fieldname === 'avatar') uploadPath = path.join(UPLOAD_DIR, 'profiles');
-        else if (file.fieldname === 'story') uploadPath = path.join(UPLOAD_DIR, 'stories');
-        else if (file.fieldname === 'channelAvatar') uploadPath = path.join(UPLOAD_DIR, 'channels');
-        else if (file.fieldname === 'groupAvatar') uploadPath = path.join(UPLOAD_DIR, 'groups');
-        else if (file.fieldname === 'file') uploadPath = path.join(UPLOAD_DIR, 'files');
-        else if (file.fieldname === 'backup') uploadPath = BACKUP_DIR;
-        
-        if (!fs.existsSync(uploadPath)) {
-            fs.mkdirSync(uploadPath, { recursive: true });
-        }
-        cb(null, uploadPath);
-    },
-    filename: function (req, file, cb) {
-        const fileExt = path.extname(file.originalname);
-        const fileName = `${Date.now()}-${Math.round(Math.random() * 1E9)}${fileExt}`;
-        cb(null, fileName);
-    }
-});
-
-const fileFilter = (req, file, cb) => {
-    const allowedTypes = {
-        'avatar': ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
-        'story': ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'video/mp4', 'video/quicktime', 'video/webm'],
-        'channelAvatar': ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
-        'groupAvatar': ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
-        'file': ['image/jpeg', 'image/png', 'image/gif', 'application/pdf', 'text/plain', 
-                'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.sheet',
-                'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                'application/zip', 'application/vnd.rar'],
-        'backup': ['application/json']
-    };
-    
-    if (allowedTypes[file.fieldname]?.includes(file.mimetype)) {
-        cb(null, true);
-    } else {
-        cb(new Error(`نوع الملف غير مدعوم للمجال: ${file.fieldname}`), false);
-    }
-};
-
-const upload = multer({
-    storage: storage,
-    limits: {
-        fileSize: 100 * 1024 * 1024
-    },
-    fileFilter: fileFilter
-});
-
-// نظام التخزين المحلي المحسن
-class EnhancedLocalStorageService {
-    constructor() {
-        this.dataFile = path.join(__dirname, 'local_data.json');
-        this.cache = new Map();
-        this.init();
-    }
-
-    init() {
-        if (!fs.existsSync(this.dataFile)) {
-            const defaultData = this.getDefaultData();
-            this.saveData(defaultData);
-            console.log('✅ تم إنشاء ملف البيانات المحلي');
-        }
-    }
-
-    loadData() {
-        try {
-            if (this.cache.has('allData')) {
-                return this.cache.get('allData');
-            }
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>المنصة التعليمية المتطورة - نظام الإدارة المتكامل</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/emoji-picker-element@1.14.0/index.min.css">
+    <link rel="stylesheet" href="css/css.css">
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/emoji-picker-element@1.14.0/index.min.js"></script>
+</head>
+<body>
+    <!-- شاشة الترحيب -->
+    <div class="welcome-screen" id="welcomeScreen">
+        <div class="welcome-content">
+            <div class="welcome-logo">
+                <div class="logo-icon large">
+                    <i class="fas fa-graduation-cap"></i>
+                </div>
+                <h1>المنصة التعليمية</h1>
+                <p>نظام إدارة تعليمي متكامل ومتطور</p>
+            </div>
             
-            const data = fs.readFileSync(this.dataFile, 'utf8');
-            const parsedData = JSON.parse(data);
-            this.cache.set('allData', parsedData);
-            return parsedData;
-        } catch (error) {
-            console.error('❌ خطأ في تحميل البيانات المحلية:', error);
-            return this.getDefaultData();
-        }
-    }
-
-    saveData(data) {
-        try {
-            fs.writeFileSync(this.dataFile, JSON.stringify(data, null, 2));
-            this.cache.set('allData', data);
-            return true;
-        } catch (error) {
-            console.error('❌ خطأ في حفظ البيانات المحلية:', error);
-            return false;
-        }
-    }
-
-    clearCache() {
-        this.cache.clear();
-    }
-
-    getDefaultData() {
-        return {
-            users: [],
-            stories: [],
-            messages: [],
-            conversations: [],
-            channels: [],
-            groups: [],
-            groupMessages: [],
-            channelMessages: [],
-            notifications: [],
-            reports: [],
-            backups: [],
-            exports: [],
-            auditLogs: [],
-            lastBackup: null,
-            stats: {
-                totalUsers: 0,
-                totalMessages: 0,
-                totalStories: 0,
-                totalChannels: 0,
-                totalGroups: 0,
-                totalConversations: 0
-            }
-        };
-    }
-
-    // دوال المستخدمين
-    async createUser(userData) {
-        const data = this.loadData();
-        const userId = uuidv4();
-        const user = {
-            _id: userId,
-            ...userData,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            isOnline: false,
-            lastSeen: new Date().toISOString(),
-            isActive: true,
-            stats: userData.stats || {
-                messagesSent: 0,
-                storiesPosted: 0,
-                channelsJoined: 0,
-                groupsJoined: 0,
-                totalLikes: 0
-            },
-            settings: userData.settings || {
-                privacy: {
-                    hideOnlineStatus: false,
-                    hideLastSeen: false,
-                    hideStoryViews: false,
-                    profileVisibility: 'public'
-                },
-                notificationSettings: {
-                    messages: true,
-                    stories: true,
-                    channels: true,
-                    groups: true,
-                    system: true,
-                    emailNotifications: false
-                },
-                appearance: {
-                    theme: 'auto',
-                    fontSize: 'medium',
-                    background: 'default',
-                    language: 'ar'
-                }
-            }
-        };
-        
-        data.users.push(user);
-        this.updateStats(data);
-        this.saveData(data);
-        
-        return user;
-    }
-
-    async findUserByEmail(email) {
-        const cacheKey = `user_email_${email}`;
-        if (this.cache.has(cacheKey)) {
-            return this.cache.get(cacheKey);
-        }
-
-        const data = this.loadData();
-        const user = data.users.find(user => user.email === email && user.isActive);
-        
-        if (user) {
-            this.cache.set(cacheKey, user);
-        }
-        
-        return user;
-    }
-
-    async findUserById(userId) {
-        const cacheKey = `user_id_${userId}`;
-        if (this.cache.has(cacheKey)) {
-            return this.cache.get(cacheKey);
-        }
-
-        const data = this.loadData();
-        const user = data.users.find(user => user._id === userId && user.isActive);
-        
-        if (user) {
-            this.cache.set(cacheKey, user);
-        }
-        
-        return user;
-    }
-
-    async searchUsers(query, limit = 20) {
-        const data = this.loadData();
-        const searchTerm = query.toLowerCase();
-        
-        return data.users
-            .filter(user => 
-                user.isActive && 
-                (user.fullName.toLowerCase().includes(searchTerm) || 
-                 user.email.toLowerCase().includes(searchTerm))
-            )
-            .slice(0, limit)
-            .map(user => this.formatUserResponse(user));
-    }
-
-    async updateUser(userId, updates) {
-        const data = this.loadData();
-        const userIndex = data.users.findIndex(user => user._id === userId);
-        
-        if (userIndex !== -1) {
-            data.users[userIndex] = {
-                ...data.users[userIndex],
-                ...updates,
-                updatedAt: new Date().toISOString()
-            };
-            this.saveData(data);
+            <div class="welcome-features">
+                <div class="feature">
+                    <i class="fas fa-comments"></i>
+                    <span>دردشة مباشرة</span>
+                </div>
+                <div class="feature">
+                    <i class="fas fa-users"></i>
+                    <span>مجموعات تعليمية</span>
+                </div>
+                <div class="feature">
+                    <i class="fas fa-play-circle"></i>
+                    <span>فصول افتراضية</span>
+                </div>
+                <div class="feature">
+                    <i class="fas fa-chart-line"></i>
+                    <span>تتبع التقدم</span>
+                </div>
+            </div>
             
-            this.cache.delete(`user_id_${userId}`);
-            this.cache.delete(`user_email_${data.users[userIndex].email}`);
+            <button class="btn btn-primary btn-lg" id="startAppBtn">
+                <i class="fas fa-rocket"></i>
+                ابدأ الآن
+            </button>
+        </div>
+    </div>
+
+    <!-- حالة الاتصال -->
+    <div class="connection-status" id="connectionStatus">
+        <i class="fas fa-wifi"></i>
+        <span>متصل بالإنترنت</span>
+    </div>
+
+    <!-- إشعار التحديث -->
+    <div class="update-notification" id="updateNotification" style="display: none;">
+        <div class="update-content">
+            <i class="fas fa-sync-alt fa-spin"></i>
+            <div class="update-info">
+                <strong>تحديث جديد متاح</strong>
+                <span>يتم تحميل التحديثات تلقائياً</span>
+            </div>
+        </div>
+        <button class="btn btn-sm btn-outline" id="reloadBtn">
+            <i class="fas fa-redo"></i>
+            تحديث الآن
+        </button>
+    </div>
+
+    <!-- الهيدر -->
+    <header class="header" id="header">
+        <div class="header-content">
+            <a href="#" class="logo" data-page="home">
+                <div class="logo-icon">
+                    <i class="fas fa-graduation-cap"></i>
+                </div>
+                <div>
+                    <div class="logo-text">المنصة التعليمية</div>
+                    <div class="logo-subtitle">نظام الإدارة المتكامل</div>
+                </div>
+            </a>
+
+            <nav class="nav">
+                <a href="#" class="nav-item" data-page="home">
+                    <i class="fas fa-home"></i>
+                    الرئيسية
+                </a>
+                <a href="#" class="nav-item" data-page="dashboard">
+                    <i class="fas fa-tachometer-alt"></i>
+                    لوحة التحكم
+                </a>
+                <a href="#" class="nav-item" data-page="chat">
+                    <i class="fab fa-whatsapp"></i>
+                    الدردشة
+                    <span class="nav-item-badge" id="unreadMessagesCount">0</span>
+                </a>
+                <a href="#" class="nav-item" data-page="stories">
+                    <i class="fas fa-history"></i>
+                    القصص
+                </a>
+                <a href="#" class="nav-item" data-page="groups">
+                    <i class="fas fa-users"></i>
+                    المجموعات
+                </a>
+                <a href="#" class="nav-item" data-page="channels">
+                    <i class="fas fa-broadcast-tower"></i>
+                    القنوات
+                </a>
+                <a href="#" class="nav-item" data-page="media">
+                    <i class="fas fa-photo-video"></i>
+                    الوسائط
+                </a>
+                <a href="#" class="nav-item" data-page="settings">
+                    <i class="fas fa-cog"></i>
+                    الإعدادات
+                </a>
+                <a href="#" class="nav-item hidden" id="loginBtn" data-page="login">
+                    <i class="fas fa-sign-in-alt"></i>
+                    تسجيل الدخول
+                </a>
+                <a href="#" class="nav-item hidden" id="registerBtn" data-page="register">
+                    <i class="fas fa-user-plus"></i>
+                    إنشاء حساب
+                </a>
+                <a href="#" class="nav-item hidden" id="logoutBtn">
+                    <i class="fas fa-sign-out-alt"></i>
+                    تسجيل الخروج
+                </a>
+            </nav>
+
+            <div class="user-info hidden" id="userInfo">
+                <div class="user-avatar">
+                    <span id="userAvatarText">م</span>
+                </div>
+                <div class="user-details">
+                    <div class="user-name" id="userNameDisplay">محمد أحمد</div>
+                    <div class="user-role" id="userRoleDisplay">طالب</div>
+                </div>
+            </div>
+
+            <button class="mobile-menu-btn" id="mobileMenuBtn">
+                <i class="fas fa-bars"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- القائمة المتنقلة -->
+    <div class="mobile-menu" id="mobileMenu">
+        <nav class="mobile-nav">
+            <a href="#" class="nav-item" data-page="home">
+                <i class="fas fa-home"></i>
+                الرئيسية
+            </a>
+            <a href="#" class="nav-item" data-page="dashboard">
+                <i class="fas fa-tachometer-alt"></i>
+                لوحة التحكم
+            </a>
+            <a href="#" class="nav-item" data-page="chat">
+                <i class="fab fa-whatsapp"></i>
+                الدردشة
+                <span class="nav-item-badge" id="unreadMessagesCountMobile">0</span>
+            </a>
+            <a href="#" class="nav-item" data-page="stories">
+                <i class="fas fa-history"></i>
+                القصص
+            </a>
+            <a href="#" class="nav-item" data-page="groups">
+                <i class="fas fa-users"></i>
+                المجموعات
+            </a>
+            <a href="#" class="nav-item" data-page="channels">
+                <i class="fas fa-broadcast-tower"></i>
+                القنوات
+            </a>
+            <a href="#" class="nav-item" data-page="media">
+                <i class="fas fa-photo-video"></i>
+                الوسائط
+            </a>
+            <a href="#" class="nav-item" data-page="settings">
+                <i class="fas fa-cog"></i>
+                الإعدادات
+            </a>
+            <a href="#" class="nav-item hidden" id="loginBtnMobile" data-page="login">
+                <i class="fas fa-sign-in-alt"></i>
+                تسجيل الدخول
+            </a>
+            <a href="#" class="nav-item hidden" id="registerBtnMobile" data-page="register">
+                <i class="fas fa-user-plus"></i>
+                إنشاء حساب
+            </a>
+            <a href="#" class="nav-item hidden" id="logoutBtnMobile">
+                <i class="fas fa-sign-out-alt"></i>
+                تسجيل الخروج
+            </a>
+        </nav>
+    </div>
+
+    <!-- طبقة التعتيم -->
+    <div class="overlay" id="overlay"></div>
+
+    <!-- المحتوى الرئيسي -->
+    <main class="main-content">
+        <!-- الصفحة الرئيسية -->
+        <div class="page active" id="home-page">
+            <div class="home-hero">
+                <div class="hero-content">
+                    <h1>مرحباً بك في المنصة التعليمية</h1>
+                    <p>منصة متكاملة للتعلم والتعاون والتواصل بين الطلاب والمعلمين</p>
+                    <div class="hero-actions">
+                        <button class="btn btn-primary btn-lg" data-page="register">
+                            <i class="fas fa-user-plus"></i>
+                            انضم إلينا
+                        </button>
+                        <button class="btn btn-outline btn-lg" data-page="login">
+                            <i class="fas fa-sign-in-alt"></i>
+                            تسجيل الدخول
+                        </button>
+                    </div>
+                </div>
+                <div class="hero-image">
+                    <i class="fas fa-graduation-cap"></i>
+                </div>
+            </div>
+
+            <div class="features-section">
+                <h2 class="section-title">مميزات المنصة</h2>
+                <div class="features-grid">
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="fas fa-comments"></i>
+                        </div>
+                        <h3>دردشة مباشرة</h3>
+                        <p>تواصل فوري مع الزملاء والمعلمين عبر نظام دردشة متكامل</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="fas fa-users"></i>
+                        </div>
+                        <h3>مجموعات تعليمية</h3>
+                        <p>أنشئ مجموعات دراسية وناقش مواضيعك مع زملائك</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="fas fa-broadcast-tower"></i>
+                        </div>
+                        <h3>قنوات البث</h3>
+                        <p>انضم إلى قنوات تعليمية متخصصة واحصل على آخر المستجدات</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="fas fa-history"></i>
+                        </div>
+                        <h3>القصص التعليمية</h3>
+                        <p>شارك تجاربك التعليمية عبر القصص التفاعلية</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="fas fa-photo-video"></i>
+                        </div>
+                        <h3>وسائط متعددة</h3>
+                        <p>شارك ومشاهدة الوسائط التعليمية بجودة عالية</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="fas fa-chart-line"></i>
+                        </div>
+                        <h3>تتبع التقدم</h3>
+                        <p>تابع تقدمك التعليمي واحصل على تقارير أداء مفصلة</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- صفحة تسجيل الدخول -->
+        <div class="page" id="login-page">
+            <div class="auth-container">
+                <div class="auth-card">
+                    <div class="auth-header">
+                        <h2>تسجيل الدخول</h2>
+                        <p>ادخل إلى حسابك للمتابعة</p>
+                    </div>
+                    <form class="auth-form" id="loginForm">
+                        <div class="form-group">
+                            <label for="loginEmail">البريد الإلكتروني</label>
+                            <input type="email" id="loginEmail" name="email" required placeholder="ادخل بريدك الإلكتروني">
+                        </div>
+                        <div class="form-group">
+                            <label for="loginPassword">كلمة المرور</label>
+                            <input type="password" id="loginPassword" name="password" required placeholder="ادخل كلمة المرور">
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-block">
+                            <i class="fas fa-sign-in-alt"></i>
+                            تسجيل الدخول
+                        </button>
+                    </form>
+                    <div class="auth-footer">
+                        <p>ليس لديك حساب؟ <a href="#" data-page="register">أنشئ حساب جديد</a></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- صفحة إنشاء حساب -->
+        <div class="page" id="register-page">
+            <div class="auth-container">
+                <div class="auth-card">
+                    <div class="auth-header">
+                        <h2>إنشاء حساب جديد</h2>
+                        <p>انضم إلى منصتنا التعليمية</p>
+                    </div>
+                    <form class="auth-form" id="registerForm">
+                        <div class="form-group">
+                            <label for="registerName">الاسم الكامل</label>
+                            <input type="text" id="registerName" name="name" required placeholder="ادخل اسمك الكامل">
+                        </div>
+                        <div class="form-group">
+                            <label for="registerEmail">البريد الإلكتروني</label>
+                            <input type="email" id="registerEmail" name="email" required placeholder="ادخل بريدك الإلكتروني">
+                        </div>
+                        <div class="form-group">
+                            <label for="registerPassword">كلمة المرور</label>
+                            <input type="password" id="registerPassword" name="password" required placeholder="اختر كلمة مرور قوية">
+                        </div>
+                        <div class="form-group">
+                            <label for="registerRole">الدور</label>
+                            <select id="registerRole" name="role" required>
+                                <option value="">اختر دورك</option>
+                                <option value="student">طالب</option>
+                                <option value="teacher">معلم</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-block">
+                            <i class="fas fa-user-plus"></i>
+                            إنشاء حساب
+                        </button>
+                    </form>
+                    <div class="auth-footer">
+                        <p>لديك حساب بالفعل؟ <a href="#" data-page="login">سجل الدخول</a></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- صفحة لوحة التحكم -->
+        <div class="page" id="dashboard-page">
+            <!-- سيتم تحميل المحتوى ديناميكياً -->
+        </div>
+
+        <!-- صفحة الدردشة -->
+        <div class="page" id="chat-page">
+            <div class="chat-container">
+                <div class="chat-sidebar active" id="chatSidebar">
+                    <div class="chat-header">
+                        <h3>المحادثات</h3>
+                        <button class="chat-toggle" id="chatToggle">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    
+                    <div class="chat-search">
+                        <input type="text" id="chatSearchInput" placeholder="بحث في المحادثات...">
+                    </div>
+                    
+                    <div class="conversations-list" id="conversationsList">
+                        <!-- سيتم ملء المحادثات ديناميكياً -->
+                    </div>
+                </div>
+                
+                <div class="chat-main">
+                    <div class="chat-header" id="activeChatHeader">
+                        <div class="chat-user-info">
+                            <div class="conversation-avatar small">
+                                <span id="activeChatAvatar">?</span>
+                            </div>
+                            <div>
+                                <div class="conversation-name" id="activeChatName">اختر محادثة</div>
+                                <div class="user-status-text" id="activeChatStatus">غير متصل</div>
+                            </div>
+                        </div>
+                        <div class="chat-actions">
+                            <button class="chat-tool-btn" id="voiceCallBtn" title="مكالمة صوتية">
+                                <i class="fas fa-phone"></i>
+                            </button>
+                            <button class="chat-tool-btn" id="videoCallBtn" title="مكالمة فيديو">
+                                <i class="fas fa-video"></i>
+                            </button>
+                            <button class="chat-toggle" id="chatToggleMain">
+                                <i class="fas fa-bars"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="chat-messages" id="chatMessages">
+                        <div class="empty-chat" id="emptyChat">
+                            <i class="fas fa-comments"></i>
+                            <h3>مرحباً في الدردشة</h3>
+                            <p>اختر محادثة لبدء التحدث</p>
+                        </div>
+                    </div>
+                    
+                    <div class="chat-input-container" id="chatInputContainer" style="display: none;">
+                        <div class="chat-input-tools">
+                            <button class="chat-tool-btn" id="attachFileBtn" title="إرفاق ملف">
+                                <i class="fas fa-paperclip"></i>
+                            </button>
+                            <button class="chat-tool-btn" id="emojiToggle" title="إدراج إيموجي">
+                                <i class="fas fa-smile"></i>
+                            </button>
+                            <input type="file" id="fileInput" style="display: none;" accept="image/*,video/*,audio/*,.pdf,.doc,.docx">
+                        </div>
+                        
+                        <div class="chat-input-wrapper">
+                            <input type="text" placeholder="اكتب رسالة..." id="chatInput">
+                        </div>
+                        
+                        <button class="send-btn" id="sendMessageBtn">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                    </div>
+                    
+                    <div class="emoji-picker-container" id="emojiPickerContainer">
+                        <emoji-picker></emoji-picker>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- صفحة القصص -->
+        <div class="page" id="stories-page">
+            <div class="stories-header">
+                <h1 class="section-title">
+                    <i class="fas fa-history"></i>
+                    القصص
+                </h1>
+                <button class="btn btn-primary" id="createStoryBtn">
+                    <i class="fas fa-plus"></i>
+                    إضافة قصة
+                </button>
+            </div>
             
-            return data.users[userIndex];
-        }
-        return null;
-    }
+            <div class="stories-container" id="storiesContainer">
+                <!-- سيتم ملء القصص ديناميكياً -->
+            </div>
 
-    async getAllUsers() {
-        const data = this.loadData();
-        return data.users.filter(user => user.isActive);
-    }
+            <div class="story-viewer" id="storyViewer">
+                <button class="story-close" id="storyClose">
+                    <i class="fas fa-times"></i>
+                </button>
+                <div class="story-content">
+                    <div class="story-progress" id="storyProgress">
+                        <!-- سيتم ملء شريط التقدم ديناميكياً -->
+                    </div>
+                    <img id="currentStoryImage" src="" alt="قصة">
+                    <div class="story-info">
+                        <div class="story-author-avatar">
+                            <span id="storyAuthorAvatar">?</span>
+                        </div>
+                        <div class="story-author-info">
+                            <div class="story-author-name" id="storyAuthorName"></div>
+                            <div class="story-time" id="storyTime"></div>
+                        </div>
+                    </div>
+                    <div class="story-nav prev" id="storyPrev">
+                        <i class="fas fa-chevron-right"></i>
+                    </div>
+                    <div class="story-nav next" id="storyNext">
+                        <i class="fas fa-chevron-left"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-    // دوال المحادثات
-    async createConversation(participants, name = null) {
-        const data = this.loadData();
-        const conversationId = uuidv4();
-        const conversation = {
-            _id: conversationId,
-            participants,
-            name: name || `محادثة ${participants.length} أشخاص`,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            lastMessage: null,
-            unreadCount: {},
-            isGroup: participants.length > 2
-        };
-        
-        data.conversations.push(conversation);
-        this.updateStats(data);
-        this.saveData(data);
-        return conversation;
-    }
-
-    async getConversationsByUserId(userId) {
-        const cacheKey = `conversations_user_${userId}`;
-        if (this.cache.has(cacheKey)) {
-            return this.cache.get(cacheKey);
-        }
-
-        const data = this.loadData();
-        const conversations = data.conversations.filter(conv => 
-            conv.participants.includes(userId)
-        );
-        
-        this.cache.set(cacheKey, conversations);
-        return conversations;
-    }
-
-    async getConversationById(conversationId) {
-        const data = this.loadData();
-        return data.conversations.find(conv => conv._id === conversationId);
-    }
-
-    async getOrCreateConversation(user1, user2) {
-        const data = this.loadData();
-        const existingConversation = data.conversations.find(conv => 
-            conv.participants.includes(user1) && 
-            conv.participants.includes(user2) &&
-            conv.participants.length === 2
-        );
-        
-        if (existingConversation) {
-            return existingConversation;
-        }
-        
-        return await this.createConversation([user1, user2]);
-    }
-
-    // دوال الرسائل
-    async createMessage(messageData) {
-        const data = this.loadData();
-        const messageId = uuidv4();
-        const message = {
-            _id: messageId,
-            ...messageData,
-            createdAt: new Date().toISOString(),
-            readBy: [messageData.senderId],
-            reactions: [],
-            edited: { isEdited: false },
-            deleted: { isDeleted: false }
-        };
-        
-        data.messages.push(message);
-        
-        const convIndex = data.conversations.findIndex(conv => conv._id === messageData.conversationId);
-        if (convIndex !== -1) {
-            data.conversations[convIndex].lastMessage = messageId;
-            data.conversations[convIndex].updatedAt = new Date().toISOString();
+        <!-- صفحة المجموعات -->
+        <div class="page" id="groups-page">
+            <div class="groups-header">
+                <h1 class="section-title">
+                    <i class="fas fa-users"></i>
+                    المجموعات التعليمية
+                </h1>
+                <button class="btn btn-primary" id="createGroupBtn">
+                    <i class="fas fa-plus"></i>
+                    إنشاء مجموعة
+                </button>
+            </div>
             
-            data.conversations[convIndex].participants.forEach(participantId => {
-                if (participantId !== messageData.senderId) {
-                    data.conversations[convIndex].unreadCount[participantId] = 
-                        (data.conversations[convIndex].unreadCount[participantId] || 0) + 1;
-                }
-            });
-        }
-        
-        this.updateStats(data);
-        this.saveData(data);
-        
-        data.conversations[convIndex].participants.forEach(participantId => {
-            this.cache.delete(`conversations_user_${participantId}`);
-        });
-        
-        return message;
-    }
+            <div class="groups-grid" id="groupsGrid">
+                <!-- سيتم ملء المجموعات ديناميكياً -->
+            </div>
+        </div>
 
-    async getMessagesByConversation(conversationId, limit = 50) {
-        const cacheKey = `messages_conv_${conversationId}_${limit}`;
-        if (this.cache.has(cacheKey)) {
-            return this.cache.get(cacheKey);
-        }
-
-        const data = this.loadData();
-        const messages = data.messages
-            .filter(msg => msg.conversationId === conversationId && !msg.deleted.isDeleted)
-            .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
-            .slice(-limit);
-
-        this.cache.set(cacheKey, messages);
-        return messages;
-    }
-
-    async markMessagesAsRead(conversationId, userId) {
-        const data = this.loadData();
-        const convIndex = data.conversations.findIndex(conv => conv._id === conversationId);
-        
-        if (convIndex !== -1) {
-            data.conversations[convIndex].unreadCount[userId] = 0;
-            this.saveData(data);
-            this.cache.delete(`conversations_user_${userId}`);
-        }
-        
-        return true;
-    }
-
-    // دوال القنوات
-    async createChannel(channelData) {
-        const data = this.loadData();
-        const channelId = uuidv4();
-        const channel = {
-            _id: channelId,
-            ...channelData,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            isActive: true,
-            members: channelData.members || [],
-            admins: channelData.admins || [channelData.creatorId],
-            channelSettings: {
-                isPublic: channelData.isPublic !== false,
-                allowComments: true,
-                adminOnlyPosts: false
-            },
-            stats: {
-                memberCount: channelData.members?.length || 1,
-                messageCount: 0,
-                dailyActiveUsers: 0
-            }
-        };
-        
-        data.channels.push(channel);
-        this.updateStats(data);
-        this.saveData(data);
-        return channel;
-    }
-
-    async getAllChannels() {
-        const data = this.loadData();
-        return data.channels.filter(channel => channel.isActive);
-    }
-
-    async getChannelById(channelId) {
-        const data = this.loadData();
-        return data.channels.find(channel => channel._id === channelId && channel.isActive);
-    }
-
-    async getUserChannels(userId) {
-        const cacheKey = `channels_user_${userId}`;
-        if (this.cache.has(cacheKey)) {
-            return this.cache.get(cacheKey);
-        }
-
-        const data = this.loadData();
-        const channels = data.channels.filter(channel => 
-            channel.isActive && 
-            (channel.members.includes(userId) || channel.admins.includes(userId))
-        );
-        
-        this.cache.set(cacheKey, channels);
-        return channels;
-    }
-
-    async createChannelMessage(messageData) {
-        const data = this.loadData();
-        const messageId = uuidv4();
-        const message = {
-            _id: messageId,
-            ...messageData,
-            createdAt: new Date().toISOString(),
-            readBy: [],
-            reactions: [],
-            edited: { isEdited: false },
-            deleted: { isDeleted: false }
-        };
-        
-        data.channelMessages.push(message);
-        
-        const channelIndex = data.channels.findIndex(channel => channel._id === messageData.channelId);
-        if (channelIndex !== -1) {
-            data.channels[channelIndex].stats.messageCount += 1;
-            data.channels[channelIndex].updatedAt = new Date().toISOString();
-        }
-        
-        this.updateStats(data);
-        this.saveData(data);
-        return message;
-    }
-
-    async getChannelMessages(channelId, limit = 50) {
-        const data = this.loadData();
-        return data.channelMessages
-            .filter(msg => msg.channelId === channelId && !msg.deleted.isDeleted)
-            .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
-            .slice(-limit);
-    }
-
-    async addMemberToChannel(channelId, userId) {
-        const data = this.loadData();
-        const channelIndex = data.channels.findIndex(channel => channel._id === channelId);
-        
-        if (channelIndex !== -1 && !data.channels[channelIndex].members.includes(userId)) {
-            data.channels[channelIndex].members.push(userId);
-            data.channels[channelIndex].stats.memberCount += 1;
-            data.channels[channelIndex].updatedAt = new Date().toISOString();
-            this.saveData(data);
+        <!-- صفحة القنوات -->
+        <div class="page" id="channels-page">
+            <div class="channels-header">
+                <h1 class="section-title">
+                    <i class="fas fa-broadcast-tower"></i>
+                    القنوات التعليمية
+                </h1>
+                <button class="btn btn-primary" id="createChannelBtn">
+                    <i class="fas fa-plus"></i>
+                    إنشاء قناة
+                </button>
+            </div>
             
-            this.cache.delete(`channels_user_${userId}`);
-            return true;
-        }
-        return false;
-    }
+            <div class="channels-grid" id="channelsGrid">
+                <!-- سيتم ملء القنوات ديناميكياً -->
+            </div>
+        </div>
 
-    // دوال المجموعات
-    async createGroup(groupData) {
-        const data = this.loadData();
-        const groupId = uuidv4();
-        const group = {
-            _id: groupId,
-            ...groupData,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            isActive: true,
-            members: groupData.members || [groupData.creatorId],
-            admins: groupData.admins || [groupData.creatorId],
-            groupSettings: {
-                isPublic: groupData.isPublic !== false,
-                allowInvites: true,
-                adminOnlyPosts: false
-            },
-            stats: {
-                memberCount: groupData.members?.length || 1,
-                messageCount: 0,
-                dailyActiveUsers: 0
-            }
-        };
-        
-        data.groups.push(group);
-        this.updateStats(data);
-        this.saveData(data);
-        return group;
-    }
-
-    async getAllGroups() {
-        const data = this.loadData();
-        return data.groups.filter(group => group.isActive);
-    }
-
-    async getGroupById(groupId) {
-        const data = this.loadData();
-        return data.groups.find(group => group._id === groupId && group.isActive);
-    }
-
-    async getUserGroups(userId) {
-        const cacheKey = `groups_user_${userId}`;
-        if (this.cache.has(cacheKey)) {
-            return this.cache.get(cacheKey);
-        }
-
-        const data = this.loadData();
-        const groups = data.groups.filter(group => 
-            group.isActive && group.members.includes(userId)
-        );
-        
-        this.cache.set(cacheKey, groups);
-        return groups;
-    }
-
-    async createGroupMessage(messageData) {
-        const data = this.loadData();
-        const messageId = uuidv4();
-        const message = {
-            _id: messageId,
-            ...messageData,
-            createdAt: new Date().toISOString(),
-            readBy: [messageData.senderId],
-            reactions: [],
-            edited: { isEdited: false },
-            deleted: { isDeleted: false }
-        };
-        
-        data.groupMessages.push(message);
-        
-        const groupIndex = data.groups.findIndex(group => group._id === messageData.groupId);
-        if (groupIndex !== -1) {
-            data.groups[groupIndex].stats.messageCount += 1;
-            data.groups[groupIndex].updatedAt = new Date().toISOString();
-        }
-        
-        this.updateStats(data);
-        this.saveData(data);
-        return message;
-    }
-
-    async getGroupMessages(groupId, limit = 50) {
-        const data = this.loadData();
-        return data.groupMessages
-            .filter(msg => msg.groupId === groupId && !msg.deleted.isDeleted)
-            .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
-            .slice(-limit);
-    }
-
-    async addMemberToGroup(groupId, userId) {
-        const data = this.loadData();
-        const groupIndex = data.groups.findIndex(group => group._id === groupId);
-        
-        if (groupIndex !== -1 && !data.groups[groupIndex].members.includes(userId)) {
-            data.groups[groupIndex].members.push(userId);
-            data.groups[groupIndex].stats.memberCount += 1;
-            data.groups[groupIndex].updatedAt = new Date().toISOString();
-            this.saveData(data);
+        <!-- صفحة الوسائط -->
+        <div class="page" id="media-page">
+            <div class="media-header">
+                <h1 class="section-title">
+                    <i class="fas fa-photo-video"></i>
+                    الوسائط التعليمية
+                </h1>
+                <div class="media-actions">
+                    <button class="btn btn-primary" id="uploadMediaBtn">
+                        <i class="fas fa-upload"></i>
+                        رفع وسائط
+                    </button>
+                    <div class="media-filter">
+                        <select id="mediaFilter">
+                            <option value="all">جميع الوسائط</option>
+                            <option value="image">الصور</option>
+                            <option value="video">الفيديوهات</option>
+                            <option value="document">المستندات</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
             
-            this.cache.delete(`groups_user_${userId}`);
-            return true;
-        }
-        return false;
-    }
+            <div class="media-grid" id="mediaGrid">
+                <!-- سيتم ملء الوسائط ديناميكياً -->
+            </div>
+        </div>
 
-    // دوال الستوريات
-    async createStory(storyData) {
-        const data = this.loadData();
-        const storyId = uuidv4();
-        const story = {
-            _id: storyId,
-            ...storyData,
-            createdAt: new Date().toISOString(),
-            expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-            views: [],
-            reactions: [],
-            replies: [],
-            metrics: {
-                viewCount: 0,
-                replyCount: 0,
-                reactionCount: 0,
-                shareCount: 0
-            }
-        };
-        
-        data.stories.push(story);
-        this.updateStats(data);
-        this.saveData(data);
-        return story;
-    }
+        <!-- صفحة الإعدادات -->
+        <div class="page" id="settings-page">
+            <div class="settings-container">
+                <h1 class="section-title">
+                    <i class="fas fa-cog"></i>
+                    الإعدادات
+                </h1>
+                
+                <div class="settings-grid">
+                    <div class="settings-sidebar">
+                        <div class="settings-nav">
+                            <button class="settings-nav-item active" data-tab="profile">
+                                <i class="fas fa-user"></i>
+                                الملف الشخصي
+                            </button>
+                            <button class="settings-nav-item" data-tab="privacy">
+                                <i class="fas fa-shield-alt"></i>
+                                الخصوصية
+                            </button>
+                            <button class="settings-nav-item" data-tab="notifications">
+                                <i class="fas fa-bell"></i>
+                                الإشعارات
+                            </button>
+                            <button class="settings-nav-item" data-tab="appearance">
+                                <i class="fas fa-palette"></i>
+                                المظهر
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="settings-content">
+                        <div class="settings-tab active" id="profile-tab">
+                            <h3>الملف الشخصي</h3>
+                            <form class="settings-form">
+                                <div class="form-group">
+                                    <label for="profileName">الاسم الكامل</label>
+                                    <input type="text" id="profileName" value="محمد أحمد">
+                                </div>
+                                <div class="form-group">
+                                    <label for="profileEmail">البريد الإلكتروني</label>
+                                    <input type="email" id="profileEmail" value="mohamed@example.com">
+                                </div>
+                                <div class="form-group">
+                                    <label for="profileBio">نبذة شخصية</label>
+                                    <textarea id="profileBio" rows="4" placeholder="اكتب نبذة عن نفسك..."></textarea>
+                                </div>
+                                <button type="submit" class="btn btn-primary">حفظ التغييرات</button>
+                            </form>
+                        </div>
+                        
+                        <div class="settings-tab" id="privacy-tab">
+                            <h3>إعدادات الخصوصية</h3>
+                            <div class="privacy-settings">
+                                <div class="privacy-item">
+                                    <div class="privacy-info">
+                                        <h4>إظهار حالة الاتصال</h4>
+                                        <p>السماح للآخرين برؤية ما إذا كنت متصلاً أم لا</p>
+                                    </div>
+                                    <label class="switch">
+                                        <input type="checkbox" checked>
+                                        <span class="slider"></span>
+                                    </label>
+                                </div>
+                                <div class="privacy-item">
+                                    <div class="privacy-info">
+                                        <h4>إظهار آخر ظهور</h4>
+                                        <p>السماح للآخرين برؤية وقت آخر ظهور لك</p>
+                                    </div>
+                                    <label class="switch">
+                                        <input type="checkbox" checked>
+                                        <span class="slider"></span>
+                                    </label>
+                                </div>
+                                <div class="privacy-item">
+                                    <div class="privacy-info">
+                                        <h4>الملف الشخصي العام</h4>
+                                        <p>جعل ملفك الشخصي مرئياً للجميع</p>
+                                    </div>
+                                    <label class="switch">
+                                        <input type="checkbox">
+                                        <span class="slider"></span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
 
-    async getActiveStories() {
-        const data = this.loadData();
-        const now = new Date().toISOString();
-        return data.stories.filter(story => story.expiresAt > now);
-    }
+    <!-- شريط الأدوات السريع -->
+    <div class="quick-actions-bar" id="quickActionsBar">
+        <button class="quick-action" data-page="chat" title="الدردشة">
+            <i class="fas fa-comments"></i>
+        </button>
+        <button class="quick-action" data-page="stories" title="القصص">
+            <i class="fas fa-history"></i>
+        </button>
+        <button class="quick-action" data-page="groups" title="المجموعات">
+            <i class="fas fa-users"></i>
+        </button>
+        <button class="quick-action" data-page="channels" title="القنوات">
+            <i class="fas fa-broadcast-tower"></i>
+        </button>
+    </div>
 
-    async getUserStories(userId) {
-        const data = this.loadData();
-        const now = new Date().toISOString();
-        return data.stories.filter(story => 
-            story.userId === userId && story.expiresAt > now
-        );
-    }
+    <!-- الزر العائم -->
+    <button class="floating-action-btn" id="floatingActionBtn">
+        <i class="fas fa-plus"></i>
+    </button>
 
-    async updateStory(storyId, updates) {
-        const data = this.loadData();
-        const storyIndex = data.stories.findIndex(story => story._id === storyId);
-        
-        if (storyIndex !== -1) {
-            data.stories[storyIndex] = {
-                ...data.stories[storyIndex],
-                ...updates
-            };
-            this.saveData(data);
-            return data.stories[storyIndex];
-        }
-        return null;
-    }
+    <!-- نافذة إنشاء مجموعة -->
+    <div class="modal" id="createGroupModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>إنشاء مجموعة جديدة</h3>
+                <button class="modal-close" id="closeGroupModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="createGroupForm">
+                    <div class="form-group">
+                        <label for="groupName">اسم المجموعة</label>
+                        <input type="text" id="groupName" name="groupName" required placeholder="ادخل اسم المجموعة">
+                    </div>
+                    <div class="form-group">
+                        <label for="groupDescription">وصف المجموعة</label>
+                        <textarea id="groupDescription" name="groupDescription" rows="3" placeholder="ادخل وصف المجموعة"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="groupPrivacy">خصوصية المجموعة</label>
+                        <select id="groupPrivacy" name="groupPrivacy">
+                            <option value="public">عامة</option>
+                            <option value="private">خاصة</option>
+                        </select>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" class="btn btn-outline" id="cancelGroupBtn">إلغاء</button>
+                        <button type="submit" class="btn btn-primary">إنشاء المجموعة</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 
-    async addStoryView(storyId, userId) {
-        const data = this.loadData();
-        const storyIndex = data.stories.findIndex(story => story._id === storyId);
-        
-        if (storyIndex !== -1 && !data.stories[storyIndex].views.includes(userId)) {
-            data.stories[storyIndex].views.push(userId);
-            data.stories[storyIndex].metrics.viewCount += 1;
-            this.saveData(data);
-            return true;
-        }
-        return false;
-    }
+    <!-- نافذة إنشاء قناة -->
+    <div class="modal" id="createChannelModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>إنشاء قناة جديدة</h3>
+                <button class="modal-close" id="closeChannelModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="createChannelForm">
+                    <div class="form-group">
+                        <label for="channelName">اسم القناة</label>
+                        <input type="text" id="channelName" name="channelName" required placeholder="ادخل اسم القناة">
+                    </div>
+                    <div class="form-group">
+                        <label for="channelDescription">وصف القناة</label>
+                        <textarea id="channelDescription" name="channelDescription" rows="3" placeholder="ادخل وصف القناة"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="channelCategory">تصنيف القناة</label>
+                        <select id="channelCategory" name="channelCategory">
+                            <option value="education">تعليمي</option>
+                            <option value="entertainment">ترفيهي</option>
+                            <option value="news">أخباري</option>
+                            <option value="technology">تكنولوجيا</option>
+                        </select>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" class="btn btn-outline" id="cancelChannelBtn">إلغاء</button>
+                        <button type="submit" class="btn btn-primary">إنشاء القناة</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 
-    // النسخ الاحتياطي
-    async createBackup() {
-        try {
-            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-            const backupFile = path.join(BACKUP_DIR, `backup-${timestamp}.json`);
-            
-            const backupData = {
-                timestamp: new Date().toISOString(),
-                data: this.loadData(),
-                version: '2.0.0'
-            };
+    <!-- نافذة رفع الوسائط -->
+    <div class="modal" id="uploadMediaModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>رفع وسائط جديدة</h3>
+                <button class="modal-close" id="closeUploadModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="uploadMediaForm">
+                    <div class="upload-area" id="uploadArea">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                        <p>اسحب وأفلت الملفات هنا أو انقر للاختيار</p>
+                        <input type="file" id="mediaFileInput" multiple style="display: none;" accept="image/*,video/*,.pdf,.doc,.docx">
+                    </div>
+                    <div class="form-group">
+                        <label for="mediaTitle">عنوان الوسائط</label>
+                        <input type="text" id="mediaTitle" placeholder="ادخل عنوان الوسائط">
+                    </div>
+                    <div class="form-group">
+                        <label for="mediaDescription">وصف الوسائط</label>
+                        <textarea id="mediaDescription" rows="3" placeholder="ادخل وصف الوسائط"></textarea>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" class="btn btn-outline" id="cancelUploadBtn">إلغاء</button>
+                        <button type="submit" class="btn btn-primary">رفع الوسائط</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 
-            fs.writeFileSync(backupFile, JSON.stringify(backupData, null, 2));
-            
-            const data = this.loadData();
-            data.backups.push({
-                filename: `backup-${timestamp}.json`,
-                timestamp: new Date().toISOString(),
-                size: JSON.stringify(backupData).length
-            });
-            
-            if (data.backups.length > 10) {
-                const oldBackup = data.backups.shift();
-                const oldBackupPath = path.join(BACKUP_DIR, oldBackup.filename);
-                if (fs.existsSync(oldBackupPath)) {
-                    fs.unlinkSync(oldBackupPath);
-                }
-            }
-            
-            data.lastBackup = new Date().toISOString();
-            this.saveData(data);
-            
-            return { success: true, filename: `backup-${timestamp}.json` };
-        } catch (error) {
-            console.error('❌ خطأ في إنشاء النسخة الاحتياطية:', error);
-            return { success: false, error: error.message };
-        }
-    }
+    <!-- نافذة إنشاء قصة -->
+    <div class="modal" id="createStoryModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>إنشاء قصة جديدة</h3>
+                <button class="modal-close" id="closeStoryModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="createStoryForm">
+                    <div class="upload-area" id="storyUploadArea">
+                        <i class="fas fa-camera"></i>
+                        <p>انقر لاختيار صورة أو فيديو للقصة</p>
+                        <input type="file" id="storyFileInput" style="display: none;" accept="image/*,video/*">
+                    </div>
+                    <div class="form-group">
+                        <label for="storyCaption">تعليق القصة</label>
+                        <textarea id="storyCaption" rows="3" placeholder="اكتب تعليقاً للقصة..."></textarea>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" class="btn btn-outline" id="cancelStoryBtn">إلغاء</button>
+                        <button type="submit" class="btn btn-primary">نشر القصة</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 
-    updateStats(data) {
-        data.stats = {
-            totalUsers: data.users.length,
-            totalMessages: data.messages.length,
-            totalStories: data.stories.length,
-            totalChannels: data.channels.length,
-            totalGroups: data.groups.length,
-            totalConversations: data.conversations.length,
-            lastUpdate: new Date().toISOString(),
-            cacheSize: this.cache.size
-        };
-        return data.stats;
-    }
+    <!-- السكريبتات -->
+    <script src="js/config.js"></script>
+    <script src="js/app.js"></script>
 
-    getStats() {
-        const data = this.loadData();
-        return this.updateStats(data);
-    }
-
-    formatUserResponse(user) {
-        const { password, ...userWithoutPassword } = user;
-        return userWithoutPassword;
-    }
-
-    // تنظيف البيانات القديمة
-    async cleanupOldData() {
-        try {
-            const data = this.loadData();
-            const now = new Date();
-            
-            // تنظيف الستوريات المنتهية
-            data.stories = data.stories.filter(story => 
-                new Date(story.expiresAt) > now
-            );
-            
-            // تنظيف الرسائل المحذوفة
-            data.messages = data.messages.filter(msg => !msg.deleted.isDeleted);
-            data.channelMessages = data.channelMessages.filter(msg => !msg.deleted.isDeleted);
-            data.groupMessages = data.groupMessages.filter(msg => !msg.deleted.isDeleted);
-            
-            this.saveData(data);
-            this.clearCache();
-            
-            console.log('🧹 تم تنظيف البيانات القديمة');
-            return true;
-        } catch (error) {
-            console.error('❌ خطأ في تنظيف البيانات:', error);
-            return false;
-        }
-    }
-}
-
-const localStorageService = new EnhancedLocalStorageService();
-
-// middleware المصادقة
-const authenticateToken = async (req, res, next) => {
-    try {
-        const authHeader = req.headers['authorization'];
-        const token = authHeader && authHeader.split(' ')[1];
-
-        if (!token) {
-            return res.status(401).json({ 
-                success: false, 
-                message: 'رمز الوصول مطلوب',
-                code: 'TOKEN_REQUIRED'
-            });
-        }
-
-        const decoded = jwt.verify(token, JWT_SECRET);
-        const user = await localStorageService.findUserById(decoded.userId);
-        
-        if (!user) {
-            return res.status(401).json({ 
-                success: false, 
-                message: 'المستخدم غير موجود',
-                code: 'USER_NOT_FOUND'
-            });
-        }
-
-        if (!user.isActive) {
-            return res.status(401).json({ 
-                success: false, 
-                message: 'الحساب موقوف',
-                code: 'ACCOUNT_SUSPENDED'
-            });
-        }
-
-        req.user = user;
-        next();
-    } catch (error) {
-        if (error.name === 'TokenExpiredError') {
-            return res.status(401).json({ 
-                success: false, 
-                message: 'انتهت صلاحية الرمز',
-                code: 'TOKEN_EXPIRED'
-            });
-        } else if (error.name === 'JsonWebTokenError') {
-            return res.status(401).json({ 
-                success: false, 
-                message: 'رمز وصول غير صالح',
-                code: 'INVALID_TOKEN'
-            });
-        } else {
-            console.error('❌ خطأ في المصادقة:', error);
-            return res.status(500).json({ 
-                success: false, 
-                message: 'خطأ في الخادم',
-                code: 'SERVER_ERROR'
-            });
-        }
-    }
-};
-
-const requireAdmin = (req, res, next) => {
-    if (req.user.role !== 'admin') {
-        return res.status(403).json({ 
-            success: false, 
-            message: 'صلاحيات مدير مطلوبة',
-            code: 'ADMIN_REQUIRED'
-        });
-    }
-    next();
-};
-
-// دوال مساعدة
-const generateToken = (userId) => {
-    return jwt.sign({ userId }, JWT_SECRET, { expiresIn: '30d' });
-};
-
-const generateRefreshToken = (userId) => {
-    return jwt.sign({ userId, type: 'refresh' }, JWT_SECRET, { expiresIn: '90d' });
-};
-
-const auditLog = async (action, userId, targetType, targetId, details = {}) => {
-    try {
-        console.log(`📋 Audit Log: ${action} by ${userId} on ${targetType} ${targetId}`, details);
-        
-        const data = localStorageService.loadData();
-        if (!data.auditLogs) data.auditLogs = [];
-        
-        data.auditLogs.push({
-            action,
-            userId,
-            targetType,
-            targetId,
-            details,
-            timestamp: new Date().toISOString()
-        });
-        
-        localStorageService.saveData(data);
-    } catch (error) {
-        console.error('❌ خطأ في تسجيل التدقيق:', error);
-    }
-};
-
-// إنشاء حساب المدير الافتراضي
-async function createDefaultAdmin() {
-    try {
-        const adminExists = await localStorageService.findUserByEmail('admin@platform.edu');
-        if (!adminExists) {
-            const hashedPassword = await bcrypt.hash('77007700', 12);
-            const admin = await localStorageService.createUser({
-                fullName: 'مدير النظام',
-                email: 'admin@platform.edu',
-                password: hashedPassword,
-                role: 'admin'
-            });
-            
-            console.log('✅ تم إنشاء حساب المدير الافتراضي');
-            console.log('📧 البريد الإلكتروني: admin@platform.edu');
-            console.log('🔑 كلمة المرور: 77007700');
-        } else {
-            console.log('✅ حساب المدير موجود بالفعل');
-        }
-    } catch (error) {
-        console.error('❌ خطأ في إنشاء حساب المدير:', error);
-    }
-}
-
-// إنشاء بيانات تجريبية
-async function createSampleData() {
-    try {
-        const users = [
-            {
-                fullName: 'أحمد محمد',
-                email: 'ahmed@example.com',
-                password: await bcrypt.hash('123456', 12),
-                role: 'teacher'
-            },
-            {
-                fullName: 'فاطمة علي',
-                email: 'fatima@example.com',
-                password: await bcrypt.hash('123456', 12),
-                role: 'student'
-            },
-            {
-                fullName: 'خالد إبراهيم',
-                email: 'khaled@example.com',
-                password: await bcrypt.hash('123456', 12),
-                role: 'student'
-            }
-        ];
-
-        for (const userData of users) {
-            const existingUser = await localStorageService.findUserByEmail(userData.email);
-            if (!existingUser) {
-                await localStorageService.createUser(userData);
-                console.log(`✅ تم إنشاء المستخدم: ${userData.fullName}`);
-            }
+    <style>
+        /* أنماط إضافية للصفحة الرئيسية */
+        .home-hero {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 4rem 2rem;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: var(--border-radius);
+            margin-bottom: 3rem;
         }
 
-        const allUsers = await localStorageService.getAllUsers();
-        const adminUser = allUsers.find(u => u.role === 'admin');
-        const teacherUser = allUsers.find(u => u.role === 'teacher');
-
-        if (adminUser && teacherUser) {
-            const channels = [
-                {
-                    name: 'قناة الرياضيات',
-                    description: 'قناة مخصصة لدروس الرياضيات والتمارين',
-                    creatorId: adminUser._id,
-                    members: allUsers.map(u => u._id),
-                    isPublic: true
-                },
-                {
-                    name: 'قناة العلوم',
-                    description: 'مناقشات وأخبار علمية',
-                    creatorId: teacherUser._id,
-                    members: allUsers.map(u => u._id),
-                    isPublic: true
-                }
-            ];
-
-            for (const channelData of channels) {
-                const existingChannel = await localStorageService.getAllChannels();
-                if (!existingChannel.find(c => c.name === channelData.name)) {
-                    await localStorageService.createChannel(channelData);
-                    console.log(`✅ تم إنشاء القناة: ${channelData.name}`);
-                }
-            }
-
-            const groups = [
-                {
-                    name: 'مجموعة الرياضيات المتقدمة',
-                    description: 'مجموعة للمناقشات المتقدمة في الرياضيات',
-                    creatorId: teacherUser._id,
-                    members: allUsers.map(u => u._id),
-                    isPublic: true
-                },
-                {
-                    name: 'مجموعة مشاريع التخرج',
-                    description: 'لمناقشة مشاريع التخرج والتعاون',
-                    creatorId: adminUser._id,
-                    members: allUsers.map(u => u._id),
-                    isPublic: true
-                }
-            ];
-
-            for (const groupData of groups) {
-                const existingGroups = await localStorageService.getAllGroups();
-                if (!existingGroups.find(g => g.name === groupData.name)) {
-                    await localStorageService.createGroup(groupData);
-                    console.log(`✅ تم إنشاء المجموعة: ${groupData.name}`);
-                }
-            }
+        .hero-content h1 {
+            font-size: 3rem;
+            margin-bottom: 1rem;
         }
 
-        console.log('✅ تم إنشاء البيانات التجريبية بنجاح');
-    } catch (error) {
-        console.error('❌ خطأ في إنشاء البيانات التجريبية:', error);
-    }
-}
-
-// تهيئة البيانات
-createDefaultAdmin();
-setTimeout(createSampleData, 1000);
-
-// تخزين المستخدمين المتصلين
-const connectedUsers = new Map();
-const userSockets = new Map();
-
-// ==================== مسارات API ====================
-
-// مسار رئيسي
-app.get('/', (req, res) => {
-    res.json({
-        success: true,
-        message: '🚀 خادم المنصة التعليمية المحسن يعمل بنجاح!',
-        version: '2.1.0',
-        timestamp: new Date().toISOString(),
-        environment: NODE_ENV,
-        features: {
-            realtime_chat: true,
-            channels: true,
-            groups: true,
-            stories: true,
-            file_upload: true,
-            emoji_support: true,
-            notifications: true,
-            caching: true,
-            search: true
-        }
-    });
-});
-
-// مسارات المصادقة
-app.post('/api/auth/register', async (req, res) => {
-    try {
-        const { fullName, email, role, password } = req.body;
-
-        if (!fullName || !email || !role || !password) {
-            return res.status(400).json({
-                success: false,
-                message: 'جميع الحقول مطلوبة',
-                code: 'MISSING_FIELDS'
-            });
+        .hero-content p {
+            font-size: 1.2rem;
+            margin-bottom: 2rem;
+            opacity: 0.9;
         }
 
-        const existingUser = await localStorageService.findUserByEmail(email);
-        if (existingUser) {
-            return res.status(400).json({
-                success: false,
-                message: 'البريد الإلكتروني مسجل مسبقاً',
-                code: 'EMAIL_EXISTS'
-            });
+        .hero-actions {
+            display: flex;
+            gap: 1rem;
         }
 
-        const hashedPassword = await bcrypt.hash(password, 12);
-        const user = await localStorageService.createUser({
-            fullName: fullName.trim(),
-            email,
-            password: hashedPassword,
-            role: role
-        });
-
-        await auditLog('REGISTER', user._id, 'user', user._id, { email, role });
-
-        const token = generateToken(user._id);
-        const refreshToken = generateRefreshToken(user._id);
-
-        res.status(201).json({
-            success: true,
-            message: 'تم إنشاء الحساب بنجاح',
-            data: {
-                user: localStorageService.formatUserResponse(user),
-                token,
-                refreshToken
-            }
-        });
-
-    } catch (error) {
-        console.error('❌ خطأ في التسجيل:', error);
-        res.status(500).json({
-            success: false,
-            message: 'حدث خطأ في الخادم',
-            code: 'SERVER_ERROR',
-            error: error.message
-        });
-    }
-});
-
-app.post('/api/auth/login', async (req, res) => {
-    try {
-        const { email, password } = req.body;
-
-        if (!email || !password) {
-            return res.status(400).json({
-                success: false,
-                message: 'البريد الإلكتروني وكلمة المرور مطلوبان',
-                code: 'MISSING_CREDENTIALS'
-            });
+        .hero-image {
+            font-size: 8rem;
+            opacity: 0.8;
         }
 
-        const user = await localStorageService.findUserByEmail(email);
-        
-        if (!user) {
-            return res.status(401).json({
-                success: false,
-                message: 'البريد الإلكتروني أو كلمة المرور غير صحيحة',
-                code: 'INVALID_CREDENTIALS'
-            });
+        .features-section {
+            padding: 2rem 0;
         }
 
-        if (!user.isActive) {
-            return res.status(401).json({
-                success: false,
-                message: 'الحساب موقوف',
-                code: 'ACCOUNT_SUSPENDED'
-            });
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-top: 2rem;
         }
 
-        const isPasswordValid = await bcrypt.compare(password, user.password);
-
-        if (!isPasswordValid) {
-            return res.status(401).json({
-                success: false,
-                message: 'البريد الإلكتروني أو كلمة المرور غير صحيحة',
-                code: 'INVALID_CREDENTIALS'
-            });
+        .feature-card {
+            background: white;
+            padding: 2rem;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            text-align: center;
+            transition: var(--transition);
         }
 
-        const updatedUser = await localStorageService.updateUser(user._id, {
-            isOnline: true,
-            lastSeen: new Date().toISOString()
-        });
-
-        const token = generateToken(user._id);
-        const refreshToken = generateRefreshToken(user._id);
-
-        await auditLog('LOGIN', user._id, 'user', user._id, { email });
-
-        res.json({
-            success: true,
-            message: 'تم تسجيل الدخول بنجاح',
-            data: {
-                user: localStorageService.formatUserResponse(updatedUser || user),
-                token,
-                refreshToken
-            }
-        });
-
-    } catch (error) {
-        console.error('❌ خطأ في تسجيل الدخول:', error);
-        res.status(500).json({
-            success: false,
-            message: 'حدث خطأ أثناء تسجيل الدخول',
-            code: 'LOGIN_ERROR',
-            error: error.message
-        });
-    }
-});
-
-app.post('/api/auth/logout', authenticateToken, async (req, res) => {
-    try {
-        await localStorageService.updateUser(req.user._id, {
-            isOnline: false,
-            lastSeen: new Date().toISOString()
-        });
-
-        await auditLog('LOGOUT', req.user._id, 'user', req.user._id);
-
-        res.json({
-            success: true,
-            message: 'تم تسجيل الخروج بنجاح'
-        });
-
-    } catch (error) {
-        console.error('❌ خطأ في تسجيل الخروج:', error);
-        res.status(500).json({
-            success: false,
-            message: 'حدث خطأ في الخادم',
-            code: 'SERVER_ERROR'
-        });
-    }
-});
-
-// مسارات المستخدمين
-app.get('/api/users/me', authenticateToken, async (req, res) => {
-    try {
-        res.json({
-            success: true,
-            data: {
-                user: localStorageService.formatUserResponse(req.user)
-            }
-        });
-    } catch (error) {
-        console.error('❌ خطأ في جلب بيانات المستخدم:', error);
-        res.status(500).json({
-            success: false,
-            message: 'حدث خطأ في الخادم',
-            code: 'SERVER_ERROR'
-        });
-    }
-});
-
-app.get('/api/users', authenticateToken, async (req, res) => {
-    try {
-        const users = await localStorageService.getAllUsers();
-        res.json({
-            success: true,
-            data: {
-                users: users.map(user => localStorageService.formatUserResponse(user))
-            }
-        });
-    } catch (error) {
-        console.error('❌ خطأ في جلب المستخدمين:', error);
-        res.status(500).json({
-            success: false,
-            message: 'حدث خطأ في الخادم',
-            code: 'SERVER_ERROR'
-        });
-    }
-});
-
-// البحث عن المستخدمين
-app.get('/api/users/search', authenticateToken, async (req, res) => {
-    try {
-        const { q } = req.query;
-
-        if (!q || q.length < 2) {
-            return res.status(400).json({
-                success: false,
-                message: 'يرجى إدخال مصطلح بحث مكون من حرفين على الأقل',
-                code: 'SEARCH_TERM_TOO_SHORT'
-            });
+        .feature-card:hover {
+            transform: translateY(-5px);
         }
 
-        const users = await localStorageService.searchUsers(q, 20);
-
-        res.json({
-            success: true,
-            data: {
-                users,
-                query: q,
-                total: users.length
-            }
-        });
-
-    } catch (error) {
-        console.error('❌ خطأ في البحث عن المستخدمين:', error);
-        res.status(500).json({
-            success: false,
-            message: 'حدث خطأ أثناء البحث',
-            code: 'SEARCH_ERROR'
-        });
-    }
-});
-
-// مسارات الدردشة
-app.get('/api/chat/conversations', authenticateToken, async (req, res) => {
-    try {
-        const conversations = await localStorageService.getConversationsByUserId(req.user._id);
-        
-        const conversationsWithLastMessage = await Promise.all(
-            conversations.map(async (conv) => {
-                const messages = await localStorageService.getMessagesByConversation(conv._id, 1);
-                const lastMessage = messages[messages.length - 1];
-                return {
-                    ...conv,
-                    lastMessage: lastMessage || null
-                };
-            })
-        );
-
-        res.json({
-            success: true,
-            data: {
-                conversations: conversationsWithLastMessage
-            }
-        });
-    } catch (error) {
-        console.error('❌ خطأ في جلب المحادثات:', error);
-        res.status(500).json({
-            success: false,
-            message: 'حدث خطأ في الخادم',
-            code: 'SERVER_ERROR'
-        });
-    }
-});
-
-app.post('/api/chat/conversations', authenticateToken, async (req, res) => {
-    try {
-        const { participantId } = req.body;
-        
-        if (!participantId) {
-            return res.status(400).json({
-                success: false,
-                message: 'معرف المشارك مطلوب',
-                code: 'MISSING_PARTICIPANT'
-            });
+        .feature-icon {
+            font-size: 3rem;
+            color: var(--primary-color);
+            margin-bottom: 1rem;
         }
 
-        const participant = await localStorageService.findUserById(participantId);
-        if (!participant) {
-            return res.status(404).json({
-                success: false,
-                message: 'المستخدم غير موجود',
-                code: 'USER_NOT_FOUND'
-            });
+        .feature-card h3 {
+            margin-bottom: 1rem;
+            color: var(--dark-color);
         }
 
-        const conversation = await localStorageService.getOrCreateConversation(
-            req.user._id,
-            participantId
-        );
-
-        res.json({
-            success: true,
-            data: {
-                conversation
-            }
-        });
-    } catch (error) {
-        console.error('❌ خطأ في إنشاء المحادثة:', error);
-        res.status(500).json({
-            success: false,
-            message: 'حدث خطأ في الخادم',
-            code: 'SERVER_ERROR'
-        });
-    }
-});
-
-app.get('/api/chat/conversations/:conversationId/messages', authenticateToken, async (req, res) => {
-    try {
-        const { conversationId } = req.params;
-        const { limit = 50 } = req.query;
-        
-        const messages = await localStorageService.getMessagesByConversation(conversationId, parseInt(limit));
-        
-        await localStorageService.markMessagesAsRead(conversationId, req.user._id);
-
-        res.json({
-            success: true,
-            data: {
-                messages,
-                pagination: {
-                    hasMore: messages.length === parseInt(limit),
-                    limit: parseInt(limit)
-                }
-            }
-        });
-    } catch (error) {
-        console.error('❌ خطأ في جلب الرسائل:', error);
-        res.status(500).json({
-            success: false,
-            message: 'حدث خطأ في الخادم',
-            code: 'SERVER_ERROR'
-        });
-    }
-});
-
-// مسارات القنوات
-app.get('/api/channels', authenticateToken, async (req, res) => {
-    try {
-        const channels = await localStorageService.getUserChannels(req.user._id);
-        res.json({
-            success: true,
-            data: {
-                channels
-            }
-        });
-    } catch (error) {
-        console.error('❌ خطأ في جلب القنوات:', error);
-        res.status(500).json({
-            success: false,
-            message: 'حدث خطأ في الخادم',
-            code: 'SERVER_ERROR'
-        });
-    }
-});
-
-app.post('/api/channels', authenticateToken, upload.single('channelAvatar'), async (req, res) => {
-    try {
-        const { name, description, isPublic = true } = req.body;
-        
-        if (!name) {
-            return res.status(400).json({
-                success: false,
-                message: 'اسم القناة مطلوب',
-                code: 'MISSING_NAME'
-            });
+        .feature-card p {
+            color: var(--gray-color);
+            line-height: 1.6;
         }
 
-        const channelData = {
-            name,
-            description,
-            isPublic: isPublic === 'true' || isPublic === true,
-            creatorId: req.user._id,
-            members: [req.user._id]
-        };
-
-        if (req.file) {
-            channelData.avatar = `/uploads/channels/${req.file.filename}`;
+        /* أنماط لوحة التحكم */
+        .dashboard-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin: 2rem 0;
         }
 
-        const channel = await localStorageService.createChannel(channelData);
-
-        await auditLog('CREATE_CHANNEL', req.user._id, 'channel', channel._id, { name });
-
-        res.status(201).json({
-            success: true,
-            message: 'تم إنشاء القناة بنجاح',
-            data: {
-                channel
-            }
-        });
-    } catch (error) {
-        console.error('❌ خطأ في إنشاء القناة:', error);
-        res.status(500).json({
-            success: false,
-            message: 'حدث خطأ في الخادم',
-            code: 'SERVER_ERROR'
-        });
-    }
-});
-
-app.get('/api/channels/:channelId/messages', authenticateToken, async (req, res) => {
-    try {
-        const { channelId } = req.params;
-        const { limit = 50 } = req.query;
-        
-        const messages = await localStorageService.getChannelMessages(channelId, parseInt(limit));
-        res.json({
-            success: true,
-            data: {
-                messages
-            }
-        });
-    } catch (error) {
-        console.error('❌ خطأ في جلب رسائل القناة:', error);
-        res.status(500).json({
-            success: false,
-            message: 'حدث خطأ في الخادم',
-            code: 'SERVER_ERROR'
-        });
-    }
-});
-
-app.post('/api/channels/:channelId/join', authenticateToken, async (req, res) => {
-    try {
-        const { channelId } = req.params;
-        const success = await localStorageService.addMemberToChannel(channelId, req.user._id);
-        
-        if (success) {
-            res.json({
-                success: true,
-                message: 'تم الانضمام إلى القناة بنجاح'
-            });
-        } else {
-            res.status(400).json({
-                success: false,
-                message: 'لم يتمكن من الانضمام إلى القناة'
-            });
-        }
-    } catch (error) {
-        console.error('❌ خطأ في الانضمام إلى القناة:', error);
-        res.status(500).json({
-            success: false,
-            message: 'حدث خطأ في الخادم',
-            code: 'SERVER_ERROR'
-        });
-    }
-});
-
-// مسارات المجموعات
-app.get('/api/groups', authenticateToken, async (req, res) => {
-    try {
-        const groups = await localStorageService.getUserGroups(req.user._id);
-        res.json({
-            success: true,
-            data: {
-                groups
-            }
-        });
-    } catch (error) {
-        console.error('❌ خطأ في جلب المجموعات:', error);
-        res.status(500).json({
-            success: false,
-            message: 'حدث خطأ في الخادم',
-            code: 'SERVER_ERROR'
-        });
-    }
-});
-
-app.post('/api/groups', authenticateToken, upload.single('groupAvatar'), async (req, res) => {
-    try {
-        const { name, description, isPublic = true } = req.body;
-        
-        if (!name) {
-            return res.status(400).json({
-                success: false,
-                message: 'اسم المجموعة مطلوب',
-                code: 'MISSING_NAME'
-            });
+        .stat-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            display: flex;
+            align-items: center;
+            gap: 1rem;
         }
 
-        const groupData = {
-            name,
-            description,
-            isPublic: isPublic === 'true' || isPublic === true,
-            creatorId: req.user._id,
-            members: [req.user._id]
-        };
-
-        if (req.file) {
-            groupData.avatar = `/uploads/groups/${req.file.filename}`;
+        .stat-icon {
+            width: 60px;
+            height: 60px;
+            background: var(--primary-color);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.5rem;
         }
 
-        const group = await localStorageService.createGroup(groupData);
-
-        await auditLog('CREATE_GROUP', req.user._id, 'group', group._id, { name });
-
-        res.status(201).json({
-            success: true,
-            message: 'تم إنشاء المجموعة بنجاح',
-            data: {
-                group
-            }
-        });
-    } catch (error) {
-        console.error('❌ خطأ في إنشاء المجموعة:', error);
-        res.status(500).json({
-            success: false,
-            message: 'حدث خطأ في الخادم',
-            code: 'SERVER_ERROR'
-        });
-    }
-});
-
-app.get('/api/groups/:groupId/messages', authenticateToken, async (req, res) => {
-    try {
-        const { groupId } = req.params;
-        const { limit = 50 } = req.query;
-        
-        const messages = await localStorageService.getGroupMessages(groupId, parseInt(limit));
-        res.json({
-            success: true,
-            data: {
-                messages
-            }
-        });
-    } catch (error) {
-        console.error('❌ خطأ في جلب رسائل المجموعة:', error);
-        res.status(500).json({
-            success: false,
-            message: 'حدث خطأ في الخادم',
-            code: 'SERVER_ERROR'
-        });
-    }
-});
-
-app.post('/api/groups/:groupId/join', authenticateToken, async (req, res) => {
-    try {
-        const { groupId } = req.params;
-        const success = await localStorageService.addMemberToGroup(groupId, req.user._id);
-        
-        if (success) {
-            res.json({
-                success: true,
-                message: 'تم الانضمام إلى المجموعة بنجاح'
-            });
-        } else {
-            res.status(400).json({
-                success: false,
-                message: 'لم يتمكن من الانضمام إلى المجموعة'
-            });
-        }
-    } catch (error) {
-        console.error('❌ خطأ في الانضمام إلى المجموعة:', error);
-        res.status(500).json({
-            success: false,
-            message: 'حدث خطأ في الخادم',
-            code: 'SERVER_ERROR'
-        });
-    }
-});
-
-// مسارات الستوريات
-app.get('/api/stories', authenticateToken, async (req, res) => {
-    try {
-        const stories = await localStorageService.getActiveStories();
-        res.json({
-            success: true,
-            data: {
-                stories
-            }
-        });
-    } catch (error) {
-        console.error('❌ خطأ في جلب الستوريات:', error);
-        res.status(500).json({
-            success: false,
-            message: 'حدث خطأ في الخادم',
-            code: 'SERVER_ERROR'
-        });
-    }
-});
-
-app.post('/api/stories', authenticateToken, upload.single('media'), async (req, res) => {
-    try {
-        const { caption } = req.body;
-        
-        if (!req.file) {
-            return res.status(400).json({
-                success: false,
-                message: 'الوسائط مطلوبة',
-                code: 'MISSING_MEDIA'
-            });
+        .stat-number {
+            font-size: 2rem;
+            font-weight: bold;
+            color: var(--dark-color);
         }
 
-        const story = await localStorageService.createStory({
-            userId: req.user._id,
-            mediaUrl: `/uploads/stories/${req.file.filename}`,
-            mediaType: req.file.mimetype.startsWith('image/') ? 'image' : 'video',
-            caption,
-            createdAt: new Date().toISOString()
-        });
-
-        await auditLog('CREATE_STORY', req.user._id, 'story', story._id);
-
-        res.status(201).json({
-            success: true,
-            message: 'تم نشر القصة بنجاح',
-            data: {
-                story
-            }
-        });
-    } catch (error) {
-        console.error('❌ خطأ في نشر القصة:', error);
-        res.status(500).json({
-            success: false,
-            message: 'حدث خطأ في الخادم',
-            code: 'SERVER_ERROR'
-        });
-    }
-});
-
-app.post('/api/stories/:storyId/view', authenticateToken, async (req, res) => {
-    try {
-        const { storyId } = req.params;
-        const success = await localStorageService.addStoryView(storyId, req.user._id);
-        
-        if (success) {
-            res.json({
-                success: true,
-                message: 'تم تسجيل المشاهدة'
-            });
-        } else {
-            res.status(400).json({
-                success: false,
-                message: 'لم يتم تسجيل المشاهدة'
-            });
-        }
-    } catch (error) {
-        console.error('❌ خطأ في تسجيل المشاهدة:', error);
-        res.status(500).json({
-            success: false,
-            message: 'حدث خطأ في الخادم',
-            code: 'SERVER_ERROR'
-        });
-    }
-});
-
-// مسار الحالة الصحية
-app.get('/api/health', (req, res) => {
-    const stats = localStorageService.getStats();
-    
-    res.json({
-        success: true,
-        data: {
-            status: 'healthy',
-            timestamp: new Date().toISOString(),
-            uptime: process.uptime(),
-            memory: process.memoryUsage(),
-            connectedUsers: connectedUsers.size,
-            stats: stats
-        }
-    });
-});
-
-// مسار تحميل الملفات
-app.post('/api/upload', authenticateToken, upload.single('file'), async (req, res) => {
-    try {
-        if (!req.file) {
-            return res.status(400).json({
-                success: false,
-                message: 'لم يتم تحميل أي ملف',
-                code: 'NO_FILE_UPLOADED'
-            });
+        .stat-label {
+            color: var(--gray-color);
+            font-size: 0.9rem;
         }
 
-        const fileInfo = {
-            filename: req.file.filename,
-            originalName: req.file.originalname,
-            mimetype: req.file.mimetype,
-            size: req.file.size,
-            url: `/uploads/files/${req.file.filename}`,
-            uploadedBy: req.user._id,
-            uploadedAt: new Date().toISOString()
-        };
+        .recent-activities {
+            background: white;
+            padding: 1.5rem;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            margin-top: 2rem;
+        }
 
-        await auditLog('UPLOAD_FILE', req.user._id, 'FILE', req.file.filename, {
-            size: req.file.size,
-            type: req.file.mimetype
-        });
+        .activity-item {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 1rem 0;
+            border-bottom: 1px solid var(--border-color);
+        }
 
-        res.json({
-            success: true,
-            message: 'تم تحميل الملف بنجاح',
-            data: fileInfo
-        });
+        .activity-item:last-child {
+            border-bottom: none;
+        }
 
-    } catch (error) {
-        console.error('❌ خطأ في تحميل الملف:', error);
-        res.status(500).json({
-            success: false,
-            message: 'حدث خطأ أثناء تحميل الملف',
-            code: 'UPLOAD_ERROR'
-        });
-    }
-});
+        .activity-item i {
+            color: var(--primary-color);
+            font-size: 1.2rem;
+        }
 
-// ==================== نظام السوكت المحسن ====================
+        .activity-content p {
+            margin: 0;
+            color: var(--dark-color);
+        }
 
-io.on('connection', (socket) => {
-    console.log('🔌 مستخدم متصل:', socket.id);
+        .activity-time {
+            font-size: 0.8rem;
+            color: var(--gray-color);
+        }
 
-    socket.on('authenticate', async (data) => {
-        try {
-            const { token } = data;
-            if (!token) {
-                socket.emit('authentication_failed', { message: 'رمز المصادقة مطلوب' });
-                return;
+        /* أنماط الإعدادات */
+        .settings-grid {
+            display: grid;
+            grid-template-columns: 250px 1fr;
+            gap: 2rem;
+            margin-top: 2rem;
+        }
+
+        .settings-sidebar {
+            background: white;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            padding: 1rem;
+        }
+
+        .settings-nav {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .settings-nav-item {
+            padding: 1rem;
+            border: none;
+            background: none;
+            text-align: right;
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--dark-color);
+        }
+
+        .settings-nav-item:hover,
+        .settings-nav-item.active {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .settings-content {
+            background: white;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            padding: 2rem;
+        }
+
+        .settings-tab {
+            display: none;
+        }
+
+        .settings-tab.active {
+            display: block;
+        }
+
+        .privacy-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .privacy-item:last-child {
+            border-bottom: none;
+        }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 34px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 34px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: var(--primary-color);
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+
+        /* أنماط الرفع */
+        .upload-area {
+            border: 2px dashed var(--border-color);
+            border-radius: var(--border-radius);
+            padding: 3rem;
+            text-align: center;
+            cursor: pointer;
+            transition: var(--transition);
+            margin-bottom: 1.5rem;
+        }
+
+        .upload-area:hover {
+            border-color: var(--primary-color);
+            background: rgba(67, 97, 238, 0.05);
+        }
+
+        .upload-area i {
+            font-size: 3rem;
+            color: var(--gray-color);
+            margin-bottom: 1rem;
+        }
+
+        .stories-header,
+        .media-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+
+        .media-actions {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        @media (max-width: 768px) {
+            .home-hero {
+                flex-direction: column;
+                text-align: center;
+                padding: 2rem 1rem;
             }
 
-            const decoded = jwt.verify(token, JWT_SECRET);
-            const user = await localStorageService.findUserById(decoded.userId);
-            
-            if (!user) {
-                socket.emit('authentication_failed', { message: 'المستخدم غير موجود' });
-                return;
+            .hero-content h1 {
+                font-size: 2rem;
             }
 
-            socket.userId = user._id;
-            connectedUsers.set(user._id, {
-                socketId: socket.id,
-                user: localStorageService.formatUserResponse(user),
-                lastSeen: new Date().toISOString()
-            });
-            userSockets.set(socket.id, user._id);
+            .hero-image {
+                font-size: 4rem;
+                margin-top: 2rem;
+            }
 
-            await localStorageService.updateUser(user._id, {
-                isOnline: true,
-                lastSeen: new Date().toISOString()
-            });
+            .hero-actions {
+                flex-direction: column;
+            }
 
-            socket.join(`user:${user._id}`);
-            
-            const userChannels = await localStorageService.getUserChannels(user._id);
-            userChannels.forEach(channel => {
-                socket.join(`channel:${channel._id}`);
-            });
+            .settings-grid {
+                grid-template-columns: 1fr;
+            }
 
-            const userGroups = await localStorageService.getUserGroups(user._id);
-            userGroups.forEach(group => {
-                socket.join(`group:${group._id}`);
-            });
+            .stories-header,
+            .media-header {
+                flex-direction: column;
+                gap: 1rem;
+                align-items: stretch;
+            }
 
-            io.emit('user_status_changed', {
-                userId: user._id,
-                isOnline: true,
-                lastSeen: new Date().toISOString()
-            });
-
-            socket.emit('authenticated', { 
-                user: localStorageService.formatUserResponse(user),
-                message: 'تم المصادقة بنجاح'
-            });
-
-            console.log(`✅ تم مصادقة المستخدم: ${user.fullName} (${socket.id})`);
-
-        } catch (error) {
-            console.error('❌ خطأ في مصادقة السوكت:', error);
-            socket.emit('authentication_failed', { message: 'فشل المصادقة' });
+            .media-actions {
+                justify-content: space-between;
+            }
         }
-    });
-
-    socket.on('send_message', async (data) => {
-        try {
-            if (!socket.userId) {
-                socket.emit('error', { message: 'غير مصرح به' });
-                return;
-            }
-
-            const { conversationId, content, type = 'text' } = data;
-            
-            if (!conversationId || !content) {
-                socket.emit('error', { message: 'معرف المحادثة والمحتوى مطلوبان' });
-                return;
-            }
-
-            const conversation = await localStorageService.getConversationById(conversationId);
-            if (!conversation) {
-                socket.emit('error', { message: 'المحادثة غير موجودة' });
-                return;
-            }
-
-            const message = await localStorageService.createMessage({
-                conversationId,
-                senderId: socket.userId,
-                content,
-                type,
-                createdAt: new Date().toISOString()
-            });
-
-            const sender = await localStorageService.findUserById(socket.userId);
-
-            conversation.participants.forEach(participantId => {
-                io.to(`user:${participantId}`).emit('new_message', {
-                    conversationId,
-                    message: {
-                        ...message,
-                        sender: localStorageService.formatUserResponse(sender)
-                    }
-                });
-            });
-
-            console.log(`💬 رسالة جديدة في المحادثة ${conversationId}`);
-
-        } catch (error) {
-            console.error('❌ خطأ في إرسال الرسالة:', error);
-            socket.emit('error', { message: 'فشل إرسال الرسالة' });
-        }
-    });
-
-    socket.on('send_channel_message', async (data) => {
-        try {
-            if (!socket.userId) {
-                socket.emit('error', { message: 'غير مصرح به' });
-                return;
-            }
-
-            const { channelId, content, type = 'text' } = data;
-            
-            if (!channelId || !content) {
-                socket.emit('error', { message: 'معرف القناة والمحتوى مطلوبان' });
-                return;
-            }
-
-            const channel = await localStorageService.getChannelById(channelId);
-            if (!channel) {
-                socket.emit('error', { message: 'القناة غير موجودة' });
-                return;
-            }
-
-            if (!channel.members.includes(socket.userId) && !channel.admins.includes(socket.userId)) {
-                socket.emit('error', { message: 'لست عضواً في هذه القناة' });
-                return;
-            }
-
-            const message = await localStorageService.createChannelMessage({
-                channelId,
-                senderId: socket.userId,
-                content,
-                type,
-                createdAt: new Date().toISOString()
-            });
-
-            const sender = await localStorageService.findUserById(socket.userId);
-
-            io.to(`channel:${channelId}`).emit('new_channel_message', {
-                channelId,
-                message: {
-                    ...message,
-                    sender: localStorageService.formatUserResponse(sender)
-                }
-            });
-
-            console.log(`📢 رسالة جديدة في القناة ${channelId}`);
-
-        } catch (error) {
-            console.error('❌ خطأ في إرسال رسالة القناة:', error);
-            socket.emit('error', { message: 'فشل إرسال رسالة القناة' });
-        }
-    });
-
-    socket.on('send_group_message', async (data) => {
-        try {
-            if (!socket.userId) {
-                socket.emit('error', { message: 'غير مصرح به' });
-                return;
-            }
-
-            const { groupId, content, type = 'text' } = data;
-            
-            if (!groupId || !content) {
-                socket.emit('error', { message: 'معرف المجموعة والمحتوى مطلوبان' });
-                return;
-            }
-
-            const group = await localStorageService.getGroupById(groupId);
-            if (!group) {
-                socket.emit('error', { message: 'المجموعة غير موجودة' });
-                return;
-            }
-
-            if (!group.members.includes(socket.userId)) {
-                socket.emit('error', { message: 'لست عضواً في هذه المجموعة' });
-                return;
-            }
-
-            const message = await localStorageService.createGroupMessage({
-                groupId,
-                senderId: socket.userId,
-                content,
-                type,
-                createdAt: new Date().toISOString()
-            });
-
-            const sender = await localStorageService.findUserById(socket.userId);
-
-            io.to(`group:${groupId}`).emit('new_group_message', {
-                groupId,
-                message: {
-                    ...message,
-                    sender: localStorageService.formatUserResponse(sender)
-                }
-            });
-
-            console.log(`👥 رسالة جديدة في المجموعة ${groupId}`);
-
-        } catch (error) {
-            console.error('❌ خطأ في إرسال رسالة المجموعة:', error);
-            socket.emit('error', { message: 'فشل إرسال رسالة المجموعة' });
-        }
-    });
-
-    socket.on('join_channel', async (data) => {
-        try {
-            const { channelId } = data;
-            if (channelId && socket.userId) {
-                const success = await localStorageService.addMemberToChannel(channelId, socket.userId);
-                if (success) {
-                    socket.join(`channel:${channelId}`);
-                    socket.emit('channel_joined', { channelId });
-                    console.log(`✅ المستخدم ${socket.userId} انضم إلى القناة ${channelId}`);
-                }
-            }
-        } catch (error) {
-            console.error('❌ خطأ في الانضمام إلى القناة:', error);
-        }
-    });
-
-    socket.on('join_group', async (data) => {
-        try {
-            const { groupId } = data;
-            if (groupId && socket.userId) {
-                const success = await localStorageService.addMemberToGroup(groupId, socket.userId);
-                if (success) {
-                    socket.join(`group:${groupId}`);
-                    socket.emit('group_joined', { groupId });
-                    console.log(`✅ المستخدم ${socket.userId} انضم إلى المجموعة ${groupId}`);
-                }
-            }
-        } catch (error) {
-            console.error('❌ خطأ في الانضمام إلى المجموعة:', error);
-        }
-    });
-
-    socket.on('typing_start', (data) => {
-        const { conversationId } = data;
-        if (conversationId && socket.userId) {
-            socket.to(conversationId).emit('user_typing', {
-                userId: socket.userId,
-                conversationId,
-                isTyping: true
-            });
-        }
-    });
-
-    socket.on('typing_stop', (data) => {
-        const { conversationId } = data;
-        if (conversationId && socket.userId) {
-            socket.to(conversationId).emit('user_typing', {
-                userId: socket.userId,
-                conversationId,
-                isTyping: false
-            });
-        }
-    });
-
-    socket.on('mark_messages_read', async (data) => {
-        try {
-            const { conversationId } = data;
-            if (conversationId && socket.userId) {
-                await localStorageService.markMessagesAsRead(conversationId, socket.userId);
-                socket.emit('messages_marked_read', { conversationId });
-            }
-        } catch (error) {
-            console.error('❌ خطأ في تحديد الرسائل كمقروءة:', error);
-        }
-    });
-
-    socket.on('disconnect', async () => {
-        console.log('🔌 مستخدم منفصل:', socket.id);
-        
-        const userId = userSockets.get(socket.id);
-        if (userId) {
-            await localStorageService.updateUser(userId, {
-                isOnline: false,
-                lastSeen: new Date().toISOString()
-            });
-
-            io.emit('user_status_changed', {
-                userId,
-                isOnline: false,
-                lastSeen: new Date().toISOString()
-            });
-
-            connectedUsers.delete(userId);
-            userSockets.delete(socket.id);
-        }
-    });
-});
-
-// وظائف الخلفية
-setInterval(async () => {
-    try {
-        await localStorageService.cleanupOldData();
-    } catch (error) {
-        console.error('❌ خطأ في تنظيف البيانات التلقائي:', error);
-    }
-}, 60 * 60 * 1000);
-
-// بدء الخادم
-server.listen(PORT, '0.0.0.0', () => {
-    console.log(`
-🚀 خادم المنصة التعليمية المحسن يعمل بنجاح!
-📍 العنوان: http://localhost:${PORT}
-📊 البيئة: ${NODE_ENV}
-⏰ الوقت: ${new Date().toLocaleString('ar-SA')}
-🗄️  التخزين: محلي مع تخزين مؤقت
-👥 المستخدمون المتصلون: ${connectedUsers.size}
-
-🔐 حساب المدير الافتراضي:
-   📧 البريد الإلكتروني: admin@platform.edu
-   🔑 كلمة المرور: 77007700
-
-✨ المميزات المحسنة:
-   💬 دردشة فورية مع التخزين المؤقت
-   🔍 بحث متقدم عن المستخدمين
-   📁 تحميل ملفات محسن
-   🚀 أداء محسن مع التجميع
-   🧹 تنظيف تلقائي للبيانات
-   📊 مراقبة صحة النظام
-    `);
-});
-
-export default app;
+    </style>
+</body>
+</html>
