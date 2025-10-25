@@ -92,7 +92,7 @@
                     لوحة التحكم
                 </a>
                 <a href="#" class="nav-item" data-page="chat">
-                    <i class="fab fa-whatsapp"></i>
+                    <i class="fas fa-comments"></i>
                     الدردشة
                     <span class="nav-item-badge" id="unreadMessagesCount">0</span>
                 </a>
@@ -111,10 +111,6 @@
                 <a href="#" class="nav-item" data-page="media">
                     <i class="fas fa-photo-video"></i>
                     الوسائط
-                </a>
-                <a href="#" class="nav-item" data-page="settings">
-                    <i class="fas fa-cog"></i>
-                    الإعدادات
                 </a>
                 <a href="#" class="nav-item hidden" id="loginBtn" data-page="login">
                     <i class="fas fa-sign-in-alt"></i>
@@ -158,7 +154,7 @@
                 لوحة التحكم
             </a>
             <a href="#" class="nav-item" data-page="chat">
-                <i class="fab fa-whatsapp"></i>
+                <i class="fas fa-comments"></i>
                 الدردشة
                 <span class="nav-item-badge" id="unreadMessagesCountMobile">0</span>
             </a>
@@ -177,10 +173,6 @@
             <a href="#" class="nav-item" data-page="media">
                 <i class="fas fa-photo-video"></i>
                 الوسائط
-            </a>
-            <a href="#" class="nav-item" data-page="settings">
-                <i class="fas fa-cog"></i>
-                الإعدادات
             </a>
             <a href="#" class="nav-item hidden" id="loginBtnMobile" data-page="login">
                 <i class="fas fa-sign-in-alt"></i>
@@ -354,9 +346,7 @@
                 <div class="chat-sidebar active" id="chatSidebar">
                     <div class="chat-header">
                         <h3>المحادثات</h3>
-                        <button class="chat-toggle" id="chatToggle">
-                            <i class="fas fa-times"></i>
-                        </button>
+                        <!-- زر إنشاء محادثة جديدة سيتم إضافته ديناميكياً -->
                     </div>
                     
                     <div class="chat-search">
@@ -621,6 +611,52 @@
                                 </div>
                             </div>
                         </div>
+
+                        <div class="settings-tab" id="notifications-tab">
+                            <h3>إعدادات الإشعارات</h3>
+                            <div class="privacy-settings">
+                                <div class="privacy-item">
+                                    <div class="privacy-info">
+                                        <h4>إشعارات الرسائل</h4>
+                                        <p>تلقي إشعارات عند وصول رسائل جديدة</p>
+                                    </div>
+                                    <label class="switch">
+                                        <input type="checkbox" checked>
+                                        <span class="slider"></span>
+                                    </label>
+                                </div>
+                                <div class="privacy-item">
+                                    <div class="privacy-info">
+                                        <h4>إشعارات المجموعات</h4>
+                                        <p>تلقي إشعارات من المجموعات</p>
+                                    </div>
+                                    <label class="switch">
+                                        <input type="checkbox" checked>
+                                        <span class="slider"></span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="settings-tab" id="appearance-tab">
+                            <h3>إعدادات المظهر</h3>
+                            <div class="form-group">
+                                <label for="themeSelect">السمة</label>
+                                <select id="themeSelect" class="form-control">
+                                    <option value="auto">تلقائي</option>
+                                    <option value="light">فاتح</option>
+                                    <option value="dark">داكن</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="fontSize">حجم الخط</label>
+                                <select id="fontSize" class="form-control">
+                                    <option value="small">صغير</option>
+                                    <option value="medium" selected>متوسط</option>
+                                    <option value="large">كبير</option>
+                                </select>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -779,203 +815,7 @@
     <script src="js/app.js"></script>
 
     <style>
-        /* أنماط إضافية للصفحة الرئيسية */
-        .home-hero {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 4rem 2rem;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border-radius: var(--border-radius);
-            margin-bottom: 3rem;
-        }
-
-        .hero-content h1 {
-            font-size: 3rem;
-            margin-bottom: 1rem;
-        }
-
-        .hero-content p {
-            font-size: 1.2rem;
-            margin-bottom: 2rem;
-            opacity: 0.9;
-        }
-
-        .hero-actions {
-            display: flex;
-            gap: 1rem;
-        }
-
-        .hero-image {
-            font-size: 8rem;
-            opacity: 0.8;
-        }
-
-        .features-section {
-            padding: 2rem 0;
-        }
-
-        .features-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 2rem;
-            margin-top: 2rem;
-        }
-
-        .feature-card {
-            background: white;
-            padding: 2rem;
-            border-radius: var(--border-radius);
-            box-shadow: var(--shadow);
-            text-align: center;
-            transition: var(--transition);
-        }
-
-        .feature-card:hover {
-            transform: translateY(-5px);
-        }
-
-        .feature-icon {
-            font-size: 3rem;
-            color: var(--primary-color);
-            margin-bottom: 1rem;
-        }
-
-        .feature-card h3 {
-            margin-bottom: 1rem;
-            color: var(--dark-color);
-        }
-
-        .feature-card p {
-            color: var(--gray-color);
-            line-height: 1.6;
-        }
-
-        /* أنماط لوحة التحكم */
-        .dashboard-stats {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 1.5rem;
-            margin: 2rem 0;
-        }
-
-        .stat-card {
-            background: white;
-            padding: 1.5rem;
-            border-radius: var(--border-radius);
-            box-shadow: var(--shadow);
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-        }
-
-        .stat-icon {
-            width: 60px;
-            height: 60px;
-            background: var(--primary-color);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 1.5rem;
-        }
-
-        .stat-number {
-            font-size: 2rem;
-            font-weight: bold;
-            color: var(--dark-color);
-        }
-
-        .stat-label {
-            color: var(--gray-color);
-            font-size: 0.9rem;
-        }
-
-        .recent-activities {
-            background: white;
-            padding: 1.5rem;
-            border-radius: var(--border-radius);
-            box-shadow: var(--shadow);
-            margin-top: 2rem;
-        }
-
-        .activity-item {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-            padding: 1rem 0;
-            border-bottom: 1px solid var(--border-color);
-        }
-
-        .activity-item:last-child {
-            border-bottom: none;
-        }
-
-        .activity-item i {
-            color: var(--primary-color);
-            font-size: 1.2rem;
-        }
-
-        .activity-content p {
-            margin: 0;
-            color: var(--dark-color);
-        }
-
-        .activity-time {
-            font-size: 0.8rem;
-            color: var(--gray-color);
-        }
-
-        /* أنماط الإعدادات */
-        .settings-grid {
-            display: grid;
-            grid-template-columns: 250px 1fr;
-            gap: 2rem;
-            margin-top: 2rem;
-        }
-
-        .settings-sidebar {
-            background: white;
-            border-radius: var(--border-radius);
-            box-shadow: var(--shadow);
-            padding: 1rem;
-        }
-
-        .settings-nav {
-            display: flex;
-            flex-direction: column;
-            gap: 0.5rem;
-        }
-
-        .settings-nav-item {
-            padding: 1rem;
-            border: none;
-            background: none;
-            text-align: right;
-            border-radius: var(--border-radius);
-            cursor: pointer;
-            transition: var(--transition);
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            color: var(--dark-color);
-        }
-
-        .settings-nav-item:hover,
-        .settings-nav-item.active {
-            background: var(--primary-color);
-            color: white;
-        }
-
-        .settings-content {
-            background: white;
-            border-radius: var(--border-radius);
-            box-shadow: var(--shadow);
-            padding: 2rem;
-        }
-
+        /* إضافات للتبديل بين علامات الإعدادات */
         .settings-tab {
             display: none;
         }
@@ -984,16 +824,28 @@
             display: block;
         }
 
-        .privacy-item {
+        .settings-nav-item {
+            width: 100%;
+            padding: 1rem;
+            border: none;
+            background: none;
+            text-align: right;
+            cursor: pointer;
+            border-radius: 8px;
+            margin-bottom: 0.5rem;
+            transition: all 0.3s ease;
             display: flex;
-            justify-content: space-between;
             align-items: center;
-            padding: 1rem 0;
-            border-bottom: 1px solid var(--border-color);
+            gap: 0.5rem;
         }
 
-        .privacy-item:last-child {
-            border-bottom: none;
+        .settings-nav-item:hover {
+            background: #f8f9fa;
+        }
+
+        .settings-nav-item.active {
+            background: #4361ee;
+            color: white;
         }
 
         .switch {
@@ -1034,83 +886,19 @@
         }
 
         input:checked + .slider {
-            background-color: var(--primary-color);
+            background-color: #4361ee;
         }
 
         input:checked + .slider:before {
             transform: translateX(26px);
         }
 
-        /* أنماط الرفع */
-        .upload-area {
-            border: 2px dashed var(--border-color);
-            border-radius: var(--border-radius);
-            padding: 3rem;
-            text-align: center;
-            cursor: pointer;
-            transition: var(--transition);
-            margin-bottom: 1.5rem;
-        }
-
-        .upload-area:hover {
-            border-color: var(--primary-color);
-            background: rgba(67, 97, 238, 0.05);
-        }
-
-        .upload-area i {
-            font-size: 3rem;
-            color: var(--gray-color);
-            margin-bottom: 1rem;
-        }
-
-        .stories-header,
-        .media-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 2rem;
-        }
-
-        .media-actions {
-            display: flex;
-            gap: 1rem;
-            align-items: center;
-        }
-
-        @media (max-width: 768px) {
-            .home-hero {
-                flex-direction: column;
-                text-align: center;
-                padding: 2rem 1rem;
-            }
-
-            .hero-content h1 {
-                font-size: 2rem;
-            }
-
-            .hero-image {
-                font-size: 4rem;
-                margin-top: 2rem;
-            }
-
-            .hero-actions {
-                flex-direction: column;
-            }
-
-            .settings-grid {
-                grid-template-columns: 1fr;
-            }
-
-            .stories-header,
-            .media-header {
-                flex-direction: column;
-                gap: 1rem;
-                align-items: stretch;
-            }
-
-            .media-actions {
-                justify-content: space-between;
-            }
+        .form-control {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            font-size: 1rem;
         }
     </style>
 </body>
