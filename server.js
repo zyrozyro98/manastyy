@@ -1,3 +1,4 @@
+// server.js - الخادم الكامل للمنصة التعليمية (محدث)
 import express from 'express';
 import http from 'http';
 import { Server } from 'socket.io';
@@ -348,18 +349,31 @@ class EnhancedLocalStorageService {
     }
 
     // دوال المحادثات
-    async createConversation(participants, name = null) {
+    async createConversation(participants, name = null, isGroup = false) {
         const data = this.loadData();
         const conversationId = uuidv4();
+        
+        // إنشاء اسم للمحادثة إذا لم يتم توفيره
+        let conversationName = name;
+        if (!conversationName && !isGroup) {
+            const otherParticipants = participants.filter(p => p !== participants[0]);
+            if (otherParticipants.length === 1) {
+                const user = await this.findUserById(otherParticipants[0]);
+                conversationName = user?.fullName || `مستخدم ${otherParticipants[0]}`;
+            } else {
+                conversationName = `محادثة ${participants.length} أشخاص`;
+            }
+        }
+        
         const conversation = {
             _id: conversationId,
             participants,
-            name: name || `محادثة ${participants.length} أشخاص`,
+            name: conversationName,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
             lastMessage: null,
             unreadCount: {},
-            isGroup: participants.length > 2
+            isGroup: isGroup
         };
         
         data.conversations.push(conversation);
@@ -393,14 +407,15 @@ class EnhancedLocalStorageService {
         const existingConversation = data.conversations.find(conv => 
             conv.participants.includes(user1) && 
             conv.participants.includes(user2) &&
-            conv.participants.length === 2
+            conv.participants.length === 2 &&
+            !conv.isGroup
         );
         
         if (existingConversation) {
             return existingConversation;
         }
         
-        return await this.createConversation([user1, user2]);
+        return await this.createConversation([user1, user2], null, false);
     }
 
     // دوال الرسائل
@@ -421,7 +436,7 @@ class EnhancedLocalStorageService {
         
         const convIndex = data.conversations.findIndex(conv => conv._id === messageData.conversationId);
         if (convIndex !== -1) {
-            data.conversations[convIndex].lastMessage = messageId;
+            data.conversations[convIndex].lastMessage = message;
             data.conversations[convIndex].updatedAt = new Date().toISOString();
             
             data.conversations[convIndex].participants.forEach(participantId => {
@@ -481,7 +496,7 @@ class EnhancedLocalStorageService {
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
             isActive: true,
-            members: channelData.members || [],
+            members: channelData.members || [channelData.creatorId],
             admins: channelData.admins || [channelData.creatorId],
             channelSettings: {
                 isPublic: channelData.isPublic !== false,
@@ -604,6 +619,14 @@ class EnhancedLocalStorageService {
         data.groups.push(group);
         this.updateStats(data);
         this.saveData(data);
+        
+        // إنشاء محادثة جماعية للمجموعة
+        await this.createConversation(
+            group.members, 
+            group.name, 
+            true
+        );
+        
         return group;
     }
 
@@ -675,6 +698,14 @@ class EnhancedLocalStorageService {
             data.groups[groupIndex].stats.memberCount += 1;
             data.groups[groupIndex].updatedAt = new Date().toISOString();
             this.saveData(data);
+            
+            // إضافة المستخدم إلى محادثة المجموعة
+            const conversation = data.conversations.find(conv => 
+                conv.isGroup && conv.name === data.groups[groupIndex].name
+            );
+            if (conversation && !conversation.participants.includes(userId)) {
+                conversation.participants.push(userId);
+            }
             
             this.cache.delete(`groups_user_${userId}`);
             return true;
