@@ -1,4 +1,4 @@
-// server.js - الخادم الكامل للمنصة التعليمية (محدث ومحسن)
+// server.js - الخادم الكامل للمنصة التعليمية (محدث ومحسن بالكامل)
 import express from 'express';
 import http from 'http';
 import { Server } from 'socket.io';
@@ -36,23 +36,22 @@ const io = new Server(server, {
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'educational-platform-super-secret-key-2024-change-in-production';
 const NODE_ENV = process.env.NODE_ENV || 'development';
-
-// مسارات الملفات
-const UPLOAD_DIR = path.join(__dirname, 'uploads');
 const BACKUP_DIR = path.join(__dirname, 'backups');
-const LOGS_DIR = path.join(__dirname, 'logs');
+const EXPORT_DIR = path.join(__dirname, 'exports');
+const UPLOAD_DIR = path.join(__dirname, 'uploads');
 
 // إنشاء المجلدات اللازمة
 const requiredDirs = [
-    UPLOAD_DIR,
-    path.join(UPLOAD_DIR, 'profiles'),
-    path.join(UPLOAD_DIR, 'stories'),
-    path.join(UPLOAD_DIR, 'channels'),
+    UPLOAD_DIR, 
+    path.join(UPLOAD_DIR, 'profiles'), 
+    path.join(UPLOAD_DIR, 'stories'), 
+    path.join(UPLOAD_DIR, 'channels'), 
+    path.join(UPLOAD_DIR, 'files'), 
     path.join(UPLOAD_DIR, 'groups'),
-    path.join(UPLOAD_DIR, 'files'),
-    BACKUP_DIR,
-    LOGS_DIR,
-    path.join(__dirname, 'public')
+    BACKUP_DIR, 
+    EXPORT_DIR,
+    path.join(__dirname, 'public'),
+    path.join(__dirname, 'logs')
 ];
 
 requiredDirs.forEach(dir => {
@@ -62,97 +61,57 @@ requiredDirs.forEach(dir => {
     }
 });
 
-// إعداد trust proxy
+// إعداد trust proxy لـ Render
 app.set('trust proxy', 1);
 
-// ============ وسائط الأمان والتحسين ============
+// وسائط الأمان والتحسين
 app.use(helmet({
     crossOriginEmbedderPolicy: false,
     contentSecurityPolicy: false
 }));
-
 app.use(compression({
     level: 6,
     threshold: 0
 }));
-
-app.use(morgan(NODE_ENV === 'production' ? 'combined' : 'dev', {
-    stream: fs.createWriteStream(path.join(LOGS_DIR, 'access.log'), { flags: 'a' })
-}));
+app.use(morgan(NODE_ENV === 'production' ? 'combined' : 'dev'));
 
 // Rate Limiting
 const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 دقيقة
+    windowMs: 15 * 60 * 1000,
     max: NODE_ENV === 'production' ? 100 : 1000,
     message: {
         success: false,
         message: 'تم تجاوز عدد الطلبات المسموح بها، يرجى المحاولة لاحقاً'
     },
-    standardHeaders: true,
-    legacyHeaders: false
+    keyGenerator: (req) => {
+        return req.ip || req.connection.remoteAddress;
+    }
 });
 app.use(limiter);
 
-// CORS مفصل
+// وسائط middleware الأساسية
 app.use(cors({
-    origin: function (origin, callback) {
-        // السماح لجميع المصادر في وضع التطوير
-        if (NODE_ENV === 'development') {
-            return callback(null, true);
-        }
-        
-        // في الإنتاج، السماح لمصادر محددة
-        const allowedOrigins = [
-            'http://localhost:3000',
-            'http://127.0.0.1:3000',
-            'https://yourdomain.com'
-        ];
-        
-        if (!origin || allowedOrigins.indexOf(origin) !== -1) {
-            callback(null, true);
-        } else {
-            callback(new Error('Not allowed by CORS'));
-        }
-    },
+    origin: process.env.CLIENT_URL || "*",
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 }));
-
-// وسائط middleware الأساسية
-app.use(express.json({ 
-    limit: '50mb',
-    verify: (req, res, buf) => {
-        req.rawBody = buf;
-    }
-}));
-
-app.use(express.urlencoded({ 
-    extended: true, 
-    limit: '50mb' 
-}));
-
-// خدمة الملفات الثابتة
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use('/uploads', express.static(UPLOAD_DIR, {
     maxAge: '1d',
-    etag: true,
-    setHeaders: (res, path) => {
-        if (path.endsWith('.html')) {
-            res.setHeader('Cache-Control', 'no-cache');
-        }
-    }
+    etag: true
 }));
-
+app.use('/exports', express.static(EXPORT_DIR));
 app.use(express.static(path.join(__dirname, 'public'), {
     maxAge: '1h',
     etag: true
 }));
 
-// ============ إعداد multer للتحميلات ============
+// إعداد multer للتحميلات
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
         let uploadPath = UPLOAD_DIR;
-        
         if (file.fieldname === 'avatar') uploadPath = path.join(UPLOAD_DIR, 'profiles');
         else if (file.fieldname === 'story') uploadPath = path.join(UPLOAD_DIR, 'stories');
         else if (file.fieldname === 'channelAvatar') uploadPath = path.join(UPLOAD_DIR, 'channels');
@@ -178,21 +137,17 @@ const fileFilter = (req, file, cb) => {
         'story': ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'video/mp4', 'video/quicktime', 'video/webm'],
         'channelAvatar': ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
         'groupAvatar': ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
-        'file': [
-            'image/jpeg', 'image/png', 'image/gif', 'application/pdf', 'text/plain', 
-            'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-            'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            'application/zip', 'application/vnd.rar', 'text/csv'
-        ],
+        'file': ['image/jpeg', 'image/png', 'image/gif', 'application/pdf', 'text/plain', 
+                'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                'application/zip', 'application/vnd.rar'],
         'backup': ['application/json']
     };
     
-    const fieldTypes = allowedTypes[file.fieldname];
-    
-    if (fieldTypes && fieldTypes.includes(file.mimetype)) {
+    if (allowedTypes[file.fieldname]?.includes(file.mimetype)) {
         cb(null, true);
     } else {
-        cb(new Error(`نوع الملف غير مدعوم للمجال: ${file.fieldname}. النوع: ${file.mimetype}`), false);
+        cb(new Error(`نوع الملف غير مدعوم للمجال: ${file.fieldname}`), false);
     }
 };
 
@@ -204,20 +159,7 @@ const upload = multer({
     fileFilter: fileFilter
 });
 
-// معالجة أخطاء multer
-app.use((error, req, res, next) => {
-    if (error instanceof multer.MulterError) {
-        if (error.code === 'LIMIT_FILE_SIZE') {
-            return res.status(400).json({
-                success: false,
-                message: 'حجم الملف كبير جداً. الحد الأقصى 100MB'
-            });
-        }
-    }
-    next(error);
-});
-
-// ============ نظام التخزين المحلي المحسن ============
+// نظام التخزين المحلي المحسن مع ذاكرة التخزين المؤقت
 class EnhancedLocalStorageService {
     constructor() {
         this.dataFile = path.join(__dirname, 'local_data.json');
@@ -231,12 +173,9 @@ class EnhancedLocalStorageService {
             const defaultData = this.getDefaultData();
             this.saveData(defaultData);
             console.log('✅ تم إنشاء ملف البيانات المحلي');
+        } else {
+            console.log('✅ تم تحميل ملف البيانات المحلي');
         }
-        
-        // تنظيف الكاش التلقائي
-        setInterval(() => {
-            this.cleanExpiredCache();
-        }, 60000); // كل دقيقة
     }
 
     loadData() {
@@ -259,9 +198,7 @@ class EnhancedLocalStorageService {
             return parsedData;
         } catch (error) {
             console.error('❌ خطأ في تحميل البيانات المحلية:', error);
-            const defaultData = this.getDefaultData();
-            this.saveData(defaultData);
-            return defaultData;
+            return this.getDefaultData();
         }
     }
 
@@ -269,7 +206,6 @@ class EnhancedLocalStorageService {
         try {
             fs.writeFileSync(this.dataFile, JSON.stringify(data, null, 2));
             
-            // تحديث الكاش
             this.cache.set('allData', {
                 data: data,
                 timestamp: Date.now()
@@ -284,15 +220,6 @@ class EnhancedLocalStorageService {
 
     clearCache() {
         this.cache.clear();
-    }
-
-    cleanExpiredCache() {
-        const now = Date.now();
-        for (let [key, value] of this.cache.entries()) {
-            if (now - value.timestamp > this.cacheTTL) {
-                this.cache.delete(key);
-            }
-        }
     }
 
     getDefaultData() {
@@ -310,13 +237,6 @@ class EnhancedLocalStorageService {
             backups: [],
             exports: [],
             auditLogs: [],
-            systemSettings: {
-                maintenance: false,
-                registrationEnabled: true,
-                maxFileSize: 100,
-                allowedFileTypes: ['jpg', 'png', 'pdf', 'doc', 'docx', 'mp4'],
-                sessionTimeout: 30
-            },
             lastBackup: null,
             stats: {
                 totalUsers: 0,
@@ -344,41 +264,38 @@ class EnhancedLocalStorageService {
             isOnline: false,
             lastSeen: new Date().toISOString(),
             isActive: true,
-            isVerified: false,
-            emailVerified: false,
-            profile: {
-                bio: '',
-                location: '',
-                website: '',
-                socialLinks: {}
-            },
-            preferences: {
-                theme: 'auto',
-                language: 'ar',
-                notifications: {
-                    email: true,
-                    push: true,
-                    sounds: true
-                },
-                privacy: {
-                    profileVisibility: 'public',
-                    showOnlineStatus: true,
-                    showLastSeen: true
-                }
-            },
+            avatar: userData.avatar || null,
+            bio: userData.bio || '',
+            phone: userData.phone || '',
             stats: {
                 messagesSent: 0,
                 storiesPosted: 0,
                 channelsJoined: 0,
                 groupsJoined: 0,
                 totalLikes: 0,
-                loginCount: 0,
-                lastLogin: null
+                totalViews: 0
             },
-            security: {
-                loginAttempts: 0,
-                lastLoginAttempt: null,
-                passwordChangedAt: new Date().toISOString()
+            settings: {
+                privacy: {
+                    hideOnlineStatus: false,
+                    hideLastSeen: false,
+                    hideStoryViews: false,
+                    profileVisibility: 'public'
+                },
+                notificationSettings: {
+                    messages: true,
+                    stories: true,
+                    channels: true,
+                    groups: true,
+                    system: true,
+                    emailNotifications: false
+                },
+                appearance: {
+                    theme: 'auto',
+                    fontSize: 'medium',
+                    background: 'default',
+                    language: 'ar'
+                }
             }
         };
         
@@ -386,8 +303,8 @@ class EnhancedLocalStorageService {
         this.updateStats(data);
         this.saveData(data);
         
-        // مسح الكاش
-        this.cache.delete('users_list');
+        // مسح ذاكرة التخزين المؤقت
+        this.cache.delete('users_all');
         
         return user;
     }
@@ -400,7 +317,7 @@ class EnhancedLocalStorageService {
 
         const data = this.loadData();
         const user = data.users.find(user => 
-            user.email.toLowerCase() === email.toLowerCase() && user.isActive
+            user.email === email && user.isActive
         );
         
         if (user) {
@@ -417,7 +334,9 @@ class EnhancedLocalStorageService {
         }
 
         const data = this.loadData();
-        const user = data.users.find(user => user._id === userId && user.isActive);
+        const user = data.users.find(user => 
+            user._id === userId && user.isActive
+        );
         
         if (user) {
             this.cache.set(cacheKey, user);
@@ -426,75 +345,8 @@ class EnhancedLocalStorageService {
         return user;
     }
 
-    async updateUser(userId, updates) {
-        const data = this.loadData();
-        const userIndex = data.users.findIndex(user => user._id === userId);
-        
-        if (userIndex !== -1) {
-            // منع تحديث بعض الحقول
-            const { _id, createdAt, email, ...safeUpdates } = updates;
-            
-            data.users[userIndex] = {
-                ...data.users[userIndex],
-                ...safeUpdates,
-                updatedAt: new Date().toISOString()
-            };
-            
-            this.saveData(data);
-            
-            // مسح الكاش
-            this.cache.delete(`user_id_${userId}`);
-            this.cache.delete(`user_email_${data.users[userIndex].email}`);
-            this.cache.delete('users_list');
-            
-            return data.users[userIndex];
-        }
-        return null;
-    }
-
-    async getAllUsers(options = {}) {
-        const cacheKey = `users_list_${JSON.stringify(options)}`;
-        if (this.cache.has(cacheKey)) {
-            return this.cache.get(cacheKey);
-        }
-
-        const data = this.loadData();
-        let users = data.users.filter(user => user.isActive);
-
-        // التصفية
-        if (options.role) {
-            users = users.filter(user => user.role === options.role);
-        }
-
-        if (options.search) {
-            const searchTerm = options.search.toLowerCase();
-            users = users.filter(user => 
-                user.fullName.toLowerCase().includes(searchTerm) ||
-                user.email.toLowerCase().includes(searchTerm)
-            );
-        }
-
-        // الترتيب
-        if (options.sortBy) {
-            users.sort((a, b) => {
-                if (options.sortOrder === 'desc') {
-                    return b[options.sortBy]?.localeCompare(a[options.sortBy]) || 0;
-                }
-                return a[options.sortBy]?.localeCompare(b[options.sortBy]) || 0;
-            });
-        }
-
-        // التقسيم
-        if (options.limit) {
-            users = users.slice(0, options.limit);
-        }
-
-        this.cache.set(cacheKey, users);
-        return users;
-    }
-
-    async searchUsers(query, limit = 20, filters = {}) {
-        const cacheKey = `search_users_${query}_${limit}_${JSON.stringify(filters)}`;
+    async searchUsers(query, limit = 20) {
+        const cacheKey = `users_search_${query}_${limit}`;
         if (this.cache.has(cacheKey)) {
             return this.cache.get(cacheKey);
         }
@@ -502,146 +354,118 @@ class EnhancedLocalStorageService {
         const data = this.loadData();
         const searchTerm = query.toLowerCase();
         
-        let results = data.users.filter(user => 
-            user.isActive && 
-            (user.fullName.toLowerCase().includes(searchTerm) || 
-             user.email.toLowerCase().includes(searchTerm) ||
-             user.profile?.bio?.toLowerCase().includes(searchTerm))
-        );
-
-        // تطبيق الفلاتر
-        if (filters.role) {
-            results = results.filter(user => user.role === filters.role);
-        }
-
-        if (filters.online) {
-            results = results.filter(user => user.isOnline);
-        }
-
-        results = results.slice(0, limit)
+        const results = data.users
+            .filter(user => 
+                user.isActive && 
+                (user.fullName.toLowerCase().includes(searchTerm) || 
+                 user.email.toLowerCase().includes(searchTerm) ||
+                 (user.bio && user.bio.toLowerCase().includes(searchTerm)))
+            )
+            .slice(0, limit)
             .map(user => this.formatUserResponse(user));
 
         this.cache.set(cacheKey, results);
         return results;
     }
 
-    async incrementUserStats(userId, field, value = 1) {
+    async updateUser(userId, updates) {
         const data = this.loadData();
         const userIndex = data.users.findIndex(user => user._id === userId);
         
         if (userIndex !== -1) {
-            if (!data.users[userIndex].stats) {
-                data.users[userIndex].stats = {};
-            }
-            
-            data.users[userIndex].stats[field] = (data.users[userIndex].stats[field] || 0) + value;
-            data.users[userIndex].updatedAt = new Date().toISOString();
+            data.users[userIndex] = {
+                ...data.users[userIndex],
+                ...updates,
+                updatedAt: new Date().toISOString()
+            };
             
             this.saveData(data);
             
-            // مسح الكاش
+            // مسح ذاكرة التخزين المؤقت
             this.cache.delete(`user_id_${userId}`);
-            this.cache.delete('users_list');
+            this.cache.delete(`user_email_${data.users[userIndex].email}`);
+            this.cache.delete('users_all');
             
-            return true;
+            return data.users[userIndex];
         }
-        return false;
+        return null;
+    }
+
+    async getAllUsers() {
+        const cacheKey = 'users_all';
+        if (this.cache.has(cacheKey)) {
+            return this.cache.get(cacheKey);
+        }
+
+        const data = this.loadData();
+        const users = data.users.filter(user => user.isActive);
+        
+        this.cache.set(cacheKey, users);
+        return users;
+    }
+
+    async getOnlineUsers() {
+        const data = this.loadData();
+        return data.users.filter(user => user.isOnline && user.isActive);
     }
 
     // ============ دوال المحادثات ============
-    async createConversation(participants, name = null, isGroup = false, metadata = {}) {
+    async createConversation(participants, name = null, isGroup = false) {
         const data = this.loadData();
         const conversationId = uuidv4();
         
-        // التحقق من المشاركين
-        const validParticipants = [];
-        for (const participantId of participants) {
-            const user = await this.findUserById(participantId);
-            if (user) {
-                validParticipants.push(participantId);
-            }
-        }
-
-        if (validParticipants.length < 2) {
-            throw new Error('يجب أن تحتوي المحادثة على مشاركين على الأقل');
-        }
-
         // إنشاء اسم للمحادثة إذا لم يتم توفيره
         let conversationName = name;
         if (!conversationName && !isGroup) {
-            if (validParticipants.length === 2) {
-                const otherUserId = validParticipants.find(id => id !== validParticipants[0]);
-                const otherUser = await this.findUserById(otherUserId);
-                conversationName = otherUser?.fullName || `مستخدم ${otherUserId}`;
+            const otherParticipants = participants.filter(p => p !== participants[0]);
+            if (otherParticipants.length === 1) {
+                const user = await this.findUserById(otherParticipants[0]);
+                conversationName = user?.fullName || `مستخدم ${otherParticipants[0]}`;
             } else {
-                conversationName = `محادثة ${validParticipants.length} أشخاص`;
+                conversationName = `محادثة ${participants.length} أشخاص`;
             }
         }
-
+        
         const conversation = {
             _id: conversationId,
-            participants: validParticipants,
+            participants,
             name: conversationName,
-            isGroup: isGroup,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
             lastMessage: null,
             unreadCount: {},
-            settings: {
-                mute: false,
-                archive: false,
-                pin: false
-            },
-            metadata: {
-                createdBy: validParticipants[0],
-                ...metadata
-            }
+            isGroup: isGroup,
+            avatar: null
         };
         
         // تهيئة unreadCount لجميع المشاركين
-        validParticipants.forEach(participantId => {
+        participants.forEach(participantId => {
             conversation.unreadCount[participantId] = 0;
         });
         
         data.conversations.push(conversation);
         this.updateStats(data);
         this.saveData(data);
-
-        // مسح الكاش
-        validParticipants.forEach(participantId => {
+        
+        // مسح ذاكرة التخزين المؤقت
+        participants.forEach(participantId => {
             this.cache.delete(`conversations_user_${participantId}`);
         });
         
         return conversation;
     }
 
-    async getConversationsByUserId(userId, options = {}) {
-        const cacheKey = `conversations_user_${userId}_${JSON.stringify(options)}`;
+    async getConversationsByUserId(userId) {
+        const cacheKey = `conversations_user_${userId}`;
         if (this.cache.has(cacheKey)) {
             return this.cache.get(cacheKey);
         }
 
         const data = this.loadData();
-        let conversations = data.conversations.filter(conv => 
+        const conversations = data.conversations.filter(conv => 
             conv.participants.includes(userId)
         );
-
-        // التصفية
-        if (options.archived !== undefined) {
-            conversations = conversations.filter(conv => 
-                conv.settings?.archive === options.archived
-            );
-        }
-
-        if (options.isGroup !== undefined) {
-            conversations = conversations.filter(conv => conv.isGroup === options.isGroup);
-        }
-
-        // الترتيب
-        conversations.sort((a, b) => 
-            new Date(b.updatedAt) - new Date(a.updatedAt)
-        );
-
+        
         this.cache.set(cacheKey, conversations);
         return conversations;
     }
@@ -667,20 +491,20 @@ class EnhancedLocalStorageService {
         return await this.createConversation([user1, user2], null, false);
     }
 
-    async updateConversationSettings(conversationId, userId, settings) {
+    async updateConversation(conversationId, updates) {
         const data = this.loadData();
         const convIndex = data.conversations.findIndex(conv => conv._id === conversationId);
         
-        if (convIndex !== -1 && data.conversations[convIndex].participants.includes(userId)) {
-            data.conversations[convIndex].settings = {
-                ...data.conversations[convIndex].settings,
-                ...settings
+        if (convIndex !== -1) {
+            data.conversations[convIndex] = {
+                ...data.conversations[convIndex],
+                ...updates,
+                updatedAt: new Date().toISOString()
             };
-            data.conversations[convIndex].updatedAt = new Date().toISOString();
             
             this.saveData(data);
             
-            // مسح الكاش
+            // مسح ذاكرة التخزين المؤقت
             data.conversations[convIndex].participants.forEach(participantId => {
                 this.cache.delete(`conversations_user_${participantId}`);
             });
@@ -694,29 +518,15 @@ class EnhancedLocalStorageService {
     async createMessage(messageData) {
         const data = this.loadData();
         const messageId = uuidv4();
-        
         const message = {
             _id: messageId,
             ...messageData,
             createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
             readBy: [messageData.senderId],
             reactions: [],
-            edited: {
-                isEdited: false,
-                editedAt: null,
-                originalContent: null
-            },
-            deleted: {
-                isDeleted: false,
-                deletedAt: null,
-                deletedBy: null
-            },
-            metadata: {
-                clientId: messageData.clientId,
-                device: messageData.device,
-                ...messageData.metadata
-            }
+            edited: { isEdited: false, editedAt: null },
+            deleted: { isDeleted: false, deletedAt: null },
+            metadata: messageData.metadata || {}
         };
         
         data.messages.push(message);
@@ -747,42 +557,27 @@ class EnhancedLocalStorageService {
             });
         }
         
-        // تحديث إحصائيات المستخدم
-        await this.incrementUserStats(messageData.senderId, 'messagesSent');
-        
         return message;
     }
 
-    async getMessagesByConversation(conversationId, options = {}) {
-        const { limit = 50, before = null, after = null } = options;
-        const cacheKey = `messages_conv_${conversationId}_${limit}_${before}_${after}`;
-        
+    async getMessagesByConversation(conversationId, limit = 50, before = null) {
+        const cacheKey = `messages_conv_${conversationId}_${limit}_${before}`;
         if (this.cache.has(cacheKey)) {
             return this.cache.get(cacheKey);
         }
 
         const data = this.loadData();
         let messages = data.messages
-            .filter(msg => 
-                msg.conversationId === conversationId && 
-                !msg.deleted.isDeleted
-            )
-            .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+            .filter(msg => msg.conversationId === conversationId && !msg.deleted.isDeleted);
 
-        // التصفية حسب التاريخ
         if (before) {
             messages = messages.filter(msg => new Date(msg.createdAt) < new Date(before));
         }
 
-        if (after) {
-            messages = messages.filter(msg => new Date(msg.createdAt) > new Date(after));
-        }
-
-        // الحد
-        messages = messages.slice(0, limit);
-
-        // الترتيب من الأقدم إلى الأحدث للعرض
-        messages.reverse();
+        messages = messages
+            .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+            .slice(0, limit)
+            .reverse();
 
         this.cache.set(cacheKey, messages);
         return messages;
@@ -794,75 +589,46 @@ class EnhancedLocalStorageService {
         
         if (convIndex !== -1) {
             data.conversations[convIndex].unreadCount[userId] = 0;
-            data.conversations[convIndex].updatedAt = new Date().toISOString();
-            
             this.saveData(data);
             
-            // مسح الكاش
+            // مسح ذاكرة التخزين المؤقت
             this.cache.delete(`conversations_user_${userId}`);
-            
-            return true;
         }
-        return false;
-    }
-
-    async editMessage(messageId, userId, newContent) {
-        const data = this.loadData();
-        const messageIndex = data.messages.findIndex(msg => msg._id === messageId);
         
-        if (messageIndex !== -1 && data.messages[messageIndex].senderId === userId) {
-            const originalContent = data.messages[messageIndex].content;
-            
-            data.messages[messageIndex].content = newContent;
-            data.messages[messageIndex].edited = {
-                isEdited: true,
-                editedAt: new Date().toISOString(),
-                originalContent: originalContent
-            };
-            data.messages[messageIndex].updatedAt = new Date().toISOString();
-            
-            this.saveData(data);
-            
-            // مسح الكاش
-            this.cache.delete(`messages_conv_${data.messages[messageIndex].conversationId}_*`);
-            
-            return data.messages[messageIndex];
-        }
-        return null;
+        return true;
     }
 
-    async deleteMessage(messageId, userId) {
+    async addReactionToMessage(messageId, userId, reaction) {
         const data = this.loadData();
         const messageIndex = data.messages.findIndex(msg => msg._id === messageId);
         
         if (messageIndex !== -1) {
-            const message = data.messages[messageIndex];
+            const existingReactionIndex = data.messages[messageIndex].reactions.findIndex(
+                r => r.userId === userId && r.reaction === reaction
+            );
             
-            // فقط المرسل أو مدير المحادثة يمكنه حذف الرسالة
-            if (message.senderId === userId) {
-                data.messages[messageIndex].deleted = {
-                    isDeleted: true,
-                    deletedAt: new Date().toISOString(),
-                    deletedBy: userId
-                };
-                data.messages[messageIndex].updatedAt = new Date().toISOString();
-                
-                this.saveData(data);
-                
-                // مسح الكاش
-                this.cache.delete(`messages_conv_${message.conversationId}_*`);
-                
-                return true;
+            if (existingReactionIndex !== -1) {
+                // إزالة التفاعل إذا كان موجوداً
+                data.messages[messageIndex].reactions.splice(existingReactionIndex, 1);
+            } else {
+                // إضافة تفاعل جديد
+                data.messages[messageIndex].reactions.push({
+                    userId,
+                    reaction,
+                    createdAt: new Date().toISOString()
+                });
             }
+            
+            this.saveData(data);
+            return data.messages[messageIndex];
         }
-        return false;
+        return null;
     }
 
     // ============ دوال القنوات ============
     async createChannel(channelData) {
         const data = this.loadData();
         const channelId = uuidv4();
-        
         const channel = {
             _id: channelId,
             ...channelData,
@@ -871,14 +637,14 @@ class EnhancedLocalStorageService {
             isActive: true,
             members: channelData.members || [channelData.creatorId],
             admins: channelData.admins || [channelData.creatorId],
-            moderators: channelData.moderators || [],
+            avatar: channelData.avatar || null,
+            banner: channelData.banner || null,
             channelSettings: {
                 isPublic: channelData.isPublic !== false,
-                allowComments: channelData.allowComments !== false,
-                adminOnlyPosts: channelData.adminOnlyPosts || false,
-                allowFileSharing: channelData.allowFileSharing !== false,
-                maxFileSize: channelData.maxFileSize || 50,
-                ...channelData.channelSettings
+                allowComments: true,
+                adminOnlyPosts: false,
+                allowFileSharing: true,
+                maxFileSize: 50 * 1024 * 1024 // 50MB
             },
             stats: {
                 memberCount: channelData.members?.length || 1,
@@ -886,62 +652,44 @@ class EnhancedLocalStorageService {
                 dailyActiveUsers: 0,
                 totalViews: 0
             },
-            metadata: {
-                category: channelData.category || 'general',
-                tags: channelData.tags || [],
-                ...channelData.metadata
-            }
+            tags: channelData.tags || []
         };
         
         data.channels.push(channel);
         this.updateStats(data);
         this.saveData(data);
-
-        // مسح الكاش
-        this.cache.delete('channels_list');
-        this.cache.delete(`channels_user_${channelData.creatorId}`);
+        
+        // مسح ذاكرة التخزين المؤقت
+        this.cache.delete('channels_all');
+        this.cache.delete('channels_public');
         
         return channel;
     }
 
-    async getAllChannels(options = {}) {
-        const cacheKey = `channels_list_${JSON.stringify(options)}`;
+    async getAllChannels() {
+        const cacheKey = 'channels_all';
         if (this.cache.has(cacheKey)) {
             return this.cache.get(cacheKey);
         }
 
         const data = this.loadData();
-        let channels = data.channels.filter(channel => channel.isActive);
+        const channels = data.channels.filter(channel => channel.isActive);
+        
+        this.cache.set(cacheKey, channels);
+        return channels;
+    }
 
-        // التصفية
-        if (options.publicOnly) {
-            channels = channels.filter(channel => channel.channelSettings.isPublic);
+    async getPublicChannels() {
+        const cacheKey = 'channels_public';
+        if (this.cache.has(cacheKey)) {
+            return this.cache.get(cacheKey);
         }
 
-        if (options.category) {
-            channels = channels.filter(channel => channel.metadata?.category === options.category);
-        }
-
-        if (options.search) {
-            const searchTerm = options.search.toLowerCase();
-            channels = channels.filter(channel => 
-                channel.name.toLowerCase().includes(searchTerm) ||
-                channel.description?.toLowerCase().includes(searchTerm)
-            );
-        }
-
-        // الترتيب
-        if (options.sortBy === 'members') {
-            channels.sort((a, b) => b.stats.memberCount - a.stats.memberCount);
-        } else {
-            channels.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-        }
-
-        // التقسيم
-        if (options.limit) {
-            channels = channels.slice(0, options.limit);
-        }
-
+        const data = this.loadData();
+        const channels = data.channels.filter(channel => 
+            channel.isActive && channel.channelSettings.isPublic
+        );
+        
         this.cache.set(cacheKey, channels);
         return channels;
     }
@@ -960,13 +708,59 @@ class EnhancedLocalStorageService {
         const data = this.loadData();
         const channels = data.channels.filter(channel => 
             channel.isActive && 
-            (channel.members.includes(userId) || 
-             channel.admins.includes(userId) ||
-             channel.moderators.includes(userId))
+            (channel.members.includes(userId) || channel.admins.includes(userId))
         );
         
         this.cache.set(cacheKey, channels);
         return channels;
+    }
+
+    async createChannelMessage(messageData) {
+        const data = this.loadData();
+        const messageId = uuidv4();
+        const message = {
+            _id: messageId,
+            ...messageData,
+            createdAt: new Date().toISOString(),
+            readBy: [],
+            reactions: [],
+            edited: { isEdited: false, editedAt: null },
+            deleted: { isDeleted: false, deletedAt: null },
+            metadata: messageData.metadata || {}
+        };
+        
+        data.channelMessages.push(message);
+        
+        const channelIndex = data.channels.findIndex(channel => channel._id === messageData.channelId);
+        if (channelIndex !== -1) {
+            data.channels[channelIndex].stats.messageCount += 1;
+            data.channels[channelIndex].updatedAt = new Date().toISOString();
+        }
+        
+        this.updateStats(data);
+        this.saveData(data);
+        
+        // مسح ذاكرة التخزين المؤقت
+        this.cache.delete(`channel_messages_${messageData.channelId}_*`);
+        
+        return message;
+    }
+
+    async getChannelMessages(channelId, limit = 50) {
+        const cacheKey = `channel_messages_${channelId}_${limit}`;
+        if (this.cache.has(cacheKey)) {
+            return this.cache.get(cacheKey);
+        }
+
+        const data = this.loadData();
+        const messages = data.channelMessages
+            .filter(msg => msg.channelId === channelId && !msg.deleted.isDeleted)
+            .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+            .slice(0, limit)
+            .reverse();
+
+        this.cache.set(cacheKey, messages);
+        return messages;
     }
 
     async addMemberToChannel(channelId, userId) {
@@ -977,37 +771,14 @@ class EnhancedLocalStorageService {
             data.channels[channelIndex].members.push(userId);
             data.channels[channelIndex].stats.memberCount += 1;
             data.channels[channelIndex].updatedAt = new Date().toISOString();
-            
             this.saveData(data);
             
-            // مسح الكاش
+            // مسح ذاكرة التخزين المؤقت
             this.cache.delete(`channels_user_${userId}`);
-            this.cache.delete('channels_list');
+            this.cache.delete('channels_all');
+            this.cache.delete('channels_public');
             
             return true;
-        }
-        return false;
-    }
-
-    async removeMemberFromChannel(channelId, userId) {
-        const data = this.loadData();
-        const channelIndex = data.channels.findIndex(channel => channel._id === channelId);
-        
-        if (channelIndex !== -1) {
-            const memberIndex = data.channels[channelIndex].members.indexOf(userId);
-            if (memberIndex !== -1) {
-                data.channels[channelIndex].members.splice(memberIndex, 1);
-                data.channels[channelIndex].stats.memberCount -= 1;
-                data.channels[channelIndex].updatedAt = new Date().toISOString();
-                
-                this.saveData(data);
-                
-                // مسح الكاش
-                this.cache.delete(`channels_user_${userId}`);
-                this.cache.delete('channels_list');
-                
-                return true;
-            }
         }
         return false;
     }
@@ -1016,7 +787,6 @@ class EnhancedLocalStorageService {
     async createGroup(groupData) {
         const data = this.loadData();
         const groupId = uuidv4();
-        
         const group = {
             _id: groupId,
             ...groupData,
@@ -1025,25 +795,21 @@ class EnhancedLocalStorageService {
             isActive: true,
             members: groupData.members || [groupData.creatorId],
             admins: groupData.admins || [groupData.creatorId],
-            moderators: groupData.moderators || [],
+            avatar: groupData.avatar || null,
+            banner: groupData.banner || null,
             groupSettings: {
                 isPublic: groupData.isPublic !== false,
-                allowInvites: groupData.allowInvites !== false,
-                adminOnlyPosts: groupData.adminOnlyPosts || false,
-                allowFileSharing: groupData.allowFileSharing !== false,
-                maxMembers: groupData.maxMembers || 100,
-                ...groupData.groupSettings
+                allowInvites: true,
+                adminOnlyPosts: false,
+                allowFileSharing: true,
+                maxMembers: 100
             },
             stats: {
                 memberCount: groupData.members?.length || 1,
                 messageCount: 0,
                 dailyActiveUsers: 0
             },
-            metadata: {
-                category: groupData.category || 'general',
-                tags: groupData.tags || [],
-                ...groupData.metadata
-            }
+            tags: groupData.tags || []
         };
         
         data.groups.push(group);
@@ -1054,55 +820,40 @@ class EnhancedLocalStorageService {
         await this.createConversation(
             group.members, 
             group.name, 
-            true,
-            { groupId: groupId }
+            true
         );
-
-        // مسح الكاش
-        this.cache.delete('groups_list');
-        this.cache.delete(`groups_user_${groupData.creatorId}`);
+        
+        // مسح ذاكرة التخزين المؤقت
+        this.cache.delete('groups_all');
+        this.cache.delete('groups_public');
         
         return group;
     }
 
-    async getAllGroups(options = {}) {
-        const cacheKey = `groups_list_${JSON.stringify(options)}`;
+    async getAllGroups() {
+        const cacheKey = 'groups_all';
         if (this.cache.has(cacheKey)) {
             return this.cache.get(cacheKey);
         }
 
         const data = this.loadData();
-        let groups = data.groups.filter(group => group.isActive);
+        const groups = data.groups.filter(group => group.isActive);
+        
+        this.cache.set(cacheKey, groups);
+        return groups;
+    }
 
-        // التصفية
-        if (options.publicOnly) {
-            groups = groups.filter(group => group.groupSettings.isPublic);
+    async getPublicGroups() {
+        const cacheKey = 'groups_public';
+        if (this.cache.has(cacheKey)) {
+            return this.cache.get(cacheKey);
         }
 
-        if (options.category) {
-            groups = groups.filter(group => group.metadata?.category === options.category);
-        }
-
-        if (options.search) {
-            const searchTerm = options.search.toLowerCase();
-            groups = groups.filter(group => 
-                group.name.toLowerCase().includes(searchTerm) ||
-                group.description?.toLowerCase().includes(searchTerm)
-            );
-        }
-
-        // الترتيب
-        if (options.sortBy === 'members') {
-            groups.sort((a, b) => b.stats.memberCount - a.stats.memberCount);
-        } else {
-            groups.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-        }
-
-        // التقسيم
-        if (options.limit) {
-            groups = groups.slice(0, options.limit);
-        }
-
+        const data = this.loadData();
+        const groups = data.groups.filter(group => 
+            group.isActive && group.groupSettings.isPublic
+        );
+        
         this.cache.set(cacheKey, groups);
         return groups;
     }
@@ -1127,6 +878,54 @@ class EnhancedLocalStorageService {
         return groups;
     }
 
+    async createGroupMessage(messageData) {
+        const data = this.loadData();
+        const messageId = uuidv4();
+        const message = {
+            _id: messageId,
+            ...messageData,
+            createdAt: new Date().toISOString(),
+            readBy: [messageData.senderId],
+            reactions: [],
+            edited: { isEdited: false, editedAt: null },
+            deleted: { isDeleted: false, deletedAt: null },
+            metadata: messageData.metadata || {}
+        };
+        
+        data.groupMessages.push(message);
+        
+        const groupIndex = data.groups.findIndex(group => group._id === messageData.groupId);
+        if (groupIndex !== -1) {
+            data.groups[groupIndex].stats.messageCount += 1;
+            data.groups[groupIndex].updatedAt = new Date().toISOString();
+        }
+        
+        this.updateStats(data);
+        this.saveData(data);
+        
+        // مسح ذاكرة التخزين المؤقت
+        this.cache.delete(`group_messages_${messageData.groupId}_*`);
+        
+        return message;
+    }
+
+    async getGroupMessages(groupId, limit = 50) {
+        const cacheKey = `group_messages_${groupId}_${limit}`;
+        if (this.cache.has(cacheKey)) {
+            return this.cache.get(cacheKey);
+        }
+
+        const data = this.loadData();
+        const messages = data.groupMessages
+            .filter(msg => msg.groupId === groupId && !msg.deleted.isDeleted)
+            .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+            .slice(0, limit)
+            .reverse();
+
+        this.cache.set(cacheKey, messages);
+        return messages;
+    }
+
     async addMemberToGroup(groupId, userId) {
         const data = this.loadData();
         const groupIndex = data.groups.findIndex(group => group._id === groupId);
@@ -1135,21 +934,21 @@ class EnhancedLocalStorageService {
             data.groups[groupIndex].members.push(userId);
             data.groups[groupIndex].stats.memberCount += 1;
             data.groups[groupIndex].updatedAt = new Date().toISOString();
-            
             this.saveData(data);
             
             // إضافة المستخدم إلى محادثة المجموعة
             const conversation = data.conversations.find(conv => 
-                conv.isGroup && conv.metadata?.groupId === groupId
+                conv.isGroup && conv.name === data.groups[groupIndex].name
             );
             if (conversation && !conversation.participants.includes(userId)) {
                 conversation.participants.push(userId);
                 conversation.unreadCount[userId] = 0;
             }
             
-            // مسح الكاش
+            // مسح ذاكرة التخزين المؤقت
             this.cache.delete(`groups_user_${userId}`);
-            this.cache.delete('groups_list');
+            this.cache.delete('groups_all');
+            this.cache.delete('groups_public');
             
             return true;
         }
@@ -1160,12 +959,11 @@ class EnhancedLocalStorageService {
     async createStory(storyData) {
         const data = this.loadData();
         const storyId = uuidv4();
-        
         const story = {
             _id: storyId,
             ...storyData,
             createdAt: new Date().toISOString(),
-            expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24 ساعة
+            expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
             views: [],
             reactions: [],
             replies: [],
@@ -1174,52 +972,71 @@ class EnhancedLocalStorageService {
                 viewCount: 0,
                 replyCount: 0,
                 reactionCount: 0,
-                shareCount: 0,
-                engagementRate: 0
-            },
-            settings: {
-                allowReplies: storyData.allowReplies !== false,
-                allowSharing: storyData.allowSharing !== false,
-                showViewCount: storyData.showViewCount !== false
-            },
-            metadata: {
-                duration: storyData.duration,
-                aspectRatio: storyData.aspectRatio,
-                ...storyData.metadata
+                shareCount: 0
             }
         };
         
         data.stories.push(story);
         this.updateStats(data);
         this.saveData(data);
-
-        // تحديث إحصائيات المستخدم
-        await this.incrementUserStats(storyData.userId, 'storiesPosted');
+        
+        // مسح ذاكرة التخزين المؤقت
+        this.cache.delete('stories_active');
+        this.cache.delete(`stories_user_${storyData.userId}`);
         
         return story;
     }
 
-    async getActiveStories(options = {}) {
+    async getActiveStories() {
+        const cacheKey = 'stories_active';
+        if (this.cache.has(cacheKey)) {
+            return this.cache.get(cacheKey);
+        }
+
         const data = this.loadData();
         const now = new Date().toISOString();
-        
-        let stories = data.stories.filter(story => 
+        const stories = data.stories.filter(story => 
             story.expiresAt > now && story.isActive
         );
-
-        // التصفية
-        if (options.userId) {
-            stories = stories.filter(story => story.userId === options.userId);
-        }
-
-        if (options.excludeViewedBy) {
-            stories = stories.filter(story => !story.views.includes(options.excludeViewedBy));
-        }
-
-        // الترتيب
-        stories.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-
+        
+        this.cache.set(cacheKey, stories);
         return stories;
+    }
+
+    async getUserStories(userId) {
+        const cacheKey = `stories_user_${userId}`;
+        if (this.cache.has(cacheKey)) {
+            return this.cache.get(cacheKey);
+        }
+
+        const data = this.loadData();
+        const now = new Date().toISOString();
+        const stories = data.stories.filter(story => 
+            story.userId === userId && story.expiresAt > now && story.isActive
+        );
+        
+        this.cache.set(cacheKey, stories);
+        return stories;
+    }
+
+    async updateStory(storyId, updates) {
+        const data = this.loadData();
+        const storyIndex = data.stories.findIndex(story => story._id === storyId);
+        
+        if (storyIndex !== -1) {
+            data.stories[storyIndex] = {
+                ...data.stories[storyIndex],
+                ...updates
+            };
+            this.saveData(data);
+            
+            // مسح ذاكرة التخزين المؤقت
+            this.cache.delete('stories_active');
+            this.cache.delete(`stories_user_${data.stories[storyIndex].userId}`);
+            
+            return data.stories[storyIndex];
+        }
+        return null;
     }
 
     async addStoryView(storyId, userId) {
@@ -1229,16 +1046,12 @@ class EnhancedLocalStorageService {
         if (storyIndex !== -1 && !data.stories[storyIndex].views.includes(userId)) {
             data.stories[storyIndex].views.push(userId);
             data.stories[storyIndex].metrics.viewCount += 1;
-            
-            // حساب معدل المشاركة
-            const totalViews = data.stories[storyIndex].metrics.viewCount;
-            const totalReactions = data.stories[storyIndex].metrics.reactionCount;
-            const totalReplies = data.stories[storyIndex].metrics.replyCount;
-            
-            data.stories[storyIndex].metrics.engagementRate = 
-                ((totalReactions + totalReplies) / totalViews) * 100;
-            
             this.saveData(data);
+            
+            // مسح ذاكرة التخزين المؤقت
+            this.cache.delete('stories_active');
+            this.cache.delete(`stories_user_${data.stories[storyIndex].userId}`);
+            
             return true;
         }
         return false;
@@ -1249,15 +1062,13 @@ class EnhancedLocalStorageService {
         const storyIndex = data.stories.findIndex(story => story._id === storyId);
         
         if (storyIndex !== -1) {
-            const existingReactionIndex = data.stories[storyIndex].reactions
-                .findIndex(r => r.userId === userId);
+            const existingReactionIndex = data.stories[storyIndex].reactions.findIndex(
+                r => r.userId === userId
+            );
             
             if (existingReactionIndex !== -1) {
-                // تحديث التفاعل الحالي
                 data.stories[storyIndex].reactions[existingReactionIndex].reaction = reaction;
-                data.stories[storyIndex].reactions[existingReactionIndex].createdAt = new Date().toISOString();
             } else {
-                // إضافة تفاعل جديد
                 data.stories[storyIndex].reactions.push({
                     userId,
                     reaction,
@@ -1267,45 +1078,62 @@ class EnhancedLocalStorageService {
             }
             
             this.saveData(data);
+            
+            // مسح ذاكرة التخزين المؤقت
+            this.cache.delete('stories_active');
+            this.cache.delete(`stories_user_${data.stories[storyIndex].userId}`);
+            
+            return data.stories[storyIndex];
+        }
+        return null;
+    }
+
+    // ============ دوال الإشعارات ============
+    async createNotification(notificationData) {
+        const data = this.loadData();
+        const notificationId = uuidv4();
+        const notification = {
+            _id: notificationId,
+            ...notificationData,
+            isRead: false,
+            createdAt: new Date().toISOString()
+        };
+        
+        if (!data.notifications) {
+            data.notifications = [];
+        }
+        
+        data.notifications.push(notification);
+        this.saveData(data);
+        
+        return notification;
+    }
+
+    async getUserNotifications(userId, limit = 20) {
+        const data = this.loadData();
+        if (!data.notifications) {
+            return [];
+        }
+        
+        return data.notifications
+            .filter(notification => notification.userId === userId)
+            .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+            .slice(0, limit);
+    }
+
+    async markNotificationAsRead(notificationId) {
+        const data = this.loadData();
+        const notificationIndex = data.notifications?.findIndex(n => n._id === notificationId);
+        
+        if (notificationIndex !== -1) {
+            data.notifications[notificationIndex].isRead = true;
+            this.saveData(data);
             return true;
         }
         return false;
     }
 
-    // ============ دوال النظام ============
-    updateStats(data) {
-        const now = new Date();
-        const activeUsers = data.users.filter(user => 
-            user.isOnline || 
-            (user.lastSeen && new Date(user.lastSeen) > new Date(now.getTime() - 15 * 60 * 1000))
-        ).length;
-
-        // حساب إجمالي التخزين
-        let totalStorage = 0;
-        // يمكن إضافة منطق لحساب حجم الملفات لاحقاً
-
-        data.stats = {
-            totalUsers: data.users.length,
-            totalMessages: data.messages.length,
-            totalStories: data.stories.length,
-            totalChannels: data.channels.length,
-            totalGroups: data.groups.length,
-            totalConversations: data.conversations.length,
-            activeUsers: activeUsers,
-            totalStorage: totalStorage,
-            lastUpdate: new Date().toISOString(),
-            cacheSize: this.cache.size,
-            systemUptime: process.uptime()
-        };
-        
-        return data.stats;
-    }
-
-    getStats() {
-        const data = this.loadData();
-        return this.updateStats(data);
-    }
-
+    // ============ النسخ الاحتياطي والإحصائيات ============
     async createBackup() {
         try {
             const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -1321,6 +1149,10 @@ class EnhancedLocalStorageService {
             fs.writeFileSync(backupFile, JSON.stringify(backupData, null, 2));
             
             const data = this.loadData();
+            if (!data.backups) {
+                data.backups = [];
+            }
+            
             data.backups.push({
                 filename: `backup-${timestamp}.json`,
                 timestamp: new Date().toISOString(),
@@ -1340,19 +1172,93 @@ class EnhancedLocalStorageService {
             data.lastBackup = new Date().toISOString();
             this.saveData(data);
             
-            console.log(`💾 تم إنشاء النسخة الاحتياطية: ${backupFile}`);
-            
-            return { 
-                success: true, 
-                filename: `backup-${timestamp}.json`,
-                size: backupData.stats
-            };
+            return { success: true, filename: `backup-${timestamp}.json` };
         } catch (error) {
             console.error('❌ خطأ في إنشاء النسخة الاحتياطية:', error);
             return { success: false, error: error.message };
         }
     }
 
+    updateStats(data) {
+        const activeUsers = data.users.filter(user => user.isOnline && user.isActive).length;
+        const totalStorage = this.calculateTotalStorage();
+        
+        data.stats = {
+            totalUsers: data.users.length,
+            totalMessages: data.messages.length + data.channelMessages.length + data.groupMessages.length,
+            totalStories: data.stories.length,
+            totalChannels: data.channels.length,
+            totalGroups: data.groups.length,
+            totalConversations: data.conversations.length,
+            activeUsers: activeUsers,
+            totalStorage: totalStorage,
+            lastUpdate: new Date().toISOString(),
+            cacheSize: this.cache.size,
+            systemUptime: process.uptime()
+        };
+        return data.stats;
+    }
+
+    calculateTotalStorage() {
+        let totalSize = 0;
+        
+        // حساب حجم ملف البيانات
+        try {
+            const stats = fs.statSync(this.dataFile);
+            totalSize += stats.size;
+        } catch (error) {
+            console.error('❌ خطأ في حساب حجم ملف البيانات:', error);
+        }
+        
+        // حساب حجم الملفات المرفوعة
+        const calculateDirSize = (dirPath) => {
+            let size = 0;
+            try {
+                const files = fs.readdirSync(dirPath);
+                files.forEach(file => {
+                    const filePath = path.join(dirPath, file);
+                    const stats = fs.statSync(filePath);
+                    if (stats.isFile()) {
+                        size += stats.size;
+                    } else if (stats.isDirectory()) {
+                        size += calculateDirSize(filePath);
+                    }
+                });
+            } catch (error) {
+                console.error(`❌ خطأ في حساب حجم المجلد ${dirPath}:`, error);
+            }
+            return size;
+        };
+        
+        totalSize += calculateDirSize(UPLOAD_DIR);
+        totalSize += calculateDirSize(BACKUP_DIR);
+        totalSize += calculateDirSize(EXPORT_DIR);
+        
+        return totalSize;
+    }
+
+    getStats() {
+        const data = this.loadData();
+        return this.updateStats(data);
+    }
+
+    getSystemInfo() {
+        return {
+            nodeVersion: process.version,
+            platform: process.platform,
+            memory: process.memoryUsage(),
+            uptime: process.uptime(),
+            environment: NODE_ENV,
+            timestamp: new Date().toISOString()
+        };
+    }
+
+    formatUserResponse(user) {
+        const { password, ...userWithoutPassword } = user;
+        return userWithoutPassword;
+    }
+
+    // تنظيف البيانات القديمة
     async cleanupOldData() {
         try {
             const data = this.loadData();
@@ -1360,44 +1266,23 @@ class EnhancedLocalStorageService {
             let cleanedCount = 0;
             
             // تنظيف الستوريات المنتهية
-            const expiredStories = data.stories.filter(story => 
-                new Date(story.expiresAt) <= now
-            );
+            const initialStoryCount = data.stories.length;
             data.stories = data.stories.filter(story => 
                 new Date(story.expiresAt) > now
             );
-            cleanedCount += expiredStories.length;
+            cleanedCount += initialStoryCount - data.stories.length;
             
-            // تنظيف المستخدمين غير النشطين (أكثر من 30 يوم)
-            const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-            const inactiveUsers = data.users.filter(user => 
-                user.isActive && 
-                new Date(user.lastSeen) < thirtyDaysAgo &&
-                user.role !== 'admin'
-            );
-            
-            inactiveUsers.forEach(user => {
-                user.isActive = false;
-                user.deactivatedAt = new Date().toISOString();
-            });
-            cleanedCount += inactiveUsers.length;
-            
-            // تنظيف الملفات المؤقتة القديمة
-            const tempDir = path.join(UPLOAD_DIR, 'temp');
-            if (fs.existsSync(tempDir)) {
-                const files = fs.readdirSync(tempDir);
-                const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-                
-                files.forEach(file => {
-                    const filePath = path.join(tempDir, file);
-                    const stats = fs.statSync(filePath);
-                    
-                    if (stats.mtime < weekAgo) {
-                        fs.unlinkSync(filePath);
-                        cleanedCount++;
-                    }
-                });
+            // تنظيف الإشعارات القديمة (أكثر من 30 يوم)
+            if (data.notifications) {
+                const initialNotificationCount = data.notifications.length;
+                const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+                data.notifications = data.notifications.filter(notification => 
+                    new Date(notification.createdAt) > thirtyDaysAgo
+                );
+                cleanedCount += initialNotificationCount - data.notifications.length;
             }
+            
+            // تنظيف النسخ الاحتياطية القديمة (يتم في createBackup)
             
             this.saveData(data);
             this.clearCache();
@@ -1410,88 +1295,52 @@ class EnhancedLocalStorageService {
         }
     }
 
-    formatUserResponse(user) {
-        if (!user) return null;
-        
-        const { password, security, ...userWithoutSensitiveData } = user;
-        return userWithoutSensitiveData;
-    }
-
-    // ============ دوال التدقيق ============
-    async auditLog(action, userId, targetType, targetId, details = {}) {
+    // تصدير البيانات
+    async exportData(format = 'json') {
         try {
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+            const exportFile = path.join(EXPORT_DIR, `export-${timestamp}.${format}`);
+            
             const data = this.loadData();
-            if (!data.auditLogs) data.auditLogs = [];
-            
-            const logEntry = {
-                _id: uuidv4(),
-                action,
-                userId,
-                targetType,
-                targetId,
-                details,
-                ip: details.ip || 'unknown',
-                userAgent: details.userAgent || 'unknown',
-                timestamp: new Date().toISOString()
+            const exportData = {
+                timestamp: new Date().toISOString(),
+                version: '2.0.0',
+                stats: this.getStats(),
+                data: {
+                    users: data.users.map(user => this.formatUserResponse(user)),
+                    conversations: data.conversations,
+                    channels: data.channels,
+                    groups: data.groups,
+                    stories: data.stories
+                }
             };
+
+            fs.writeFileSync(exportFile, JSON.stringify(exportData, null, 2));
             
-            data.auditLogs.push(logEntry);
-            
-            // الاحتفاظ بآخر 1000 سجل تدقيق فقط
-            if (data.auditLogs.length > 1000) {
-                data.auditLogs = data.auditLogs.slice(-1000);
+            if (!data.exports) {
+                data.exports = [];
             }
+            
+            data.exports.push({
+                filename: `export-${timestamp}.${format}`,
+                timestamp: new Date().toISOString(),
+                format: format,
+                size: JSON.stringify(exportData).length
+            });
             
             this.saveData(data);
             
-            console.log(`📋 Audit: ${action} by ${userId} on ${targetType} ${targetId}`);
-            
+            return { success: true, filename: `export-${timestamp}.${format}` };
         } catch (error) {
-            console.error('❌ خطأ في تسجيل التدقيق:', error);
+            console.error('❌ خطأ في تصدير البيانات:', error);
+            return { success: false, error: error.message };
         }
-    }
-
-    async getAuditLogs(options = {}) {
-        const data = this.loadData();
-        let logs = data.auditLogs || [];
-
-        // التصفية
-        if (options.userId) {
-            logs = logs.filter(log => log.userId === options.userId);
-        }
-
-        if (options.action) {
-            logs = logs.filter(log => log.action === options.action);
-        }
-
-        if (options.targetType) {
-            logs = logs.filter(log => log.targetType === options.targetType);
-        }
-
-        if (options.startDate) {
-            logs = logs.filter(log => new Date(log.timestamp) >= new Date(options.startDate));
-        }
-
-        if (options.endDate) {
-            logs = logs.filter(log => new Date(log.timestamp) <= new Date(options.endDate));
-        }
-
-        // الترتيب
-        logs.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-
-        // التقسيم
-        if (options.limit) {
-            logs = logs.slice(0, options.limit);
-        }
-
-        return logs;
     }
 }
 
-// إنشاء نسخة من خدمة التخزين
 const localStorageService = new EnhancedLocalStorageService();
 
-// ============ middleware المصادقة ============
+// middleware المصادقة
 const authenticateToken = async (req, res, next) => {
     try {
         const authHeader = req.headers['authorization'];
@@ -1521,16 +1370,6 @@ const authenticateToken = async (req, res, next) => {
                 success: false, 
                 message: 'الحساب موقوف',
                 code: 'ACCOUNT_SUSPENDED'
-            });
-        }
-
-        // التحقق من إعدادات النظام
-        const data = localStorageService.loadData();
-        if (data.systemSettings.maintenance && user.role !== 'admin') {
-            return res.status(503).json({
-                success: false,
-                message: 'النظام تحت الصيانة',
-                code: 'MAINTENANCE_MODE'
             });
         }
 
@@ -1571,24 +1410,36 @@ const requireAdmin = (req, res, next) => {
     next();
 };
 
-const requireTeacherOrAdmin = (req, res, next) => {
-    if (req.user.role !== 'admin' && req.user.role !== 'teacher') {
-        return res.status(403).json({ 
-            success: false, 
-            message: 'صلاحيات معلم أو مدير مطلوبة',
-            code: 'TEACHER_OR_ADMIN_REQUIRED'
-        });
-    }
-    next();
-};
-
-// ============ دوال مساعدة ============
+// دوال مساعدة
 const generateToken = (userId) => {
     return jwt.sign({ userId }, JWT_SECRET, { expiresIn: '30d' });
 };
 
 const generateRefreshToken = (userId) => {
     return jwt.sign({ userId, type: 'refresh' }, JWT_SECRET, { expiresIn: '90d' });
+};
+
+const auditLog = async (action, userId, targetType, targetId, details = {}) => {
+    try {
+        const logEntry = {
+            action,
+            userId,
+            targetType,
+            targetId,
+            details,
+            timestamp: new Date().toISOString(),
+            ip: details.ip || 'unknown'
+        };
+        
+        console.log(`📋 Audit Log: ${action} by ${userId} on ${targetType} ${targetId}`, details);
+        
+        // حفظ في سجل التدقيق
+        const logData = JSON.stringify(logEntry) + '\n';
+        fs.appendFileSync(path.join(__dirname, 'logs', 'audit.log'), logData);
+        
+    } catch (error) {
+        console.error('❌ خطأ في تسجيل التدقيق:', error);
+    }
 };
 
 const validateEmail = (email) => {
@@ -1600,12 +1451,7 @@ const validatePassword = (password) => {
     return password && password.length >= 6;
 };
 
-const sanitizeInput = (input) => {
-    if (typeof input !== 'string') return input;
-    return input.trim().replace(/[<>]/g, '');
-};
-
-// ============ إنشاء البيانات الأولية ============
+// إنشاء حساب المدير الافتراضي
 async function createDefaultAdmin() {
     try {
         const adminExists = await localStorageService.findUserByEmail('admin@platform.edu');
@@ -1615,7 +1461,8 @@ async function createDefaultAdmin() {
                 fullName: 'مدير النظام',
                 email: 'admin@platform.edu',
                 password: hashedPassword,
-                role: 'admin'
+                role: 'admin',
+                bio: 'مدير المنصة التعليمية'
             });
             
             console.log('✅ تم إنشاء حساب المدير الافتراضي');
@@ -1629,28 +1476,37 @@ async function createDefaultAdmin() {
     }
 }
 
+// إنشاء بيانات تجريبية
 async function createSampleData() {
     try {
-        if (NODE_ENV !== 'development') return;
-
         const users = [
             {
                 fullName: 'أحمد محمد',
                 email: 'ahmed@example.com',
                 password: await bcrypt.hash('123456', 12),
-                role: 'teacher'
+                role: 'teacher',
+                bio: 'معلم رياضيات متخصص'
             },
             {
                 fullName: 'فاطمة علي',
                 email: 'fatima@example.com',
                 password: await bcrypt.hash('123456', 12),
-                role: 'student'
+                role: 'student',
+                bio: 'طالبة في الصف العاشر'
             },
             {
                 fullName: 'خالد إبراهيم',
                 email: 'khaled@example.com',
                 password: await bcrypt.hash('123456', 12),
-                role: 'student'
+                role: 'student',
+                bio: 'مهتم بالبرمجة والتكنولوجيا'
+            },
+            {
+                fullName: 'سارة عبدالله',
+                email: 'sara@example.com',
+                password: await bcrypt.hash('123456', 12),
+                role: 'teacher',
+                bio: 'معلمة لغة عربية وأدب'
             }
         ];
 
@@ -1664,26 +1520,34 @@ async function createSampleData() {
 
         const allUsers = await localStorageService.getAllUsers();
         const adminUser = allUsers.find(u => u.role === 'admin');
-        const teacherUser = allUsers.find(u => u.role === 'teacher');
+        const teacherUsers = allUsers.filter(u => u.role === 'teacher');
 
-        if (adminUser && teacherUser) {
+        if (adminUser && teacherUsers.length > 0) {
             // إنشاء قنوات
             const channels = [
                 {
                     name: 'قناة الرياضيات',
-                    description: 'قناة مخصصة لدروس الرياضيات والتمارين',
+                    description: 'قناة مخصصة لدروس الرياضيات والتمارين والحلول',
                     creatorId: adminUser._id,
                     members: allUsers.map(u => u._id),
                     isPublic: true,
-                    category: 'education'
+                    tags: ['رياضيات', 'تعليم', 'دروس']
                 },
                 {
                     name: 'قناة العلوم',
-                    description: 'مناقشات وأخبار علمية',
-                    creatorId: teacherUser._id,
+                    description: 'مناقشات وأخبار علمية وتجارب ممتعة',
+                    creatorId: teacherUsers[0]._id,
                     members: allUsers.map(u => u._id),
                     isPublic: true,
-                    category: 'education'
+                    tags: ['علوم', 'فيزياء', 'كيمياء', 'أحياء']
+                },
+                {
+                    name: 'قناة البرمجة',
+                    description: 'تعلم البرمجة وتطوير التطبيقات',
+                    creatorId: adminUser._id,
+                    members: allUsers.map(u => u._id),
+                    isPublic: true,
+                    tags: ['برمجة', 'تطوير', 'تقنية']
                 }
             ];
 
@@ -1699,11 +1563,19 @@ async function createSampleData() {
             const groups = [
                 {
                     name: 'مجموعة الرياضيات المتقدمة',
-                    description: 'مجموعة للمناقشات المتقدمة في الرياضيات',
-                    creatorId: teacherUser._id,
+                    description: 'مجموعة للمناقشات المتقدمة في الرياضيات وحل المسائل الصعبة',
+                    creatorId: teacherUsers[0]._id,
                     members: allUsers.map(u => u._id),
                     isPublic: false,
-                    category: 'education'
+                    tags: ['رياضيات', 'متقدم', 'مسائل']
+                },
+                {
+                    name: 'مجموعة مشاريع التخرج',
+                    description: 'لمناقشة مشاريع التخرج والتعاون بين الطلاب',
+                    creatorId: adminUser._id,
+                    members: allUsers.map(u => u._id),
+                    isPublic: true,
+                    tags: ['مشاريع', 'تخرج', 'تعاون']
                 }
             ];
 
@@ -1714,6 +1586,28 @@ async function createSampleData() {
                     console.log(`✅ تم إنشاء المجموعة: ${groupData.name}`);
                 }
             }
+
+            // إنشاء محادثات فردية
+            if (allUsers.length >= 2) {
+                await localStorageService.createConversation(
+                    [allUsers[0]._id, allUsers[1]._id],
+                    null,
+                    false
+                );
+                console.log('✅ تم إنشاء محادثة فردية');
+            }
+
+            // إنشاء بعض الرسائل
+            const channelsList = await localStorageService.getAllChannels();
+            if (channelsList.length > 0) {
+                await localStorageService.createChannelMessage({
+                    channelId: channelsList[0]._id,
+                    senderId: adminUser._id,
+                    content: 'مرحباً بالجميع في قناة الرياضيات! 🎉',
+                    type: 'text'
+                });
+                console.log('✅ تم إنشاء رسالة ترحيب في القناة');
+            }
         }
 
         console.log('✅ تم إنشاء البيانات التجريبية بنجاح');
@@ -1722,16 +1616,33 @@ async function createSampleData() {
     }
 }
 
-// ============ مسارات API ============
+// تخزين المستخدمين المتصلين
+const connectedUsers = new Map();
+const userSockets = new Map();
+
+// ==================== مسارات API ====================
 
 // مسار رئيسي
 app.get('/', (req, res) => {
     res.json({
         success: true,
-        message: '🚀 خادم المنصة التعليمية المحسن يعمل بنجاح!',
-        version: '2.1.0',
+        message: '🚀 خادم المنصة التعليمية المتكامل يعمل بنجاح!',
+        version: '2.0.0',
         timestamp: new Date().toISOString(),
         environment: NODE_ENV,
+        features: {
+            realtime_chat: true,
+            channels: true,
+            groups: true,
+            stories: true,
+            file_upload: true,
+            emoji_support: true,
+            notifications: true,
+            caching: true,
+            search: true,
+            voice_messages: true,
+            reactions: true
+        },
         endpoints: {
             auth: '/api/auth/*',
             users: '/api/users/*',
@@ -1740,9 +1651,8 @@ app.get('/', (req, res) => {
             groups: '/api/groups/*',
             stories: '/api/stories/*',
             admin: '/api/admin/*',
-            system: '/api/system/*'
-        },
-        stats: localStorageService.getStats()
+            upload: '/api/upload'
+        }
     });
 });
 
@@ -1751,7 +1661,6 @@ app.post('/api/auth/register', async (req, res) => {
     try {
         const { fullName, email, password, role = 'student' } = req.body;
 
-        // التحقق من الإدخال
         if (!fullName || !email || !password) {
             return res.status(400).json({
                 success: false,
@@ -1776,16 +1685,6 @@ app.post('/api/auth/register', async (req, res) => {
             });
         }
 
-        // التحقق من إعدادات النظام
-        const data = localStorageService.loadData();
-        if (!data.systemSettings.registrationEnabled) {
-            return res.status(403).json({
-                success: false,
-                message: 'التسجيل مغلق حالياً',
-                code: 'REGISTRATION_DISABLED'
-            });
-        }
-
         const existingUser = await localStorageService.findUserByEmail(email);
         if (existingUser) {
             return res.status(400).json({
@@ -1797,21 +1696,20 @@ app.post('/api/auth/register', async (req, res) => {
 
         const hashedPassword = await bcrypt.hash(password, 12);
         const user = await localStorageService.createUser({
-            fullName: sanitizeInput(fullName),
-            email: email.toLowerCase(),
+            fullName: fullName.trim(),
+            email: email.toLowerCase().trim(),
             password: hashedPassword,
             role: role
         });
 
+        await auditLog('REGISTER', user._id, 'USER', user._id, { 
+            email, 
+            role,
+            ip: req.ip 
+        });
+
         const token = generateToken(user._id);
         const refreshToken = generateRefreshToken(user._id);
-
-        await localStorageService.auditLog('REGISTER', user._id, 'USER', user._id, {
-            email: email,
-            role: role,
-            ip: req.ip,
-            userAgent: req.get('User-Agent')
-        });
 
         res.status(201).json({
             success: true,
@@ -1864,30 +1762,9 @@ app.post('/api/auth/login', async (req, res) => {
             });
         }
 
-        // التحقق من محاولات تسجيل الدخول
-        const now = new Date();
-        const fifteenMinutesAgo = new Date(now.getTime() - 15 * 60 * 1000);
-        
-        if (user.security?.loginAttempts >= 5 && 
-            user.security?.lastLoginAttempt > fifteenMinutesAgo.toISOString()) {
-            return res.status(429).json({
-                success: false,
-                message: 'تم تجاوز عدد محاولات تسجيل الدخول المسموح بها، يرجى المحاولة لاحقاً',
-                code: 'TOO_MANY_ATTEMPTS'
-            });
-        }
-
         const isPasswordValid = await bcrypt.compare(password, user.password);
 
         if (!isPasswordValid) {
-            // تحديث محاولات تسجيل الدخول
-            await localStorageService.updateUser(user._id, {
-                security: {
-                    loginAttempts: (user.security?.loginAttempts || 0) + 1,
-                    lastLoginAttempt: new Date().toISOString()
-                }
-            });
-
             return res.status(401).json({
                 success: false,
                 message: 'البريد الإلكتروني أو كلمة المرور غير صحيحة',
@@ -1895,23 +1772,17 @@ app.post('/api/auth/login', async (req, res) => {
             });
         }
 
-        // إعادة تعيين محاولات تسجيل الدخول
         const updatedUser = await localStorageService.updateUser(user._id, {
             isOnline: true,
-            lastSeen: new Date().toISOString(),
-            lastLogin: new Date().toISOString(),
-            'security.loginAttempts': 0,
-            'security.lastLoginAttempt': null,
-            'stats.loginCount': (user.stats?.loginCount || 0) + 1
+            lastSeen: new Date().toISOString()
         });
 
         const token = generateToken(user._id);
         const refreshToken = generateRefreshToken(user._id);
 
-        await localStorageService.auditLog('LOGIN', user._id, 'USER', user._id, {
-            email: email,
-            ip: req.ip,
-            userAgent: req.get('User-Agent')
+        await auditLog('LOGIN', user._id, 'USER', user._id, { 
+            email,
+            ip: req.ip 
         });
 
         res.json({
@@ -1940,7 +1811,7 @@ app.post('/api/auth/refresh', async (req, res) => {
         const { refreshToken } = req.body;
 
         if (!refreshToken) {
-            return res.status(401).json({
+            return res.status(400).json({
                 success: false,
                 message: 'رمز التحديث مطلوب',
                 code: 'REFRESH_TOKEN_REQUIRED'
@@ -1948,6 +1819,7 @@ app.post('/api/auth/refresh', async (req, res) => {
         }
 
         const decoded = jwt.verify(refreshToken, JWT_SECRET);
+        
         if (decoded.type !== 'refresh') {
             return res.status(401).json({
                 success: false,
@@ -1970,13 +1842,15 @@ app.post('/api/auth/refresh', async (req, res) => {
 
         res.json({
             success: true,
+            message: 'تم تجديد الرمز بنجاح',
             data: {
                 token: newToken,
                 refreshToken: newRefreshToken
             }
         });
+
     } catch (error) {
-        console.error('❌ خطأ في تحديث الرمز:', error);
+        console.error('❌ خطأ في تجديد الرمز:', error);
         res.status(401).json({
             success: false,
             message: 'رمز تحديث غير صالح',
@@ -1992,9 +1866,8 @@ app.post('/api/auth/logout', authenticateToken, async (req, res) => {
             lastSeen: new Date().toISOString()
         });
 
-        await localStorageService.auditLog('LOGOUT', req.user._id, 'USER', req.user._id, {
-            ip: req.ip,
-            userAgent: req.get('User-Agent')
+        await auditLog('LOGOUT', req.user._id, 'USER', req.user._id, {
+            ip: req.ip
         });
 
         res.json({
@@ -2004,60 +1877,6 @@ app.post('/api/auth/logout', authenticateToken, async (req, res) => {
 
     } catch (error) {
         console.error('❌ خطأ في تسجيل الخروج:', error);
-        res.status(500).json({
-            success: false,
-            message: 'حدث خطأ في الخادم',
-            code: 'SERVER_ERROR'
-        });
-    }
-});
-
-app.post('/api/auth/change-password', authenticateToken, async (req, res) => {
-    try {
-        const { currentPassword, newPassword } = req.body;
-
-        if (!currentPassword || !newPassword) {
-            return res.status(400).json({
-                success: false,
-                message: 'كلمة المرور الحالية والجديدة مطلوبتان',
-                code: 'MISSING_PASSWORDS'
-            });
-        }
-
-        if (!validatePassword(newPassword)) {
-            return res.status(400).json({
-                success: false,
-                message: 'كلمة المرور الجديدة يجب أن تكون 6 أحرف على الأقل',
-                code: 'WEAK_PASSWORD'
-            });
-        }
-
-        const isCurrentPasswordValid = await bcrypt.compare(currentPassword, req.user.password);
-        if (!isCurrentPasswordValid) {
-            return res.status(401).json({
-                success: false,
-                message: 'كلمة المرور الحالية غير صحيحة',
-                code: 'INVALID_CURRENT_PASSWORD'
-            });
-        }
-
-        const hashedNewPassword = await bcrypt.hash(newPassword, 12);
-        await localStorageService.updateUser(req.user._id, {
-            password: hashedNewPassword,
-            'security.passwordChangedAt': new Date().toISOString()
-        });
-
-        await localStorageService.auditLog('CHANGE_PASSWORD', req.user._id, 'USER', req.user._id, {
-            ip: req.ip
-        });
-
-        res.json({
-            success: true,
-            message: 'تم تغيير كلمة المرور بنجاح'
-        });
-
-    } catch (error) {
-        console.error('❌ خطأ في تغيير كلمة المرور:', error);
         res.status(500).json({
             success: false,
             message: 'حدث خطأ في الخادم',
@@ -2087,20 +1906,12 @@ app.get('/api/users/me', authenticateToken, async (req, res) => {
 
 app.put('/api/users/me', authenticateToken, upload.single('avatar'), async (req, res) => {
     try {
-        const { fullName, bio, location, website, preferences } = req.body;
+        const { fullName, bio, phone } = req.body;
         const updates = {};
 
-        if (fullName) updates.fullName = sanitizeInput(fullName);
-        if (bio !== undefined) updates.bio = sanitizeInput(bio);
-        if (location !== undefined) updates.location = sanitizeInput(location);
-        if (website !== undefined) updates.website = sanitizeInput(website);
-        
-        if (preferences) {
-            updates.preferences = {
-                ...req.user.preferences,
-                ...preferences
-            };
-        }
+        if (fullName) updates.fullName = fullName.trim();
+        if (bio !== undefined) updates.bio = bio;
+        if (phone) updates.phone = phone;
 
         if (req.file) {
             updates.avatar = `/uploads/profiles/${req.file.filename}`;
@@ -2115,9 +1926,7 @@ app.put('/api/users/me', authenticateToken, upload.single('avatar'), async (req,
             });
         }
 
-        await localStorageService.auditLog('UPDATE_PROFILE', req.user._id, 'USER', req.user._id, {
-            fields: Object.keys(updates)
-        });
+        await auditLog('UPDATE_PROFILE', req.user._id, 'USER', req.user._id);
 
         res.json({
             success: true,
@@ -2139,16 +1948,7 @@ app.put('/api/users/me', authenticateToken, upload.single('avatar'), async (req,
 
 app.get('/api/users', authenticateToken, async (req, res) => {
     try {
-        const { search, role, limit = 50, sortBy, sortOrder } = req.query;
-        
-        const users = await localStorageService.getAllUsers({
-            search,
-            role,
-            limit: parseInt(limit),
-            sortBy,
-            sortOrder
-        });
-
+        const users = await localStorageService.getAllUsers();
         res.json({
             success: true,
             data: {
@@ -2166,11 +1966,12 @@ app.get('/api/users', authenticateToken, async (req, res) => {
     }
 });
 
+// البحث عن المستخدمين
 app.get('/api/users/search', authenticateToken, async (req, res) => {
     try {
-        const { q, limit = 20, role, online } = req.query;
+        const { q, limit = 20 } = req.query;
 
-        if (!q || q.length < 2) {
+        if (!q || q.trim().length < 2) {
             return res.status(400).json({
                 success: false,
                 message: 'يرجى إدخال مصطلح بحث مكون من حرفين على الأقل',
@@ -2178,10 +1979,7 @@ app.get('/api/users/search', authenticateToken, async (req, res) => {
             });
         }
 
-        const users = await localStorageService.searchUsers(q, parseInt(limit), {
-            role,
-            online: online === 'true'
-        });
+        const users = await localStorageService.searchUsers(q.trim(), parseInt(limit));
 
         res.json({
             success: true,
@@ -2202,77 +2000,40 @@ app.get('/api/users/search', authenticateToken, async (req, res) => {
     }
 });
 
-app.get('/api/users/:userId', authenticateToken, async (req, res) => {
-    try {
-        const { userId } = req.params;
-        const user = await localStorageService.findUserById(userId);
-
-        if (!user) {
-            return res.status(404).json({
-                success: false,
-                message: 'المستخدم غير موجود',
-                code: 'USER_NOT_FOUND'
-            });
-        }
-
-        // التحقق من إعدادات الخصوصية
-        if (user.preferences?.privacy?.profileVisibility === 'private' && 
-            user._id !== req.user._id && 
-            req.user.role !== 'admin') {
-            return res.status(403).json({
-                success: false,
-                message: 'غير مصرح بالوصول إلى هذا الملف الشخصي',
-                code: 'PROFILE_PRIVATE'
-            });
-        }
-
-        res.json({
-            success: true,
-            data: {
-                user: localStorageService.formatUserResponse(user)
-            }
-        });
-
-    } catch (error) {
-        console.error('❌ خطأ في جلب بيانات المستخدم:', error);
-        res.status(500).json({
-            success: false,
-            message: 'حدث خطأ في الخادم',
-            code: 'SERVER_ERROR'
-        });
-    }
-});
-
-// مسارات الدردشة
+// مسارات الدردشة والمحادثات
 app.get('/api/chat/conversations', authenticateToken, async (req, res) => {
     try {
-        const { archived, isGroup } = req.query;
+        const conversations = await localStorageService.getConversationsByUserId(req.user._id);
         
-        const conversations = await localStorageService.getConversationsByUserId(req.user._id, {
-            archived: archived === 'true',
-            isGroup: isGroup ? isGroup === 'true' : undefined
-        });
-
-        // جلب معلومات إضافية للمحادثات
         const conversationsWithDetails = await Promise.all(
             conversations.map(async (conv) => {
-                let participantsDetails = [];
+                const messages = await localStorageService.getMessagesByConversation(conv._id, 1);
+                const lastMessage = messages[0] || null;
                 
-                for (const participantId of conv.participants) {
-                    if (participantId !== req.user._id || conv.participants.length === 1) {
-                        const user = await localStorageService.findUserById(participantId);
-                        if (user) {
-                            participantsDetails.push(localStorageService.formatUserResponse(user));
-                        }
-                    }
-                }
-                
+                // جلب معلومات المشاركين
+                const participantsDetails = await Promise.all(
+                    conv.participants
+                        .filter(participantId => participantId !== req.user._id)
+                        .map(async (participantId) => {
+                            const user = await localStorageService.findUserById(participantId);
+                            return user ? localStorageService.formatUserResponse(user) : null;
+                        })
+                );
+
                 return {
                     ...conv,
-                    participantsDetails
+                    lastMessage,
+                    participantsDetails: participantsDetails.filter(p => p !== null)
                 };
             })
         );
+
+        // ترتيب المحادثات حسب آخر رسالة
+        conversationsWithDetails.sort((a, b) => {
+            const dateA = a.lastMessage ? new Date(a.lastMessage.createdAt) : new Date(a.updatedAt);
+            const dateB = b.lastMessage ? new Date(b.lastMessage.createdAt) : new Date(b.updatedAt);
+            return dateB - dateA;
+        });
 
         res.json({
             success: true,
@@ -2292,50 +2053,36 @@ app.get('/api/chat/conversations', authenticateToken, async (req, res) => {
 
 app.post('/api/chat/conversations', authenticateToken, async (req, res) => {
     try {
-        const { participantIds, name, isGroup = false, metadata = {} } = req.body;
+        const { participantId } = req.body;
         
-        if (!participantIds || !Array.isArray(participantIds) || participantIds.length === 0) {
+        if (!participantId) {
             return res.status(400).json({
                 success: false,
-                message: 'يجب تحديد مشاركين للمحادثة',
-                code: 'MISSING_PARTICIPANTS'
+                message: 'معرف المشارك مطلوب',
+                code: 'MISSING_PARTICIPANT'
             });
         }
 
-        // التحقق من وجود المستخدمين
-        const validParticipants = [req.user._id];
-        for (const participantId of participantIds) {
-            if (participantId !== req.user._id) {
-                const user = await localStorageService.findUserById(participantId);
-                if (user) {
-                    validParticipants.push(participantId);
-                }
-            }
-        }
-
-        if (validParticipants.length < 2) {
-            return res.status(400).json({
+        const participant = await localStorageService.findUserById(participantId);
+        if (!participant) {
+            return res.status(404).json({
                 success: false,
-                message: 'يجب أن تحتوي المحادثة على مشاركين على الأقل',
-                code: 'INSUFFICIENT_PARTICIPANTS'
+                message: 'المستخدم غير موجود',
+                code: 'USER_NOT_FOUND'
             });
         }
 
-        const conversation = await localStorageService.createConversation(
-            validParticipants, 
-            name, 
-            isGroup,
-            metadata
+        const conversation = await localStorageService.getOrCreateConversation(
+            req.user._id,
+            participantId
         );
 
-        await localStorageService.auditLog('CREATE_CONVERSATION', req.user._id, 'CONVERSATION', conversation._id, {
-            isGroup,
-            participantCount: validParticipants.length
+        await auditLog('CREATE_CONVERSATION', req.user._id, 'CONVERSATION', conversation._id, {
+            participantId
         });
 
-        res.status(201).json({
+        res.json({
             success: true,
-            message: 'تم إنشاء المحادثة بنجاح',
             data: {
                 conversation
             }
@@ -2353,7 +2100,7 @@ app.post('/api/chat/conversations', authenticateToken, async (req, res) => {
 app.get('/api/chat/conversations/:conversationId/messages', authenticateToken, async (req, res) => {
     try {
         const { conversationId } = req.params;
-        const { limit = 50, before, after } = req.query;
+        const { limit = 50, before = null } = req.query;
         
         const conversation = await localStorageService.getConversationById(conversationId);
         if (!conversation) {
@@ -2372,13 +2119,12 @@ app.get('/api/chat/conversations/:conversationId/messages', authenticateToken, a
             });
         }
 
-        const messages = await localStorageService.getMessagesByConversation(conversationId, {
-            limit: parseInt(limit),
-            before,
-            after
-        });
+        const messages = await localStorageService.getMessagesByConversation(
+            conversationId, 
+            parseInt(limit),
+            before
+        );
 
-        // تحديث unreadCount
         await localStorageService.markMessagesAsRead(conversationId, req.user._id);
 
         res.json({
@@ -2389,8 +2135,7 @@ app.get('/api/chat/conversations/:conversationId/messages', authenticateToken, a
                 pagination: {
                     hasMore: messages.length === parseInt(limit),
                     limit: parseInt(limit),
-                    before,
-                    after
+                    nextCursor: messages.length > 0 ? messages[messages.length - 1].createdAt : null
                 }
             }
         });
@@ -2408,12 +2153,12 @@ app.post('/api/chat/conversations/:conversationId/messages', authenticateToken, 
     try {
         const { conversationId } = req.params;
         const { content, type = 'text', metadata = {} } = req.body;
-        
+
         if (!content && type === 'text') {
             return res.status(400).json({
                 success: false,
                 message: 'محتوى الرسالة مطلوب',
-                code: 'MISSING_CONTENT'
+                code: 'MESSAGE_CONTENT_REQUIRED'
             });
         }
 
@@ -2437,27 +2182,25 @@ app.post('/api/chat/conversations/:conversationId/messages', authenticateToken, 
         const message = await localStorageService.createMessage({
             conversationId,
             senderId: req.user._id,
-            content: sanitizeInput(content),
+            content,
             type,
-            metadata: {
-                clientId: metadata.clientId,
-                device: req.get('User-Agent'),
-                ...metadata
-            }
+            metadata
         });
 
-        await localStorageService.auditLog('SEND_MESSAGE', req.user._id, 'MESSAGE', message._id, {
+        await auditLog('SEND_MESSAGE', req.user._id, 'MESSAGE', message._id, {
             conversationId,
             type,
-            length: content.length
+            length: content?.length || 0
         });
 
         // إرسال الرسالة عبر WebSocket لجميع المشاركين
         conversation.participants.forEach(participantId => {
-            io.to(participantId).emit('new_message', {
-                message,
-                conversation
-            });
+            if (connectedUsers.has(participantId)) {
+                io.to(connectedUsers.get(participantId)).emit('new_message', {
+                    message,
+                    conversation
+                });
+            }
         });
 
         res.status(201).json({
@@ -2467,133 +2210,9 @@ app.post('/api/chat/conversations/:conversationId/messages', authenticateToken, 
                 message
             }
         });
+
     } catch (error) {
         console.error('❌ خطأ في إرسال الرسالة:', error);
-        res.status(500).json({
-            success: false,
-            message: 'حدث خطأ في الخادم',
-            code: 'SERVER_ERROR'
-        });
-    }
-});
-
-app.put('/api/chat/conversations/:conversationId/messages/:messageId', authenticateToken, async (req, res) => {
-    try {
-        const { conversationId, messageId } = req.params;
-        const { content } = req.body;
-
-        if (!content) {
-            return res.status(400).json({
-                success: false,
-                message: 'محتوى الرسالة مطلوب',
-                code: 'MISSING_CONTENT'
-            });
-        }
-
-        const conversation = await localStorageService.getConversationById(conversationId);
-        if (!conversation) {
-            return res.status(404).json({
-                success: false,
-                message: 'المحادثة غير موجودة',
-                code: 'CONVERSATION_NOT_FOUND'
-            });
-        }
-
-        if (!conversation.participants.includes(req.user._id)) {
-            return res.status(403).json({
-                success: false,
-                message: 'غير مصرح لك بالتعديل في هذه المحادثة',
-                code: 'ACCESS_DENIED'
-            });
-        }
-
-        const updatedMessage = await localStorageService.editMessage(messageId, req.user._id, sanitizeInput(content));
-        if (!updatedMessage) {
-            return res.status(404).json({
-                success: false,
-                message: 'الرسالة غير موجودة أو لا يمكن تعديلها',
-                code: 'MESSAGE_NOT_FOUND'
-            });
-        }
-
-        await localStorageService.auditLog('EDIT_MESSAGE', req.user._id, 'MESSAGE', messageId, {
-            conversationId
-        });
-
-        // إرسال التحديث عبر WebSocket
-        conversation.participants.forEach(participantId => {
-            io.to(participantId).emit('message_updated', {
-                message: updatedMessage,
-                conversationId
-            });
-        });
-
-        res.json({
-            success: true,
-            message: 'تم تعديل الرسالة بنجاح',
-            data: {
-                message: updatedMessage
-            }
-        });
-    } catch (error) {
-        console.error('❌ خطأ في تعديل الرسالة:', error);
-        res.status(500).json({
-            success: false,
-            message: 'حدث خطأ في الخادم',
-            code: 'SERVER_ERROR'
-        });
-    }
-});
-
-app.delete('/api/chat/conversations/:conversationId/messages/:messageId', authenticateToken, async (req, res) => {
-    try {
-        const { conversationId, messageId } = req.params;
-
-        const conversation = await localStorageService.getConversationById(conversationId);
-        if (!conversation) {
-            return res.status(404).json({
-                success: false,
-                message: 'المحادثة غير موجودة',
-                code: 'CONVERSATION_NOT_FOUND'
-            });
-        }
-
-        if (!conversation.participants.includes(req.user._id)) {
-            return res.status(403).json({
-                success: false,
-                message: 'غير مصرح لك بالحذف في هذه المحادثة',
-                code: 'ACCESS_DENIED'
-            });
-        }
-
-        const success = await localStorageService.deleteMessage(messageId, req.user._id);
-        if (!success) {
-            return res.status(404).json({
-                success: false,
-                message: 'الرسالة غير موجودة أو لا يمكن حذفها',
-                code: 'MESSAGE_NOT_FOUND'
-            });
-        }
-
-        await localStorageService.auditLog('DELETE_MESSAGE', req.user._id, 'MESSAGE', messageId, {
-            conversationId
-        });
-
-        // إرسال التحديث عبر WebSocket
-        conversation.participants.forEach(participantId => {
-            io.to(participantId).emit('message_deleted', {
-                messageId,
-                conversationId,
-                deletedBy: req.user._id
-            });
-        });
-
-        res.json({
-            success: true,
-            message: 'تم حذف الرسالة بنجاح'
-        });
-    } catch (error) {
-        console.error('❌ خطأ في حذف الرسالة:', error);
         res.status(500).json({
             success: false,
             message: 'حدث خطأ في الخادم',
@@ -2605,16 +2224,7 @@ app.delete('/api/chat/conversations/:conversationId/messages/:messageId', authen
 // مسارات القنوات
 app.get('/api/channels', authenticateToken, async (req, res) => {
     try {
-        const { search, category, publicOnly, limit, sortBy } = req.query;
-        
-        const channels = await localStorageService.getAllChannels({
-            search,
-            category,
-            publicOnly: publicOnly === 'true',
-            limit: limit ? parseInt(limit) : undefined,
-            sortBy
-        });
-
+        const channels = await localStorageService.getPublicChannels();
         res.json({
             success: true,
             data: {
@@ -2634,7 +2244,6 @@ app.get('/api/channels', authenticateToken, async (req, res) => {
 app.get('/api/channels/my', authenticateToken, async (req, res) => {
     try {
         const channels = await localStorageService.getUserChannels(req.user._id);
-        
         res.json({
             success: true,
             data: {
@@ -2653,7 +2262,7 @@ app.get('/api/channels/my', authenticateToken, async (req, res) => {
 
 app.post('/api/channels', authenticateToken, upload.single('channelAvatar'), async (req, res) => {
     try {
-        const { name, description, isPublic = true, category, tags } = req.body;
+        const { name, description, isPublic = true, tags = [] } = req.body;
         
         if (!name) {
             return res.status(400).json({
@@ -2664,12 +2273,11 @@ app.post('/api/channels', authenticateToken, upload.single('channelAvatar'), asy
         }
 
         const channelData = {
-            name: sanitizeInput(name),
-            description: description ? sanitizeInput(description) : '',
-            creatorId: req.user._id,
+            name: name.trim(),
+            description: description?.trim() || '',
             isPublic: isPublic === 'true' || isPublic === true,
-            category: category || 'general',
-            tags: tags ? tags.split(',').map(tag => tag.trim()) : []
+            creatorId: req.user._id,
+            tags: Array.isArray(tags) ? tags : tags.split(',').map(tag => tag.trim())
         };
 
         if (req.file) {
@@ -2678,7 +2286,7 @@ app.post('/api/channels', authenticateToken, upload.single('channelAvatar'), asy
 
         const channel = await localStorageService.createChannel(channelData);
 
-        await localStorageService.auditLog('CREATE_CHANNEL', req.user._id, 'CHANNEL', channel._id, {
+        await auditLog('CREATE_CHANNEL', req.user._id, 'CHANNEL', channel._id, { 
             name: channel.name,
             isPublic: channel.channelSettings.isPublic
         });
@@ -2700,11 +2308,12 @@ app.post('/api/channels', authenticateToken, upload.single('channelAvatar'), asy
     }
 });
 
-app.get('/api/channels/:channelId', authenticateToken, async (req, res) => {
+app.get('/api/channels/:channelId/messages', authenticateToken, async (req, res) => {
     try {
         const { channelId } = req.params;
+        const { limit = 50 } = req.query;
+        
         const channel = await localStorageService.getChannelById(channelId);
-
         if (!channel) {
             return res.status(404).json({
                 success: false,
@@ -2713,25 +2322,24 @@ app.get('/api/channels/:channelId', authenticateToken, async (req, res) => {
             });
         }
 
-        // التحقق من العضوية للقنوات الخاصة
-        if (!channel.channelSettings.isPublic && 
-            !channel.members.includes(req.user._id) &&
-            req.user.role !== 'admin') {
+        if (!channel.members.includes(req.user._id) && !channel.admins.includes(req.user._id)) {
             return res.status(403).json({
                 success: false,
-                message: 'غير مصرح بالوصول إلى هذه القناة',
-                code: 'CHANNEL_PRIVATE'
+                message: 'لست عضواً في هذه القناة',
+                code: 'NOT_MEMBER'
             });
         }
 
+        const messages = await localStorageService.getChannelMessages(channelId, parseInt(limit));
         res.json({
             success: true,
             data: {
+                messages,
                 channel
             }
         });
     } catch (error) {
-        console.error('❌ خطأ في جلب بيانات القناة:', error);
+        console.error('❌ خطأ في جلب رسائل القناة:', error);
         res.status(500).json({
             success: false,
             message: 'حدث خطأ في الخادم',
@@ -2743,7 +2351,7 @@ app.get('/api/channels/:channelId', authenticateToken, async (req, res) => {
 app.post('/api/channels/:channelId/join', authenticateToken, async (req, res) => {
     try {
         const { channelId } = req.params;
-
+        
         const channel = await localStorageService.getChannelById(channelId);
         if (!channel) {
             return res.status(404).json({
@@ -2753,7 +2361,7 @@ app.post('/api/channels/:channelId/join', authenticateToken, async (req, res) =>
             });
         }
 
-        if (!channel.channelSettings.isPublic && req.user.role !== 'admin') {
+        if (!channel.channelSettings.isPublic) {
             return res.status(403).json({
                 success: false,
                 message: 'هذه القناة خاصة وتتطلب دعوة',
@@ -2762,24 +2370,28 @@ app.post('/api/channels/:channelId/join', authenticateToken, async (req, res) =>
         }
 
         const success = await localStorageService.addMemberToChannel(channelId, req.user._id);
-        if (!success) {
-            return res.status(400).json({
+        
+        if (success) {
+            await auditLog('JOIN_CHANNEL', req.user._id, 'CHANNEL', channelId, {
+                channelName: channel.name
+            });
+
+            res.json({
+                success: true,
+                message: 'تم الانضمام إلى القناة بنجاح',
+                data: {
+                    channel
+                }
+            });
+        } else {
+            res.status(400).json({
                 success: false,
                 message: 'أنت بالفعل عضو في هذه القناة',
                 code: 'ALREADY_MEMBER'
             });
         }
-
-        await localStorageService.auditLog('JOIN_CHANNEL', req.user._id, 'CHANNEL', channelId, {
-            channelName: channel.name
-        });
-
-        res.json({
-            success: true,
-            message: 'تم الانضمام للقناة بنجاح'
-        });
     } catch (error) {
-        console.error('❌ خطأ في الانضمام للقناة:', error);
+        console.error('❌ خطأ في الانضمام إلى القناة:', error);
         res.status(500).json({
             success: false,
             message: 'حدث خطأ في الخادم',
@@ -2788,68 +2400,10 @@ app.post('/api/channels/:channelId/join', authenticateToken, async (req, res) =>
     }
 });
 
-app.post('/api/channels/:channelId/leave', authenticateToken, async (req, res) => {
-    try {
-        const { channelId } = req.params;
-
-        const channel = await localStorageService.getChannelById(channelId);
-        if (!channel) {
-            return res.status(404).json({
-                success: false,
-                message: 'القناة غير موجودة',
-                code: 'CHANNEL_NOT_FOUND'
-            });
-        }
-
-        // لا يمكن للمديرين المغادرة إذا كانوا المدير الوحيد
-        if (channel.admins.includes(req.user._id) && channel.admins.length === 1) {
-            return res.status(400).json({
-                success: false,
-                message: 'لا يمكنك مغادرة القناة لأنك المدير الوحيد',
-                code: 'LAST_ADMIN'
-            });
-        }
-
-        const success = await localStorageService.removeMemberFromChannel(channelId, req.user._id);
-        if (!success) {
-            return res.status(400).json({
-                success: false,
-                message: 'أنت لست عضواً في هذه القناة',
-                code: 'NOT_MEMBER'
-            });
-        }
-
-        await localStorageService.auditLog('LEAVE_CHANNEL', req.user._id, 'CHANNEL', channelId, {
-            channelName: channel.name
-        });
-
-        res.json({
-            success: true,
-            message: 'تم مغادرة القناة بنجاح'
-        });
-    } catch (error) {
-        console.error('❌ خطأ في مغادرة القناة:', error);
-        res.status(500).json({
-            success: false,
-            message: 'حدث خطأ في الخادم',
-            code: 'SERVER_ERROR'
-        });
-    }
-});
-
-// مسارات المجموعات (مشابهة للقنوات)
+// مسارات المجموعات
 app.get('/api/groups', authenticateToken, async (req, res) => {
     try {
-        const { search, category, publicOnly, limit, sortBy } = req.query;
-        
-        const groups = await localStorageService.getAllGroups({
-            search,
-            category,
-            publicOnly: publicOnly === 'true',
-            limit: limit ? parseInt(limit) : undefined,
-            sortBy
-        });
-
+        const groups = await localStorageService.getPublicGroups();
         res.json({
             success: true,
             data: {
@@ -2869,7 +2423,6 @@ app.get('/api/groups', authenticateToken, async (req, res) => {
 app.get('/api/groups/my', authenticateToken, async (req, res) => {
     try {
         const groups = await localStorageService.getUserGroups(req.user._id);
-        
         res.json({
             success: true,
             data: {
@@ -2888,7 +2441,7 @@ app.get('/api/groups/my', authenticateToken, async (req, res) => {
 
 app.post('/api/groups', authenticateToken, upload.single('groupAvatar'), async (req, res) => {
     try {
-        const { name, description, isPublic = true, category, tags, maxMembers } = req.body;
+        const { name, description, isPublic = true, tags = [] } = req.body;
         
         if (!name) {
             return res.status(400).json({
@@ -2899,13 +2452,11 @@ app.post('/api/groups', authenticateToken, upload.single('groupAvatar'), async (
         }
 
         const groupData = {
-            name: sanitizeInput(name),
-            description: description ? sanitizeInput(description) : '',
-            creatorId: req.user._id,
+            name: name.trim(),
+            description: description?.trim() || '',
             isPublic: isPublic === 'true' || isPublic === true,
-            category: category || 'general',
-            tags: tags ? tags.split(',').map(tag => tag.trim()) : [],
-            maxMembers: maxMembers ? parseInt(maxMembers) : 100
+            creatorId: req.user._id,
+            tags: Array.isArray(tags) ? tags : tags.split(',').map(tag => tag.trim())
         };
 
         if (req.file) {
@@ -2914,7 +2465,7 @@ app.post('/api/groups', authenticateToken, upload.single('groupAvatar'), async (
 
         const group = await localStorageService.createGroup(groupData);
 
-        await localStorageService.auditLog('CREATE_GROUP', req.user._id, 'GROUP', group._id, {
+        await auditLog('CREATE_GROUP', req.user._id, 'GROUP', group._id, { 
             name: group.name,
             isPublic: group.groupSettings.isPublic
         });
@@ -2936,10 +2487,11 @@ app.post('/api/groups', authenticateToken, upload.single('groupAvatar'), async (
     }
 });
 
-app.post('/api/groups/:groupId/join', authenticateToken, async (req, res) => {
+app.get('/api/groups/:groupId/messages', authenticateToken, async (req, res) => {
     try {
         const { groupId } = req.params;
-
+        const { limit = 50 } = req.query;
+        
         const group = await localStorageService.getGroupById(groupId);
         if (!group) {
             return res.status(404).json({
@@ -2949,7 +2501,46 @@ app.post('/api/groups/:groupId/join', authenticateToken, async (req, res) => {
             });
         }
 
-        if (!group.groupSettings.isPublic && req.user.role !== 'admin') {
+        if (!group.members.includes(req.user._id)) {
+            return res.status(403).json({
+                success: false,
+                message: 'لست عضواً في هذه المجموعة',
+                code: 'NOT_MEMBER'
+            });
+        }
+
+        const messages = await localStorageService.getGroupMessages(groupId, parseInt(limit));
+        res.json({
+            success: true,
+            data: {
+                messages,
+                group
+            }
+        });
+    } catch (error) {
+        console.error('❌ خطأ في جلب رسائل المجموعة:', error);
+        res.status(500).json({
+            success: false,
+            message: 'حدث خطأ في الخادم',
+            code: 'SERVER_ERROR'
+        });
+    }
+});
+
+app.post('/api/groups/:groupId/join', authenticateToken, async (req, res) => {
+    try {
+        const { groupId } = req.params;
+        
+        const group = await localStorageService.getGroupById(groupId);
+        if (!group) {
+            return res.status(404).json({
+                success: false,
+                message: 'المجموعة غير موجودة',
+                code: 'GROUP_NOT_FOUND'
+            });
+        }
+
+        if (!group.groupSettings.isPublic) {
             return res.status(403).json({
                 success: false,
                 message: 'هذه المجموعة خاصة وتتطلب دعوة',
@@ -2957,34 +2548,29 @@ app.post('/api/groups/:groupId/join', authenticateToken, async (req, res) => {
             });
         }
 
-        // التحقق من الحد الأقصى للأعضاء
-        if (group.stats.memberCount >= group.groupSettings.maxMembers) {
-            return res.status(400).json({
-                success: false,
-                message: 'المجموعة ممتلئة',
-                code: 'GROUP_FULL'
-            });
-        }
-
         const success = await localStorageService.addMemberToGroup(groupId, req.user._id);
-        if (!success) {
-            return res.status(400).json({
+        
+        if (success) {
+            await auditLog('JOIN_GROUP', req.user._id, 'GROUP', groupId, {
+                groupName: group.name
+            });
+
+            res.json({
+                success: true,
+                message: 'تم الانضمام إلى المجموعة بنجاح',
+                data: {
+                    group
+                }
+            });
+        } else {
+            res.status(400).json({
                 success: false,
                 message: 'أنت بالفعل عضو في هذه المجموعة',
                 code: 'ALREADY_MEMBER'
             });
         }
-
-        await localStorageService.auditLog('JOIN_GROUP', req.user._id, 'GROUP', groupId, {
-            groupName: group.name
-        });
-
-        res.json({
-            success: true,
-            message: 'تم الانضمام للمجموعة بنجاح'
-        });
     } catch (error) {
-        console.error('❌ خطأ في الانضمام للمجموعة:', error);
+        console.error('❌ خطأ في الانضمام إلى المجموعة:', error);
         res.status(500).json({
             success: false,
             message: 'حدث خطأ في الخادم',
@@ -2996,20 +2582,19 @@ app.post('/api/groups/:groupId/join', authenticateToken, async (req, res) => {
 // مسارات الستوريات
 app.get('/api/stories', authenticateToken, async (req, res) => {
     try {
-        const { userId, excludeViewed } = req.query;
+        const stories = await localStorageService.getActiveStories();
         
-        const stories = await localStorageService.getActiveStories({
-            userId,
-            excludeViewedBy: excludeViewed === 'true' ? req.user._id : undefined
-        });
-
         // جلب معلومات المستخدمين للستوريات
         const storiesWithUserDetails = await Promise.all(
             stories.map(async (story) => {
                 const user = await localStorageService.findUserById(story.userId);
+                const hasViewed = story.views.includes(req.user._id);
+                
                 return {
                     ...story,
-                    user: user ? localStorageService.formatUserResponse(user) : null
+                    user: user ? localStorageService.formatUserResponse(user) : null,
+                    hasViewed,
+                    canView: true // يمكن للمستخدم رؤية الستوري
                 };
             })
         );
@@ -3030,9 +2615,28 @@ app.get('/api/stories', authenticateToken, async (req, res) => {
     }
 });
 
+app.get('/api/stories/my', authenticateToken, async (req, res) => {
+    try {
+        const stories = await localStorageService.getUserStories(req.user._id);
+        res.json({
+            success: true,
+            data: {
+                stories
+            }
+        });
+    } catch (error) {
+        console.error('❌ خطأ في جلب ستوريات المستخدم:', error);
+        res.status(500).json({
+            success: false,
+            message: 'حدث خطأ في الخادم',
+            code: 'SERVER_ERROR'
+        });
+    }
+});
+
 app.post('/api/stories', authenticateToken, upload.single('media'), async (req, res) => {
     try {
-        const { caption, type = 'image', allowReplies = true, allowSharing = true } = req.body;
+        const { caption, type = 'image' } = req.body;
         
         if (!req.file && type !== 'text') {
             return res.status(400).json({
@@ -3044,10 +2648,8 @@ app.post('/api/stories', authenticateToken, upload.single('media'), async (req, 
 
         const storyData = {
             userId: req.user._id,
-            caption: caption ? sanitizeInput(caption) : '',
-            type,
-            allowReplies: allowReplies === 'true',
-            allowSharing: allowSharing === 'true'
+            caption: caption?.trim() || '',
+            type
         };
 
         if (req.file) {
@@ -3057,20 +2659,20 @@ app.post('/api/stories', authenticateToken, upload.single('media'), async (req, 
 
         const story = await localStorageService.createStory(storyData);
 
-        await localStorageService.auditLog('CREATE_STORY', req.user._id, 'STORY', story._id, { 
-            type,
+        await auditLog('CREATE_STORY', req.user._id, 'STORY', story._id, { 
+            type: story.mediaType || 'text',
             hasMedia: !!req.file
         });
 
         res.status(201).json({
             success: true,
-            message: 'تم نشر الستوري بنجاح',
+            message: 'تم نشر القصة بنجاح',
             data: {
                 story
             }
         });
     } catch (error) {
-        console.error('❌ خطأ في إنشاء الستوري:', error);
+        console.error('❌ خطأ في نشر القصة:', error);
         res.status(500).json({
             success: false,
             message: 'حدث خطأ في الخادم',
@@ -3082,22 +2684,22 @@ app.post('/api/stories', authenticateToken, upload.single('media'), async (req, 
 app.post('/api/stories/:storyId/view', authenticateToken, async (req, res) => {
     try {
         const { storyId } = req.params;
-
         const success = await localStorageService.addStoryView(storyId, req.user._id);
-        if (!success) {
-            return res.status(400).json({
+        
+        if (success) {
+            res.json({
+                success: true,
+                message: 'تم تسجيل المشاهدة'
+            });
+        } else {
+            res.status(400).json({
                 success: false,
                 message: 'تم مشاهدة الستوري مسبقاً',
                 code: 'ALREADY_VIEWED'
             });
         }
-
-        res.json({
-            success: true,
-            message: 'تم تسجيل المشاهدة'
-        });
     } catch (error) {
-        console.error('❌ خطأ في تسجيل مشاهدة الستوري:', error);
+        console.error('❌ خطأ في تسجيل المشاهدة:', error);
         res.status(500).json({
             success: false,
             message: 'حدث خطأ في الخادم',
@@ -3119,21 +2721,29 @@ app.post('/api/stories/:storyId/reaction', authenticateToken, async (req, res) =
             });
         }
 
-        const success = await localStorageService.addStoryReaction(storyId, req.user._id, reaction);
-        if (!success) {
-            return res.status(404).json({
+        const updatedStory = await localStorageService.addStoryReaction(
+            storyId, 
+            req.user._id, 
+            reaction
+        );
+
+        if (updatedStory) {
+            res.json({
+                success: true,
+                message: 'تم إضافة التفاعل بنجاح',
+                data: {
+                    story: updatedStory
+                }
+            });
+        } else {
+            res.status(404).json({
                 success: false,
                 message: 'الستوري غير موجود',
                 code: 'STORY_NOT_FOUND'
             });
         }
-
-        res.json({
-            success: true,
-            message: 'تم إضافة التفاعل بنجاح'
-        });
     } catch (error) {
-        console.error('❌ خطأ في إضافة تفاعل الستوري:', error);
+        console.error('❌ خطأ في إضافة التفاعل:', error);
         res.status(500).json({
             success: false,
             message: 'حدث خطأ في الخادم',
@@ -3142,170 +2752,10 @@ app.post('/api/stories/:storyId/reaction', authenticateToken, async (req, res) =
     }
 });
 
-// مسارات الإدارة
-app.get('/api/admin/stats', authenticateToken, requireAdmin, async (req, res) => {
-    try {
-        const stats = localStorageService.getStats();
-        const auditLogs = await localStorageService.getAuditLogs({ limit: 10 });
-        
-        res.json({
-            success: true,
-            data: {
-                stats,
-                recentActivity: auditLogs
-            }
-        });
-    } catch (error) {
-        console.error('❌ خطأ في جلب إحصائيات النظام:', error);
-        res.status(500).json({
-            success: false,
-            message: 'حدث خطأ في الخادم',
-            code: 'SERVER_ERROR'
-        });
-    }
-});
-
-app.get('/api/admin/audit-logs', authenticateToken, requireAdmin, async (req, res) => {
-    try {
-        const { userId, action, targetType, startDate, endDate, limit = 50 } = req.query;
-        
-        const logs = await localStorageService.getAuditLogs({
-            userId,
-            action,
-            targetType,
-            startDate,
-            endDate,
-            limit: parseInt(limit)
-        });
-
-        res.json({
-            success: true,
-            data: {
-                logs,
-                total: logs.length
-            }
-        });
-    } catch (error) {
-        console.error('❌ خطأ في جلب سجلات التدقيق:', error);
-        res.status(500).json({
-            success: false,
-            message: 'حدث خطأ في الخادم',
-            code: 'SERVER_ERROR'
-        });
-    }
-});
-
-app.post('/api/admin/backup', authenticateToken, requireAdmin, async (req, res) => {
-    try {
-        const result = await localStorageService.createBackup();
-        
-        if (result.success) {
-            await localStorageService.auditLog('CREATE_BACKUP', req.user._id, 'SYSTEM', 'backup', {
-                filename: result.filename
-            });
-            
-            res.json({
-                success: true,
-                message: 'تم إنشاء النسخة الاحتياطية بنجاح',
-                data: {
-                    filename: result.filename,
-                    stats: result.stats
-                }
-            });
-        } else {
-            res.status(500).json({
-                success: false,
-                message: 'فشل في إنشاء النسخة الاحتياطية',
-                error: result.error
-            });
-        }
-    } catch (error) {
-        console.error('❌ خطأ في إنشاء النسخة الاحتياطية:', error);
-        res.status(500).json({
-            success: false,
-            message: 'حدث خطأ في الخادم',
-            code: 'SERVER_ERROR'
-        });
-    }
-});
-
-app.post('/api/admin/cleanup', authenticateToken, requireAdmin, async (req, res) => {
-    try {
-        const result = await localStorageService.cleanupOldData();
-        
-        if (result.success) {
-            await localStorageService.auditLog('CLEANUP_DATA', req.user._id, 'SYSTEM', 'cleanup', {
-                cleanedCount: result.cleanedCount
-            });
-            
-            res.json({
-                success: true,
-                message: `تم تنظيف ${result.cleanedCount} عنصر من البيانات القديمة بنجاح`
-            });
-        } else {
-            res.status(500).json({
-                success: false,
-                message: 'فشل في تنظيف البيانات',
-                error: result.error
-            });
-        }
-    } catch (error) {
-        console.error('❌ خطأ في تنظيف البيانات:', error);
-        res.status(500).json({
-            success: false,
-            message: 'حدث خطأ في الخادم',
-            code: 'SERVER_ERROR'
-        });
-    }
-});
-
-app.put('/api/admin/system-settings', authenticateToken, requireAdmin, async (req, res) => {
-    try {
-        const { maintenance, registrationEnabled, maxFileSize } = req.body;
-        
-        const data = localStorageService.loadData();
-        
-        if (maintenance !== undefined) {
-            data.systemSettings.maintenance = maintenance;
-        }
-        
-        if (registrationEnabled !== undefined) {
-            data.systemSettings.registrationEnabled = registrationEnabled;
-        }
-        
-        if (maxFileSize !== undefined) {
-            data.systemSettings.maxFileSize = maxFileSize;
-        }
-        
-        localStorageService.saveData(data);
-        
-        await localStorageService.auditLog('UPDATE_SYSTEM_SETTINGS', req.user._id, 'SYSTEM', 'settings', {
-            maintenance,
-            registrationEnabled,
-            maxFileSize
-        });
-
-        res.json({
-            success: true,
-            message: 'تم تحديث إعدادات النظام بنجاح',
-            data: {
-                settings: data.systemSettings
-            }
-        });
-    } catch (error) {
-        console.error('❌ خطأ في تحديث إعدادات النظام:', error);
-        res.status(500).json({
-            success: false,
-            message: 'حدث خطأ في الخادم',
-            code: 'SERVER_ERROR'
-        });
-    }
-});
-
-// مسارات النظام
-app.get('/api/system/health', (req, res) => {
+// مسار الحالة الصحية
+app.get('/api/health', (req, res) => {
     const stats = localStorageService.getStats();
-    const memoryUsage = process.memoryUsage();
+    const systemInfo = localStorageService.getSystemInfo();
     
     res.json({
         success: true,
@@ -3313,36 +2763,10 @@ app.get('/api/system/health', (req, res) => {
             status: 'healthy',
             timestamp: new Date().toISOString(),
             uptime: process.uptime(),
-            memory: {
-                used: Math.round(memoryUsage.heapUsed / 1024 / 1024),
-                total: Math.round(memoryUsage.heapTotal / 1024 / 1024),
-                rss: Math.round(memoryUsage.rss / 1024 / 1024)
-            },
-            nodeVersion: process.version,
-            platform: process.platform,
-            stats: stats
-        }
-    });
-});
-
-app.get('/api/system/info', authenticateToken, (req, res) => {
-    const data = localStorageService.loadData();
-    
-    res.json({
-        success: true,
-        data: {
-            version: '2.1.0',
-            environment: NODE_ENV,
-            systemSettings: data.systemSettings,
-            features: {
-                chat: true,
-                channels: true,
-                groups: true,
-                stories: true,
-                fileSharing: true,
-                realTime: true,
-                notifications: true
-            }
+            memory: process.memoryUsage(),
+            connectedUsers: connectedUsers.size,
+            stats: stats,
+            system: systemInfo
         }
     });
 });
@@ -3368,9 +2792,10 @@ app.post('/api/upload', authenticateToken, upload.single('file'), async (req, re
             uploadedAt: new Date().toISOString()
         };
 
-        await localStorageService.auditLog('UPLOAD_FILE', req.user._id, 'FILE', req.file.filename, {
+        await auditLog('UPLOAD_FILE', req.user._id, 'FILE', req.file.filename, {
             size: req.file.size,
-            type: req.file.mimetype
+            type: req.file.mimetype,
+            originalName: req.file.originalname
         });
 
         res.json({
@@ -3389,42 +2814,225 @@ app.post('/api/upload', authenticateToken, upload.single('file'), async (req, re
     }
 });
 
-// نظام WebSocket
-const connectedUsers = new Map();
+// مسارات الإدارة
+app.get('/api/admin/stats', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const stats = localStorageService.getStats();
+        const systemInfo = localStorageService.getSystemInfo();
+        const onlineUsers = await localStorageService.getOnlineUsers();
+        
+        res.json({
+            success: true,
+            data: {
+                stats,
+                system: systemInfo,
+                onlineUsers: onlineUsers.map(user => localStorageService.formatUserResponse(user)),
+                connectedSockets: connectedUsers.size
+            }
+        });
+    } catch (error) {
+        console.error('❌ خطأ في جلب إحصائيات النظام:', error);
+        res.status(500).json({
+            success: false,
+            message: 'حدث خطأ في الخادم',
+            code: 'SERVER_ERROR'
+        });
+    }
+});
+
+app.post('/api/admin/backup', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const result = await localStorageService.createBackup();
+        
+        if (result.success) {
+            await auditLog('CREATE_BACKUP', req.user._id, 'SYSTEM', 'backup', {
+                filename: result.filename
+            });
+            
+            res.json({
+                success: true,
+                message: 'تم إنشاء النسخة الاحتياطية بنجاح',
+                data: result
+            });
+        } else {
+            res.status(500).json({
+                success: false,
+                message: 'فشل في إنشاء النسخة الاحتياطية',
+                error: result.error
+            });
+        }
+    } catch (error) {
+        console.error('❌ خطأ في إنشاء النسخة الاحتياطية:', error);
+        res.status(500).json({
+            success: false,
+            message: 'حدث خطأ في الخادم',
+            code: 'SERVER_ERROR'
+        });
+    }
+});
+
+app.post('/api/admin/cleanup', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const result = await localStorageService.cleanupOldData();
+        
+        if (result.success) {
+            await auditLog('CLEANUP_DATA', req.user._id, 'SYSTEM', 'cleanup', {
+                cleanedCount: result.cleanedCount
+            });
+            
+            res.json({
+                success: true,
+                message: 'تم تنظيف البيانات القديمة بنجاح',
+                data: result
+            });
+        } else {
+            res.status(500).json({
+                success: false,
+                message: 'فشل في تنظيف البيانات',
+                error: result.error
+            });
+        }
+    } catch (error) {
+        console.error('❌ خطأ في تنظيف البيانات:', error);
+        res.status(500).json({
+            success: false,
+            message: 'حدث خطأ في الخادم',
+            code: 'SERVER_ERROR'
+        });
+    }
+});
+
+app.post('/api/admin/export', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const { format = 'json' } = req.body;
+        const result = await localStorageService.exportData(format);
+        
+        if (result.success) {
+            await auditLog('EXPORT_DATA', req.user._id, 'SYSTEM', 'export', {
+                format,
+                filename: result.filename
+            });
+            
+            res.json({
+                success: true,
+                message: 'تم تصدير البيانات بنجاح',
+                data: result
+            });
+        } else {
+            res.status(500).json({
+                success: false,
+                message: 'فشل في تصدير البيانات',
+                error: result.error
+            });
+        }
+    } catch (error) {
+        console.error('❌ خطأ في تصدير البيانات:', error);
+        res.status(500).json({
+            success: false,
+            message: 'حدث خطأ في الخادم',
+            code: 'SERVER_ERROR'
+        });
+    }
+});
+
+// ==================== نظام WebSocket المحسن ====================
 
 io.on('connection', (socket) => {
     console.log('🔌 مستخدم متصل:', socket.id);
 
-    socket.on('authenticate', async (token) => {
+    socket.on('authenticate', async (data) => {
         try {
+            const { token } = data;
+            if (!token) {
+                socket.emit('authentication_failed', { message: 'رمز المصادقة مطلوب' });
+                return;
+            }
+
             const decoded = jwt.verify(token, JWT_SECRET);
             const user = await localStorageService.findUserById(decoded.userId);
             
-            if (user) {
-                socket.userId = user._id;
-                connectedUsers.set(user._id, socket.id);
-                
-                await localStorageService.updateUser(user._id, {
-                    isOnline: true,
-                    lastSeen: new Date().toISOString()
-                });
-                
-                socket.join(user._id);
-                
-                socket.emit('authenticated', {
-                    success: true,
-                    user: localStorageService.formatUserResponse(user)
-                });
-                
-                console.log(`✅ تم توثيق المستخدم: ${user.fullName}`);
+            if (!user) {
+                socket.emit('authentication_failed', { message: 'المستخدم غير موجود' });
+                return;
             }
-        } catch (error) {
-            console.error('❌ خطأ في توثيق WebSocket:', error);
-            socket.emit('authenticated', {
-                success: false,
-                message: 'رمز وصول غير صالح'
+
+            socket.userId = user._id;
+            connectedUsers.set(user._id, socket.id);
+            userSockets.set(socket.id, user._id);
+
+            await localStorageService.updateUser(user._id, {
+                isOnline: true,
+                lastSeen: new Date().toISOString()
             });
+
+            socket.join(`user:${user._id}`);
+            
+            // الانضمام للقنوات والمجموعات الخاصة بالمستخدم
+            const userChannels = await localStorageService.getUserChannels(user._id);
+            userChannels.forEach(channel => {
+                socket.join(`channel:${channel._id}`);
+            });
+
+            const userGroups = await localStorageService.getUserGroups(user._id);
+            userGroups.forEach(group => {
+                socket.join(`group:${group._id}`);
+            });
+
+            // إعلام الآخرين بتحديث حالة المستخدم
+            io.emit('user_status_changed', {
+                userId: user._id,
+                isOnline: true,
+                lastSeen: new Date().toISOString(),
+                user: localStorageService.formatUserResponse(user)
+            });
+
+            socket.emit('authenticated', { 
+                user: localStorageService.formatUserResponse(user),
+                message: 'تم المصادقة بنجاح'
+            });
+
+            console.log(`✅ تم مصادقة المستخدم: ${user.fullName} (${socket.id})`);
+
+        } catch (error) {
+            console.error('❌ خطأ في مصادقة السوكت:', error);
+            socket.emit('authentication_failed', { message: 'فشل المصادقة' });
         }
+    });
+
+    socket.on('join_conversation', (conversationId) => {
+        if (socket.userId) {
+            socket.join(`conversation:${conversationId}`);
+            console.log(`💬 المستخدم ${socket.userId} انضم للمحادثة ${conversationId}`);
+        }
+    });
+
+    socket.on('leave_conversation', (conversationId) => {
+        socket.leave(`conversation:${conversationId}`);
+        console.log(`💬 المستخدم ${socket.userId} غادر المحادثة ${conversationId}`);
+    });
+
+    socket.on('join_channel', (channelId) => {
+        if (socket.userId) {
+            socket.join(`channel:${channelId}`);
+            console.log(`📺 المستخدم ${socket.userId} انضم للقناة ${channelId}`);
+        }
+    });
+
+    socket.on('leave_channel', (channelId) => {
+        socket.leave(`channel:${channelId}`);
+        console.log(`📺 المستخدم ${socket.userId} غادر القناة ${channelId}`);
+    });
+
+    socket.on('join_group', (groupId) => {
+        if (socket.userId) {
+            socket.join(`group:${groupId}`);
+            console.log(`👥 المستخدم ${socket.userId} انضم للمجموعة ${groupId}`);
+        }
+    });
+
+    socket.on('leave_group', (groupId) => {
+        socket.leave(`group:${groupId}`);
+        console.log(`👥 المستخدم ${socket.userId} غادر المجموعة ${groupId}`);
     });
 
     socket.on('send_message', async (data) => {
@@ -3434,10 +3042,21 @@ io.on('connection', (socket) => {
                 return;
             }
 
-            const { conversationId, content } = data;
+            const { conversationId, content, type = 'text', metadata = {} } = data;
             
-            if (!conversationId || !content) {
+            if (!conversationId || (!content && type === 'text')) {
                 socket.emit('error', { message: 'معرف المحادثة والمحتوى مطلوبان' });
+                return;
+            }
+
+            const conversation = await localStorageService.getConversationById(conversationId);
+            if (!conversation) {
+                socket.emit('error', { message: 'المحادثة غير موجودة' });
+                return;
+            }
+
+            if (!conversation.participants.includes(socket.userId)) {
+                socket.emit('error', { message: 'غير مصرح لك بإرسال رسائل في هذه المحادثة' });
                 return;
             }
 
@@ -3445,18 +3064,24 @@ io.on('connection', (socket) => {
                 conversationId,
                 senderId: socket.userId,
                 content,
-                type: 'text'
+                type,
+                metadata
             });
 
-            const conversation = await localStorageService.getConversationById(conversationId);
-            if (conversation) {
-                conversation.participants.forEach(participantId => {
-                    io.to(participantId).emit('new_message', {
-                        conversationId,
-                        message
-                    });
+            const sender = await localStorageService.findUserById(socket.userId);
+
+            // إرسال الرسالة لجميع المشاركين في المحادثة
+            conversation.participants.forEach(participantId => {
+                io.to(`user:${participantId}`).emit('new_message', {
+                    conversationId,
+                    message: {
+                        ...message,
+                        sender: localStorageService.formatUserResponse(sender)
+                    }
                 });
-            }
+            });
+
+            console.log(`💬 رسالة جديدة في المحادثة ${conversationId} من ${sender.fullName}`);
 
         } catch (error) {
             console.error('❌ خطأ في إرسال الرسالة:', error);
@@ -3464,22 +3089,221 @@ io.on('connection', (socket) => {
         }
     });
 
-    socket.on('disconnect', async () => {
-        console.log('🔌 مستخدم منقطع:', socket.id);
-        
-        if (socket.userId) {
-            connectedUsers.delete(socket.userId);
-            
-            try {
-                await localStorageService.updateUser(socket.userId, {
-                    isOnline: false,
-                    lastSeen: new Date().toISOString()
-                });
-            } catch (error) {
-                console.error('❌ خطأ في تحديث حالة المستخدم:', error);
+    socket.on('send_channel_message', async (data) => {
+        try {
+            if (!socket.userId) {
+                socket.emit('error', { message: 'غير مصرح به' });
+                return;
             }
+
+            const { channelId, content, type = 'text', metadata = {} } = data;
+            
+            if (!channelId || (!content && type === 'text')) {
+                socket.emit('error', { message: 'معرف القناة والمحتوى مطلوبان' });
+                return;
+            }
+
+            const channel = await localStorageService.getChannelById(channelId);
+            if (!channel) {
+                socket.emit('error', { message: 'القناة غير موجودة' });
+                return;
+            }
+
+            if (!channel.members.includes(socket.userId) && !channel.admins.includes(socket.userId)) {
+                socket.emit('error', { message: 'لست عضواً في هذه القناة' });
+                return;
+            }
+
+            const message = await localStorageService.createChannelMessage({
+                channelId,
+                senderId: socket.userId,
+                content,
+                type,
+                metadata
+            });
+
+            const sender = await localStorageService.findUserById(socket.userId);
+
+            io.to(`channel:${channelId}`).emit('new_channel_message', {
+                channelId,
+                message: {
+                    ...message,
+                    sender: localStorageService.formatUserResponse(sender)
+                }
+            });
+
+            console.log(`📢 رسالة جديدة في القناة ${channelId} من ${sender.fullName}`);
+
+        } catch (error) {
+            console.error('❌ خطأ في إرسال رسالة القناة:', error);
+            socket.emit('error', { message: 'فشل إرسال رسالة القناة' });
         }
     });
+
+    socket.on('send_group_message', async (data) => {
+        try {
+            if (!socket.userId) {
+                socket.emit('error', { message: 'غير مصرح به' });
+                return;
+            }
+
+            const { groupId, content, type = 'text', metadata = {} } = data;
+            
+            if (!groupId || (!content && type === 'text')) {
+                socket.emit('error', { message: 'معرف المجموعة والمحتوى مطلوبان' });
+                return;
+            }
+
+            const group = await localStorageService.getGroupById(groupId);
+            if (!group) {
+                socket.emit('error', { message: 'المجموعة غير موجودة' });
+                return;
+            }
+
+            if (!group.members.includes(socket.userId)) {
+                socket.emit('error', { message: 'لست عضواً في هذه المجموعة' });
+                return;
+            }
+
+            const message = await localStorageService.createGroupMessage({
+                groupId,
+                senderId: socket.userId,
+                content,
+                type,
+                metadata
+            });
+
+            const sender = await localStorageService.findUserById(socket.userId);
+
+            io.to(`group:${groupId}`).emit('new_group_message', {
+                groupId,
+                message: {
+                    ...message,
+                    sender: localStorageService.formatUserResponse(sender)
+                }
+            });
+
+            console.log(`👥 رسالة جديدة في المجموعة ${groupId} من ${sender.fullName}`);
+
+        } catch (error) {
+            console.error('❌ خطأ في إرسال رسالة المجموعة:', error);
+            socket.emit('error', { message: 'فشل إرسال رسالة المجموعة' });
+        }
+    });
+
+    socket.on('typing_start', (data) => {
+        const { conversationId } = data;
+        if (conversationId && socket.userId) {
+            socket.to(`conversation:${conversationId}`).emit('user_typing', {
+                userId: socket.userId,
+                conversationId,
+                isTyping: true
+            });
+        }
+    });
+
+    socket.on('typing_stop', (data) => {
+        const { conversationId } = data;
+        if (conversationId && socket.userId) {
+            socket.to(`conversation:${conversationId}`).emit('user_typing', {
+                userId: socket.userId,
+                conversationId,
+                isTyping: false
+            });
+        }
+    });
+
+    socket.on('mark_messages_read', async (data) => {
+        try {
+            const { conversationId } = data;
+            if (conversationId && socket.userId) {
+                await localStorageService.markMessagesAsRead(conversationId, socket.userId);
+                socket.emit('messages_marked_read', { conversationId });
+            }
+        } catch (error) {
+            console.error('❌ خطأ في تحديد الرسائل كمقروءة:', error);
+        }
+    });
+
+    socket.on('message_reaction', async (data) => {
+        try {
+            const { messageId, reaction } = data;
+            if (messageId && reaction && socket.userId) {
+                const updatedMessage = await localStorageService.addReactionToMessage(
+                    messageId, 
+                    socket.userId, 
+                    reaction
+                );
+                
+                if (updatedMessage) {
+                    // إرسال تحديث التفاعل لجميع المشاركين
+                    const conversation = await localStorageService.getConversationById(updatedMessage.conversationId);
+                    if (conversation) {
+                        conversation.participants.forEach(participantId => {
+                            io.to(`user:${participantId}`).emit('message_reaction_updated', {
+                                messageId,
+                                reactions: updatedMessage.reactions
+                            });
+                        });
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('❌ خطأ في إضافة تفاعل الرسالة:', error);
+        }
+    });
+
+    socket.on('disconnect', async () => {
+        console.log('🔌 مستخدم منفصل:', socket.id);
+        
+        const userId = userSockets.get(socket.id);
+        if (userId) {
+            await localStorageService.updateUser(userId, {
+                isOnline: false,
+                lastSeen: new Date().toISOString()
+            });
+
+            // إعلام الآخرين بتحديث حالة المستخدم
+            io.emit('user_status_changed', {
+                userId,
+                isOnline: false,
+                lastSeen: new Date().toISOString()
+            });
+
+            connectedUsers.delete(userId);
+            userSockets.delete(socket.id);
+        }
+    });
+});
+
+// وظائف الخلفية المجدولة
+setInterval(async () => {
+    try {
+        await localStorageService.cleanupOldData();
+        console.log('🧹 تم تنظيف البيانات القديمة تلقائياً');
+    } catch (error) {
+        console.error('❌ خطأ في التنظيف التلقائي:', error);
+    }
+}, 60 * 60 * 1000); // كل ساعة
+
+setInterval(async () => {
+    try {
+        if (NODE_ENV === 'production') {
+            await localStorageService.createBackup();
+            console.log('💾 تم إنشاء نسخة احتياطية تلقائية');
+        }
+    } catch (error) {
+        console.error('❌ خطأ في النسخ الاحتياطي التلقائي:', error);
+    }
+}, 24 * 60 * 60 * 1000); // كل 24 ساعة
+
+// معالجة الأخطاء غير المعالجة
+process.on('uncaughtException', (error) => {
+    console.error('❌ خطأ غير معالج:', error);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('❌ وعد مرفوض غير معالج:', reason);
 });
 
 // بدء الخادم
@@ -3488,18 +3312,39 @@ async function startServer() {
         // إنشاء حساب المدير الافتراضي
         await createDefaultAdmin();
         
+        // إنشاء بيانات تجريبية في وضع التطوير
+        if (NODE_ENV === 'development') {
+            await createSampleData();
+        }
+        
+        // تنظيف البيانات القديمة عند البدء
+        await localStorageService.cleanupOldData();
+        
         server.listen(PORT, '0.0.0.0', () => {
-            console.log('\n' + '='.repeat(50));
-            console.log('🚀 خادم المنصة التعليمية يعمل بنجاح!');
-            console.log('='.repeat(50));
+            console.log('\n' + '='.repeat(70));
+            console.log('🚀 خادم المنصة التعليمية المتكامل يعمل بنجاح!');
+            console.log('='.repeat(70));
             console.log(`📍 العنوان: http://localhost:${PORT}`);
-            console.log(`⏰ الوقت: ${new Date().toLocaleString()}`);
+            console.log(`🌍 البيئة: ${NODE_ENV}`);
+            console.log(`⏰ الوقت: ${new Date().toLocaleString('ar-SA')}`);
             console.log(`👥 المستخدمون المتصلون: ${connectedUsers.size}`);
-            console.log('='.repeat(50));
+            console.log(`💾 قاعدة البيانات: ${localStorageService.dataFile}`);
+            console.log('='.repeat(70));
+            console.log('\n📋 نقاط النهاية المتاحة:');
+            console.log(`   🔐 المصادقة: POST http://localhost:${PORT}/api/auth/login`);
+            console.log(`   👤 المستخدمون: GET http://localhost:${PORT}/api/users/me`);
+            console.log(`   💬 المحادثات: GET http://localhost:${PORT}/api/chat/conversations`);
+            console.log(`   📺 القنوات: GET http://localhost:${PORT}/api/channels`);
+            console.log(`   👥 المجموعات: GET http://localhost:${PORT}/api/groups`);
+            console.log(`   📸 الستوريات: GET http://localhost:${PORT}/api/stories`);
+            console.log(`   🛠️ الإدارة: GET http://localhost:${PORT}/api/admin/stats`);
+            console.log(`   ❤️ الصحة: GET http://localhost:${PORT}/api/health`);
+            console.log(`   📁 التحميل: POST http://localhost:${PORT}/api/upload`);
+            console.log('='.repeat(70));
             console.log('\n🔐 حساب المدير الافتراضي:');
-            console.log('   📧 البريد: admin@platform.edu');
+            console.log('   📧 البريد الإلكتروني: admin@platform.edu');
             console.log('   🔑 كلمة المرور: 77007700');
-            console.log('='.repeat(50));
+            console.log('='.repeat(70));
         });
     } catch (error) {
         console.error('❌ فشل في بدء الخادم:', error);
@@ -3509,4 +3354,4 @@ async function startServer() {
 
 startServer();
 
-export default app;
+export { app, io, localStorageService };
