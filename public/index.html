@@ -5,8 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>المنصة التعليمية المتطورة - نظام الإدارة المتكامل</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/emoji-picker-element@1.14.0/index.min.css">
     <link rel="stylesheet" href="css/css.css">
     <script src="/socket.io/socket.io.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/emoji-picker-element@1.14.0/index.min.js"></script>
 </head>
 <body>
     <!-- شاشة الترحيب -->
@@ -49,7 +51,22 @@
     <!-- حالة الاتصال -->
     <div class="connection-status" id="connectionStatus">
         <i class="fas fa-wifi"></i>
-        <span>جاري الاتصال...</span>
+        <span>متصل بالإنترنت</span>
+    </div>
+
+    <!-- إشعار التحديث -->
+    <div class="update-notification" id="updateNotification" style="display: none;">
+        <div class="update-content">
+            <i class="fas fa-sync-alt fa-spin"></i>
+            <div class="update-info">
+                <strong>تحديث جديد متاح</strong>
+                <span>يتم تحميل التحديثات تلقائياً</span>
+            </div>
+        </div>
+        <button class="btn btn-sm btn-outline" id="reloadBtn">
+            <i class="fas fa-redo"></i>
+            تحديث الآن
+        </button>
     </div>
 
     <!-- الهيدر -->
@@ -77,6 +94,7 @@
                 <a href="#" class="nav-item" data-page="chat">
                     <i class="fas fa-comments"></i>
                     الدردشة
+                    <span class="nav-item-badge" id="unreadMessagesCount">0</span>
                 </a>
                 <a href="#" class="nav-item" data-page="stories">
                     <i class="fas fa-history"></i>
@@ -89,6 +107,10 @@
                 <a href="#" class="nav-item" data-page="channels">
                     <i class="fas fa-broadcast-tower"></i>
                     القنوات
+                </a>
+                <a href="#" class="nav-item" data-page="media">
+                    <i class="fas fa-photo-video"></i>
+                    الوسائط
                 </a>
                 <a href="#" class="nav-item hidden" id="loginBtn" data-page="login">
                     <i class="fas fa-sign-in-alt"></i>
@@ -134,6 +156,7 @@
             <a href="#" class="nav-item" data-page="chat">
                 <i class="fas fa-comments"></i>
                 الدردشة
+                <span class="nav-item-badge" id="unreadMessagesCountMobile">0</span>
             </a>
             <a href="#" class="nav-item" data-page="stories">
                 <i class="fas fa-history"></i>
@@ -146,6 +169,10 @@
             <a href="#" class="nav-item" data-page="channels">
                 <i class="fas fa-broadcast-tower"></i>
                 القنوات
+            </a>
+            <a href="#" class="nav-item" data-page="media">
+                <i class="fas fa-photo-video"></i>
+                الوسائط
             </a>
             <a href="#" class="nav-item hidden" id="loginBtnMobile" data-page="login">
                 <i class="fas fa-sign-in-alt"></i>
@@ -219,6 +246,20 @@
                         </div>
                         <h3>القصص التعليمية</h3>
                         <p>شارك تجاربك التعليمية عبر القصص التفاعلية</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="fas fa-photo-video"></i>
+                        </div>
+                        <h3>وسائط متعددة</h3>
+                        <p>شارك ومشاهدة الوسائط التعليمية بجودة عالية</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="fas fa-chart-line"></i>
+                        </div>
+                        <h3>تتبع التقدم</h3>
+                        <p>تابع تقدمك التعليمي واحصل على تقارير أداء مفصلة</p>
                     </div>
                 </div>
             </div>
@@ -302,9 +343,10 @@
         <!-- صفحة الدردشة -->
         <div class="page" id="chat-page">
             <div class="chat-container">
-                <div class="chat-sidebar">
+                <div class="chat-sidebar active" id="chatSidebar">
                     <div class="chat-header">
                         <h3>المحادثات</h3>
+                        <!-- زر إنشاء محادثة جديدة سيتم إضافته ديناميكياً -->
                     </div>
                     
                     <div class="chat-search">
@@ -317,7 +359,7 @@
                 </div>
                 
                 <div class="chat-main">
-                    <div class="chat-header">
+                    <div class="chat-header" id="activeChatHeader">
                         <div class="chat-user-info">
                             <div class="conversation-avatar small">
                                 <span id="activeChatAvatar">?</span>
@@ -326,6 +368,17 @@
                                 <div class="conversation-name" id="activeChatName">اختر محادثة</div>
                                 <div class="user-status-text" id="activeChatStatus">غير متصل</div>
                             </div>
+                        </div>
+                        <div class="chat-actions">
+                            <button class="chat-tool-btn" id="voiceCallBtn" title="مكالمة صوتية">
+                                <i class="fas fa-phone"></i>
+                            </button>
+                            <button class="chat-tool-btn" id="videoCallBtn" title="مكالمة فيديو">
+                                <i class="fas fa-video"></i>
+                            </button>
+                            <button class="chat-toggle" id="chatToggleMain">
+                                <i class="fas fa-bars"></i>
+                            </button>
                         </div>
                     </div>
                     
@@ -338,6 +391,16 @@
                     </div>
                     
                     <div class="chat-input-container" id="chatInputContainer" style="display: none;">
+                        <div class="chat-input-tools">
+                            <button class="chat-tool-btn" id="attachFileBtn" title="إرفاق ملف">
+                                <i class="fas fa-paperclip"></i>
+                            </button>
+                            <button class="chat-tool-btn" id="emojiToggle" title="إدراج إيموجي">
+                                <i class="fas fa-smile"></i>
+                            </button>
+                            <input type="file" id="fileInput" style="display: none;" accept="image/*,video/*,audio/*,.pdf,.doc,.docx">
+                        </div>
+                        
                         <div class="chat-input-wrapper">
                             <input type="text" placeholder="اكتب رسالة..." id="chatInput">
                         </div>
@@ -345,6 +408,10 @@
                         <button class="send-btn" id="sendMessageBtn">
                             <i class="fas fa-paper-plane"></i>
                         </button>
+                    </div>
+                    
+                    <div class="emoji-picker-container" id="emojiPickerContainer">
+                        <emoji-picker></emoji-picker>
                     </div>
                 </div>
             </div>
@@ -357,10 +424,41 @@
                     <i class="fas fa-history"></i>
                     القصص
                 </h1>
+                <button class="btn btn-primary" id="createStoryBtn">
+                    <i class="fas fa-plus"></i>
+                    إضافة قصة
+                </button>
             </div>
             
             <div class="stories-container" id="storiesContainer">
                 <!-- سيتم ملء القصص ديناميكياً -->
+            </div>
+
+            <div class="story-viewer" id="storyViewer">
+                <button class="story-close" id="storyClose">
+                    <i class="fas fa-times"></i>
+                </button>
+                <div class="story-content">
+                    <div class="story-progress" id="storyProgress">
+                        <!-- سيتم ملء شريط التقدم ديناميكياً -->
+                    </div>
+                    <img id="currentStoryImage" src="" alt="قصة">
+                    <div class="story-info">
+                        <div class="story-author-avatar">
+                            <span id="storyAuthorAvatar">?</span>
+                        </div>
+                        <div class="story-author-info">
+                            <div class="story-author-name" id="storyAuthorName"></div>
+                            <div class="story-time" id="storyTime"></div>
+                        </div>
+                    </div>
+                    <div class="story-nav prev" id="storyPrev">
+                        <i class="fas fa-chevron-right"></i>
+                    </div>
+                    <div class="story-nav next" id="storyNext">
+                        <i class="fas fa-chevron-left"></i>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -371,6 +469,10 @@
                     <i class="fas fa-users"></i>
                     المجموعات التعليمية
                 </h1>
+                <button class="btn btn-primary" id="createGroupBtn">
+                    <i class="fas fa-plus"></i>
+                    إنشاء مجموعة
+                </button>
             </div>
             
             <div class="groups-grid" id="groupsGrid">
@@ -385,15 +487,419 @@
                     <i class="fas fa-broadcast-tower"></i>
                     القنوات التعليمية
                 </h1>
+                <button class="btn btn-primary" id="createChannelBtn">
+                    <i class="fas fa-plus"></i>
+                    إنشاء قناة
+                </button>
             </div>
             
             <div class="channels-grid" id="channelsGrid">
                 <!-- سيتم ملء القنوات ديناميكياً -->
             </div>
         </div>
+
+        <!-- صفحة الوسائط -->
+        <div class="page" id="media-page">
+            <div class="media-header">
+                <h1 class="section-title">
+                    <i class="fas fa-photo-video"></i>
+                    الوسائط التعليمية
+                </h1>
+                <div class="media-actions">
+                    <button class="btn btn-primary" id="uploadMediaBtn">
+                        <i class="fas fa-upload"></i>
+                        رفع وسائط
+                    </button>
+                    <div class="media-filter">
+                        <select id="mediaFilter">
+                            <option value="all">جميع الوسائط</option>
+                            <option value="image">الصور</option>
+                            <option value="video">الفيديوهات</option>
+                            <option value="document">المستندات</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="media-grid" id="mediaGrid">
+                <!-- سيتم ملء الوسائط ديناميكياً -->
+            </div>
+        </div>
+
+        <!-- صفحة الإعدادات -->
+        <div class="page" id="settings-page">
+            <div class="settings-container">
+                <h1 class="section-title">
+                    <i class="fas fa-cog"></i>
+                    الإعدادات
+                </h1>
+                
+                <div class="settings-grid">
+                    <div class="settings-sidebar">
+                        <div class="settings-nav">
+                            <button class="settings-nav-item active" data-tab="profile">
+                                <i class="fas fa-user"></i>
+                                الملف الشخصي
+                            </button>
+                            <button class="settings-nav-item" data-tab="privacy">
+                                <i class="fas fa-shield-alt"></i>
+                                الخصوصية
+                            </button>
+                            <button class="settings-nav-item" data-tab="notifications">
+                                <i class="fas fa-bell"></i>
+                                الإشعارات
+                            </button>
+                            <button class="settings-nav-item" data-tab="appearance">
+                                <i class="fas fa-palette"></i>
+                                المظهر
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="settings-content">
+                        <div class="settings-tab active" id="profile-tab">
+                            <h3>الملف الشخصي</h3>
+                            <form class="settings-form">
+                                <div class="form-group">
+                                    <label for="profileName">الاسم الكامل</label>
+                                    <input type="text" id="profileName" value="محمد أحمد">
+                                </div>
+                                <div class="form-group">
+                                    <label for="profileEmail">البريد الإلكتروني</label>
+                                    <input type="email" id="profileEmail" value="mohamed@example.com">
+                                </div>
+                                <div class="form-group">
+                                    <label for="profileBio">نبذة شخصية</label>
+                                    <textarea id="profileBio" rows="4" placeholder="اكتب نبذة عن نفسك..."></textarea>
+                                </div>
+                                <button type="submit" class="btn btn-primary">حفظ التغييرات</button>
+                            </form>
+                        </div>
+                        
+                        <div class="settings-tab" id="privacy-tab">
+                            <h3>إعدادات الخصوصية</h3>
+                            <div class="privacy-settings">
+                                <div class="privacy-item">
+                                    <div class="privacy-info">
+                                        <h4>إظهار حالة الاتصال</h4>
+                                        <p>السماح للآخرين برؤية ما إذا كنت متصلاً أم لا</p>
+                                    </div>
+                                    <label class="switch">
+                                        <input type="checkbox" checked>
+                                        <span class="slider"></span>
+                                    </label>
+                                </div>
+                                <div class="privacy-item">
+                                    <div class="privacy-info">
+                                        <h4>إظهار آخر ظهور</h4>
+                                        <p>السماح للآخرين برؤية وقت آخر ظهور لك</p>
+                                    </div>
+                                    <label class="switch">
+                                        <input type="checkbox" checked>
+                                        <span class="slider"></span>
+                                    </label>
+                                </div>
+                                <div class="privacy-item">
+                                    <div class="privacy-info">
+                                        <h4>الملف الشخصي العام</h4>
+                                        <p>جعل ملفك الشخصي مرئياً للجميع</p>
+                                    </div>
+                                    <label class="switch">
+                                        <input type="checkbox">
+                                        <span class="slider"></span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="settings-tab" id="notifications-tab">
+                            <h3>إعدادات الإشعارات</h3>
+                            <div class="privacy-settings">
+                                <div class="privacy-item">
+                                    <div class="privacy-info">
+                                        <h4>إشعارات الرسائل</h4>
+                                        <p>تلقي إشعارات عند وصول رسائل جديدة</p>
+                                    </div>
+                                    <label class="switch">
+                                        <input type="checkbox" checked>
+                                        <span class="slider"></span>
+                                    </label>
+                                </div>
+                                <div class="privacy-item">
+                                    <div class="privacy-info">
+                                        <h4>إشعارات المجموعات</h4>
+                                        <p>تلقي إشعارات من المجموعات</p>
+                                    </div>
+                                    <label class="switch">
+                                        <input type="checkbox" checked>
+                                        <span class="slider"></span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="settings-tab" id="appearance-tab">
+                            <h3>إعدادات المظهر</h3>
+                            <div class="form-group">
+                                <label for="themeSelect">السمة</label>
+                                <select id="themeSelect" class="form-control">
+                                    <option value="auto">تلقائي</option>
+                                    <option value="light">فاتح</option>
+                                    <option value="dark">داكن</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="fontSize">حجم الخط</label>
+                                <select id="fontSize" class="form-control">
+                                    <option value="small">صغير</option>
+                                    <option value="medium" selected>متوسط</option>
+                                    <option value="large">كبير</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </main>
 
+    <!-- شريط الأدوات السريع -->
+    <div class="quick-actions-bar" id="quickActionsBar">
+        <button class="quick-action" data-page="chat" title="الدردشة">
+            <i class="fas fa-comments"></i>
+        </button>
+        <button class="quick-action" data-page="stories" title="القصص">
+            <i class="fas fa-history"></i>
+        </button>
+        <button class="quick-action" data-page="groups" title="المجموعات">
+            <i class="fas fa-users"></i>
+        </button>
+        <button class="quick-action" data-page="channels" title="القنوات">
+            <i class="fas fa-broadcast-tower"></i>
+        </button>
+    </div>
+
+    <!-- الزر العائم -->
+    <button class="floating-action-btn" id="floatingActionBtn">
+        <i class="fas fa-plus"></i>
+    </button>
+
+    <!-- نافذة إنشاء مجموعة -->
+    <div class="modal" id="createGroupModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>إنشاء مجموعة جديدة</h3>
+                <button class="modal-close" id="closeGroupModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="createGroupForm">
+                    <div class="form-group">
+                        <label for="groupName">اسم المجموعة</label>
+                        <input type="text" id="groupName" name="groupName" required placeholder="ادخل اسم المجموعة">
+                    </div>
+                    <div class="form-group">
+                        <label for="groupDescription">وصف المجموعة</label>
+                        <textarea id="groupDescription" name="groupDescription" rows="3" placeholder="ادخل وصف المجموعة"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="groupPrivacy">خصوصية المجموعة</label>
+                        <select id="groupPrivacy" name="groupPrivacy">
+                            <option value="public">عامة</option>
+                            <option value="private">خاصة</option>
+                        </select>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" class="btn btn-outline" id="cancelGroupBtn">إلغاء</button>
+                        <button type="submit" class="btn btn-primary">إنشاء المجموعة</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- نافذة إنشاء قناة -->
+    <div class="modal" id="createChannelModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>إنشاء قناة جديدة</h3>
+                <button class="modal-close" id="closeChannelModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="createChannelForm">
+                    <div class="form-group">
+                        <label for="channelName">اسم القناة</label>
+                        <input type="text" id="channelName" name="channelName" required placeholder="ادخل اسم القناة">
+                    </div>
+                    <div class="form-group">
+                        <label for="channelDescription">وصف القناة</label>
+                        <textarea id="channelDescription" name="channelDescription" rows="3" placeholder="ادخل وصف القناة"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="channelCategory">تصنيف القناة</label>
+                        <select id="channelCategory" name="channelCategory">
+                            <option value="education">تعليمي</option>
+                            <option value="entertainment">ترفيهي</option>
+                            <option value="news">أخباري</option>
+                            <option value="technology">تكنولوجيا</option>
+                        </select>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" class="btn btn-outline" id="cancelChannelBtn">إلغاء</button>
+                        <button type="submit" class="btn btn-primary">إنشاء القناة</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- نافذة رفع الوسائط -->
+    <div class="modal" id="uploadMediaModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>رفع وسائط جديدة</h3>
+                <button class="modal-close" id="closeUploadModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="uploadMediaForm">
+                    <div class="upload-area" id="uploadArea">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                        <p>اسحب وأفلت الملفات هنا أو انقر للاختيار</p>
+                        <input type="file" id="mediaFileInput" multiple style="display: none;" accept="image/*,video/*,.pdf,.doc,.docx">
+                    </div>
+                    <div class="form-group">
+                        <label for="mediaTitle">عنوان الوسائط</label>
+                        <input type="text" id="mediaTitle" placeholder="ادخل عنوان الوسائط">
+                    </div>
+                    <div class="form-group">
+                        <label for="mediaDescription">وصف الوسائط</label>
+                        <textarea id="mediaDescription" rows="3" placeholder="ادخل وصف الوسائط"></textarea>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" class="btn btn-outline" id="cancelUploadBtn">إلغاء</button>
+                        <button type="submit" class="btn btn-primary">رفع الوسائط</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- نافذة إنشاء قصة -->
+    <div class="modal" id="createStoryModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>إنشاء قصة جديدة</h3>
+                <button class="modal-close" id="closeStoryModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="createStoryForm">
+                    <div class="upload-area" id="storyUploadArea">
+                        <i class="fas fa-camera"></i>
+                        <p>انقر لاختيار صورة أو فيديو للقصة</p>
+                        <input type="file" id="storyFileInput" style="display: none;" accept="image/*,video/*">
+                    </div>
+                    <div class="form-group">
+                        <label for="storyCaption">تعليق القصة</label>
+                        <textarea id="storyCaption" rows="3" placeholder="اكتب تعليقاً للقصة..."></textarea>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" class="btn btn-outline" id="cancelStoryBtn">إلغاء</button>
+                        <button type="submit" class="btn btn-primary">نشر القصة</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <!-- السكريبتات -->
+    <script src="js/config.js"></script>
     <script src="js/app.js"></script>
+
+    <style>
+        /* إضافات للتبديل بين علامات الإعدادات */
+        .settings-tab {
+            display: none;
+        }
+
+        .settings-tab.active {
+            display: block;
+        }
+
+        .settings-nav-item {
+            width: 100%;
+            padding: 1rem;
+            border: none;
+            background: none;
+            text-align: right;
+            cursor: pointer;
+            border-radius: 8px;
+            margin-bottom: 0.5rem;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .settings-nav-item:hover {
+            background: #f8f9fa;
+        }
+
+        .settings-nav-item.active {
+            background: #4361ee;
+            color: white;
+        }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 34px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 34px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: #4361ee;
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            font-size: 1rem;
+        }
+    </style>
 </body>
 </html>
