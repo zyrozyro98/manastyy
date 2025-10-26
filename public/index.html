@@ -4,202 +4,43 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>المنصة التعليمية المتطورة - نظام الإدارة المتكامل</title>
+    
+    <!-- الأيقونات -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/emoji-picker-element@1.14.0/index.min.css">
+    
+    <!-- الأنماط -->
     <link rel="stylesheet" href="css/css.css">
+    
+    <!-- السكريبتات -->
     <script src="/socket.io/socket.io.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/emoji-picker-element@1.14.0/index.min.js"></script>
-    <style>
-        /* تحسينات إضافية */
-        .notification {
-            position: fixed;
-            top: 100px;
-            left: 20px;
-            background: white;
-            padding: 1rem 1.5rem;
-            border-radius: 12px;
-            box-shadow: 0 5px 20px rgba(0,0,0,0.15);
-            border-right: 4px solid #4361ee;
-            z-index: 1000;
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-            max-width: 400px;
-            animation: slideInLeft 0.3s ease;
-        }
-
-        .notification.success {
-            border-right-color: #4cc9f0;
-        }
-
-        .notification.error {
-            border-right-color: #f72585;
-        }
-
-        .notification.warning {
-            border-right-color: #f8961e;
-        }
-
-        @keyframes slideInLeft {
-            from {
-                transform: translateX(-100%);
-                opacity: 0;
-            }
-            to {
-                transform: translateX(0);
-                opacity: 1;
-            }
-        }
-
-        .loading-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.7);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 2000;
-        }
-
-        .loading-spinner {
-            background: white;
-            padding: 2rem;
-            border-radius: 12px;
-            text-align: center;
-        }
-
-        .spinner {
-            width: 40px;
-            height: 40px;
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid #4361ee;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 1rem;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        .user-status {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            font-size: 0.8rem;
-        }
-
-        .status-online {
-            color: #4cc9f0;
-        }
-
-        .status-offline {
-            color: #6c757d;
-        }
-
-        .status-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            display: inline-block;
-        }
-
-        .status-online .status-dot {
-            background: #4cc9f0;
-            animation: pulse 2s infinite;
-        }
-
-        .status-offline .status-dot {
-            background: #6c757d;
-        }
-
-        @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.5; }
-            100% { opacity: 1; }
-        }
-
-        .typing-indicator {
-            padding: 0.5rem 1rem;
-            font-size: 0.8rem;
-            color: #6c757d;
-            display: none;
-        }
-
-        .typing-dots {
-            display: inline-flex;
-            gap: 2px;
-            margin-left: 0.5rem;
-        }
-
-        .typing-dots span {
-            width: 4px;
-            height: 4px;
-            background: #6c757d;
-            border-radius: 50%;
-            animation: typing 1.4s infinite ease-in-out;
-        }
-
-        .typing-dots span:nth-child(1) { animation-delay: -0.32s; }
-        .typing-dots span:nth-child(2) { animation-delay: -0.16s; }
-
-        @keyframes typing {
-            0%, 80%, 100% { transform: scale(0); }
-            40% { transform: scale(1); }
-        }
-
-        .message-status {
-            display: flex;
-            align-items: center;
-            gap: 0.25rem;
-            font-size: 0.7rem;
-            opacity: 0.7;
-        }
-
-        .search-results {
-            position: absolute;
-            top: 100%;
-            left: 0;
-            right: 0;
-            background: white;
-            border: 1px solid #dee2e6;
-            border-radius: 8px;
-            max-height: 300px;
-            overflow-y: auto;
-            z-index: 100;
-            display: none;
-        }
-
-        .search-result-item {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-            padding: 1rem;
-            border-bottom: 1px solid #f8f9fa;
-            cursor: pointer;
-            transition: background-color 0.2s;
-        }
-
-        .search-result-item:hover {
-            background: #f8f9fa;
-        }
-
-        .search-result-item:last-child {
-            border-bottom: none;
-        }
-
-        .no-results {
-            padding: 2rem;
-            text-align: center;
-            color: #6c757d;
-        }
-    </style>
+    
+    <!-- الأمان والأداء -->
+    <meta name="description" content="منصة تعليمية متكاملة للتواصل والتعلم والتعاون بين الطلاب والمعلمين">
+    <meta name="keywords" content="منصة تعليمية, تعلم إلكتروني, دردشة, محادثات, تعليم">
+    <meta name="author" content="فريق المنصة التعليمية">
+    
+    <!-- PWA -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#4361ee">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
 </head>
 <body>
+    <!-- شاشة التحميل -->
+    <div class="loading-screen" id="loadingScreen">
+        <div class="loading-content">
+            <div class="loading-spinner">
+                <div class="spinner"></div>
+            </div>
+            <div class="loading-text">
+                <h2>المنصة التعليمية</h2>
+                <p>جاري تحميل التطبيق...</p>
+            </div>
+        </div>
+    </div>
+
     <!-- شاشة الترحيب -->
     <div class="welcome-screen" id="welcomeScreen">
         <div class="welcome-content">
@@ -228,34 +69,17 @@
                     <i class="fas fa-chart-line"></i>
                     <span>تتبع التقدم</span>
                 </div>
-                <div class="feature">
-                    <i class="fas fa-shield-alt"></i>
-                    <span>أمان متكامل</span>
-                </div>
-                <div class="feature">
-                    <i class="fas fa-mobile-alt"></i>
-                    <span>متجاوب مع الجوال</span>
-                </div>
             </div>
             
-            <button class="btn btn-primary btn-lg" id="startAppBtn">
-                <i class="fas fa-rocket"></i>
-                ابدأ الآن
-            </button>
-
-            <div class="welcome-stats" style="margin-top: 2rem; display: flex; gap: 2rem; justify-content: center; flex-wrap: wrap;">
-                <div class="stat" style="text-align: center;">
-                    <div style="font-size: 2rem; font-weight: bold; color: #4cc9f0;">1000+</div>
-                    <div style="font-size: 0.9rem; opacity: 0.8;">طالب مسجل</div>
-                </div>
-                <div class="stat" style="text-align: center;">
-                    <div style="font-size: 2rem; font-weight: bold; color: #f72585;">50+</div>
-                    <div style="font-size: 0.9rem; opacity: 0.8;">معلم نشط</div>
-                </div>
-                <div class="stat" style="text-align: center;">
-                    <div style="font-size: 2rem; font-weight: bold; color: #f8961e;">100+</div>
-                    <div style="font-size: 0.9rem; opacity: 0.8;">مادة تعليمية</div>
-                </div>
+            <div class="welcome-actions">
+                <button class="btn btn-primary btn-lg" id="startAppBtn">
+                    <i class="fas fa-rocket"></i>
+                    ابدأ الآن
+                </button>
+                <button class="btn btn-outline btn-lg" id="quickDemoBtn">
+                    <i class="fas fa-eye"></i>
+                    عرض سريع
+                </button>
             </div>
         </div>
     </div>
@@ -281,19 +105,24 @@
         </button>
     </div>
 
+    <!-- الإشعارات العائمة -->
+    <div class="notifications-container" id="notificationsContainer"></div>
+
     <!-- الهيدر -->
     <header class="header" id="header">
         <div class="header-content">
+            <!-- الشعار -->
             <a href="#" class="logo" data-page="home">
                 <div class="logo-icon">
                     <i class="fas fa-graduation-cap"></i>
                 </div>
-                <div>
-                    <div class="logo-text">المنصة التعليمية</div>
+                <div class="logo-text">
+                    <div class="logo-title">المنصة التعليمية</div>
                     <div class="logo-subtitle">نظام الإدارة المتكامل</div>
                 </div>
             </a>
 
+            <!-- التنقل الرئيسي -->
             <nav class="nav">
                 <a href="#" class="nav-item" data-page="home">
                     <i class="fas fa-home"></i>
@@ -306,7 +135,7 @@
                 <a href="#" class="nav-item" data-page="chat">
                     <i class="fas fa-comments"></i>
                     الدردشة
-                    <span class="nav-item-badge" id="unreadMessagesCount" style="display: none;">0</span>
+                    <span class="nav-item-badge" id="unreadMessagesCount">0</span>
                 </a>
                 <a href="#" class="nav-item" data-page="stories">
                     <i class="fas fa-history"></i>
@@ -324,38 +153,37 @@
                     <i class="fas fa-photo-video"></i>
                     الوسائط
                 </a>
-                <a href="#" class="nav-item" data-page="settings">
-                    <i class="fas fa-cog"></i>
-                    الإعدادات
-                </a>
-                <a href="#" class="nav-item hidden" id="loginBtn" data-page="login">
+                
+                <!-- عناصر للمستخدمين غير المسجلين -->
+                <a href="#" class="nav-item unauth-only" id="loginBtn" data-page="login">
                     <i class="fas fa-sign-in-alt"></i>
                     تسجيل الدخول
                 </a>
-                <a href="#" class="nav-item hidden" id="registerBtn" data-page="register">
+                <a href="#" class="nav-item unauth-only" id="registerBtn" data-page="register">
                     <i class="fas fa-user-plus"></i>
                     إنشاء حساب
                 </a>
-                <a href="#" class="nav-item hidden" id="logoutBtn">
+                
+                <!-- عناصر للمستخدمين المسجلين -->
+                <a href="#" class="nav-item auth-only" id="logoutBtn">
                     <i class="fas fa-sign-out-alt"></i>
                     تسجيل الخروج
                 </a>
             </nav>
 
-            <div class="user-info hidden" id="userInfo">
-                <div class="user-avatar">
+            <!-- معلومات المستخدم -->
+            <div class="user-info auth-only" id="userInfo">
+                <div class="user-avatar" id="userAvatar">
                     <span id="userAvatarText">م</span>
                 </div>
                 <div class="user-details">
                     <div class="user-name" id="userNameDisplay">محمد أحمد</div>
                     <div class="user-role" id="userRoleDisplay">طالب</div>
-                    <div class="user-status status-online" id="userStatus">
-                        <span class="status-dot"></span>
-                        <span>متصل</span>
-                    </div>
                 </div>
+                <div class="user-status-indicator" id="userStatusIndicator"></div>
             </div>
 
+            <!-- زر القائمة المتنقلة -->
             <button class="mobile-menu-btn" id="mobileMenuBtn">
                 <i class="fas fa-bars"></i>
             </button>
@@ -364,6 +192,21 @@
 
     <!-- القائمة المتنقلة -->
     <div class="mobile-menu" id="mobileMenu">
+        <div class="mobile-menu-header">
+            <div class="user-info">
+                <div class="user-avatar">
+                    <span id="mobileUserAvatarText">م</span>
+                </div>
+                <div class="user-details">
+                    <div class="user-name" id="mobileUserNameDisplay">محمد أحمد</div>
+                    <div class="user-role" id="mobileUserRoleDisplay">طالب</div>
+                </div>
+            </div>
+            <button class="mobile-menu-close" id="mobileMenuClose">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        
         <nav class="mobile-nav">
             <a href="#" class="nav-item" data-page="home">
                 <i class="fas fa-home"></i>
@@ -376,7 +219,7 @@
             <a href="#" class="nav-item" data-page="chat">
                 <i class="fas fa-comments"></i>
                 الدردشة
-                <span class="nav-item-badge" id="unreadMessagesCountMobile" style="display: none;">0</span>
+                <span class="nav-item-badge" id="unreadMessagesCountMobile">0</span>
             </a>
             <a href="#" class="nav-item" data-page="stories">
                 <i class="fas fa-history"></i>
@@ -398,15 +241,19 @@
                 <i class="fas fa-cog"></i>
                 الإعدادات
             </a>
-            <a href="#" class="nav-item hidden" id="loginBtnMobile" data-page="login">
+            
+            <!-- عناصر للمستخدمين غير المسجلين -->
+            <a href="#" class="nav-item unauth-only" data-page="login">
                 <i class="fas fa-sign-in-alt"></i>
                 تسجيل الدخول
             </a>
-            <a href="#" class="nav-item hidden" id="registerBtnMobile" data-page="register">
+            <a href="#" class="nav-item unauth-only" data-page="register">
                 <i class="fas fa-user-plus"></i>
                 إنشاء حساب
             </a>
-            <a href="#" class="nav-item hidden" id="logoutBtnMobile">
+            
+            <!-- عناصر للمستخدمين المسجلين -->
+            <a href="#" class="nav-item auth-only" id="logoutBtnMobile">
                 <i class="fas fa-sign-out-alt"></i>
                 تسجيل الخروج
             </a>
@@ -425,13 +272,17 @@
                     <h1>مرحباً بك في المنصة التعليمية</h1>
                     <p>منصة متكاملة للتعلم والتعاون والتواصل بين الطلاب والمعلمين</p>
                     <div class="hero-actions">
-                        <button class="btn btn-primary btn-lg" data-page="register">
+                        <button class="btn btn-primary btn-lg unauth-only" data-page="register">
                             <i class="fas fa-user-plus"></i>
                             انضم إلينا
                         </button>
-                        <button class="btn btn-outline btn-lg" data-page="login">
+                        <button class="btn btn-outline btn-lg unauth-only" data-page="login">
                             <i class="fas fa-sign-in-alt"></i>
                             تسجيل الدخول
+                        </button>
+                        <button class="btn btn-primary btn-lg auth-only" data-page="dashboard">
+                            <i class="fas fa-tachometer-alt"></i>
+                            لوحة التحكم
                         </button>
                     </div>
                 </div>
@@ -448,65 +299,51 @@
                             <i class="fas fa-comments"></i>
                         </div>
                         <h3>دردشة مباشرة</h3>
-                        <p>تواصل فوري مع الزملاء والمعلمين عبر نظام دردشة متكامل مع إمكانية إرسال الوسائط والملفات</p>
+                        <p>تواصل فوري مع الزملاء والمعلمين عبر نظام دردشة متكامل</p>
                     </div>
                     <div class="feature-card">
                         <div class="feature-icon">
                             <i class="fas fa-users"></i>
                         </div>
                         <h3>مجموعات تعليمية</h3>
-                        <p>أنشئ مجموعات دراسية وناقش مواضيعك مع زملائك في بيئة تعاونية آمنة</p>
+                        <p>أنشئ مجموعات دراسية وناقش مواضيعك مع زملائك</p>
                     </div>
                     <div class="feature-card">
                         <div class="feature-icon">
                             <i class="fas fa-broadcast-tower"></i>
                         </div>
                         <h3>قنوات البث</h3>
-                        <p>انضم إلى قنوات تعليمية متخصصة واحصل على آخر المستجدات والإعلانات المهمة</p>
+                        <p>انضم إلى قنوات تعليمية متخصصة واحصل على آخر المستجدات</p>
                     </div>
                     <div class="feature-card">
                         <div class="feature-icon">
                             <i class="fas fa-history"></i>
                         </div>
                         <h3>القصص التعليمية</h3>
-                        <p>شارك تجاربك التعليمية عبر القصص التفاعلية التي تختفي بعد 24 ساعة</p>
+                        <p>شارك تجاربك التعليمية عبر القصص التفاعلية</p>
                     </div>
                     <div class="feature-card">
                         <div class="feature-icon">
                             <i class="fas fa-photo-video"></i>
                         </div>
                         <h3>وسائط متعددة</h3>
-                        <p>شارك ومشاهدة الوسائط التعليمية بجودة عالية مع دعم جميع أنواع الملفات</p>
+                        <p>شارك ومشاهدة الوسائط التعليمية بجودة عالية</p>
                     </div>
                     <div class="feature-card">
                         <div class="feature-icon">
                             <i class="fas fa-chart-line"></i>
                         </div>
                         <h3>تتبع التقدم</h3>
-                        <p>تابع تقدمك التعليمي واحصل على تقارير أداء مفصلة وإحصائيات دقيقة</p>
+                        <p>تابع تقدمك التعليمي واحصل على تقارير أداء مفصلة</p>
                     </div>
                 </div>
             </div>
 
-            <div class="stats-section" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 4rem 2rem; border-radius: 12px; margin: 3rem 0;">
-                <h2 class="section-title" style="color: white; text-align: center;">إحصائيات المنصة</h2>
-                <div class="stats-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 2rem; margin-top: 2rem;">
-                    <div class="stat-item" style="text-align: center;">
-                        <div class="stat-number" style="font-size: 3rem; font-weight: bold;">1,250</div>
-                        <div class="stat-label" style="font-size: 1.2rem;">طالب مسجل</div>
-                    </div>
-                    <div class="stat-item" style="text-align: center;">
-                        <div class="stat-number" style="font-size: 3rem; font-weight: bold;">85</div>
-                        <div class="stat-label" style="font-size: 1.2rem;">معلم نشط</div>
-                    </div>
-                    <div class="stat-item" style="text-align: center;">
-                        <div class="stat-number" style="font-size: 3rem; font-weight: bold;">156</div>
-                        <div class="stat-label" style="font-size: 1.2rem;">مادة تعليمية</div>
-                    </div>
-                    <div class="stat-item" style="text-align: center;">
-                        <div class="stat-number" style="font-size: 3rem; font-weight: bold;">24/7</div>
-                        <div class="stat-label" style="font-size: 1.2rem;">دعم فني</div>
-                    </div>
+            <!-- إحصائيات سريعة -->
+            <div class="stats-section auth-only">
+                <h2 class="section-title">إحصائيات سريعة</h2>
+                <div class="stats-grid" id="quickStats">
+                    <!-- سيتم ملؤها ديناميكياً -->
                 </div>
             </div>
         </div>
@@ -521,36 +358,44 @@
                     </div>
                     <form class="auth-form" id="loginForm">
                         <div class="form-group">
-                            <label for="loginEmail">البريد الإلكتروني</label>
+                            <label for="loginEmail">
+                                <i class="fas fa-envelope"></i>
+                                البريد الإلكتروني
+                            </label>
                             <input type="email" id="loginEmail" name="email" required placeholder="ادخل بريدك الإلكتروني">
                         </div>
                         <div class="form-group">
-                            <label for="loginPassword">كلمة المرور</label>
-                            <input type="password" id="loginPassword" name="password" required placeholder="ادخل كلمة المرور">
-                        </div>
-                        <div class="form-group" style="display: flex; justify-content: space-between; align-items: center;">
-                            <label style="margin: 0;">
-                                <input type="checkbox" id="rememberMe"> تذكرني
+                            <label for="loginPassword">
+                                <i class="fas fa-lock"></i>
+                                كلمة المرور
                             </label>
-                            <a href="#" style="color: #4361ee; text-decoration: none;">نسيت كلمة المرور؟</a>
+                            <input type="password" id="loginPassword" name="password" required placeholder="ادخل كلمة المرور">
+                            <button type="button" class="password-toggle" id="toggleLoginPassword">
+                                <i class="fas fa-eye"></i>
+                            </button>
                         </div>
-                        <button type="submit" class="btn btn-primary btn-block">
+                        <div class="form-options">
+                            <label class="checkbox">
+                                <input type="checkbox" id="rememberMe">
+                                <span class="checkmark"></span>
+                                تذكرني
+                            </label>
+                            <a href="#" class="forgot-password" id="forgotPasswordBtn">
+                                نسيت كلمة المرور؟
+                            </a>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-block" id="loginSubmitBtn">
                             <i class="fas fa-sign-in-alt"></i>
                             تسجيل الدخول
                         </button>
                     </form>
-                    <div class="auth-divider" style="text-align: center; margin: 1.5rem 0; position: relative;">
-                        <span style="background: white; padding: 0 1rem; color: #6c757d;">أو</span>
-                        <hr style="position: absolute; top: 50%; left: 0; right: 0; z-index: -1; margin: 0;">
+                    <div class="auth-divider">
+                        <span>أو</span>
                     </div>
-                    <div class="social-login" style="display: flex; gap: 1rem; margin-bottom: 1.5rem;">
-                        <button type="button" class="btn btn-outline btn-block" style="flex: 1;">
-                            <i class="fab fa-google" style="color: #DB4437;"></i>
-                            جوجل
-                        </button>
-                        <button type="button" class="btn btn-outline btn-block" style="flex: 1;">
-                            <i class="fab fa-microsoft" style="color: #0078D4;"></i>
-                            مايكروسوفت
+                    <div class="auth-social">
+                        <button class="btn btn-outline btn-block" id="googleLoginBtn">
+                            <i class="fab fa-google"></i>
+                            متابعة مع جوجل
                         </button>
                     </div>
                     <div class="auth-footer">
@@ -570,44 +415,52 @@
                     </div>
                     <form class="auth-form" id="registerForm">
                         <div class="form-group">
-                            <label for="registerName">الاسم الكامل</label>
-                            <input type="text" id="registerName" name="name" required placeholder="ادخل اسمك الكامل">
+                            <label for="registerName">
+                                <i class="fas fa-user"></i>
+                                الاسم الكامل
+                            </label>
+                            <input type="text" id="registerName" name="fullName" required placeholder="ادخل اسمك الكامل">
                         </div>
                         <div class="form-group">
-                            <label for="registerEmail">البريد الإلكتروني</label>
+                            <label for="registerEmail">
+                                <i class="fas fa-envelope"></i>
+                                البريد الإلكتروني
+                            </label>
                             <input type="email" id="registerEmail" name="email" required placeholder="ادخل بريدك الإلكتروني">
                         </div>
                         <div class="form-group">
-                            <label for="registerPassword">كلمة المرور</label>
+                            <label for="registerPassword">
+                                <i class="fas fa-lock"></i>
+                                كلمة المرور
+                            </label>
                             <input type="password" id="registerPassword" name="password" required placeholder="اختر كلمة مرور قوية">
-                            <div class="password-strength" style="margin-top: 0.5rem; font-size: 0.8rem; color: #6c757d;">
-                                <div id="passwordStrength" style="height: 4px; background: #dee2e6; border-radius: 2px; margin-top: 0.25rem;">
-                                    <div id="passwordStrengthBar" style="height: 100%; width: 0%; background: #f72585; border-radius: 2px; transition: all 0.3s;"></div>
-                                </div>
-                                <div id="passwordRequirements" style="margin-top: 0.5rem;">
-                                    يجب أن تحتوي كلمة المرور على 8 أحرف على الأقل
-                                </div>
+                            <button type="button" class="password-toggle" id="toggleRegisterPassword">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                            <div class="password-strength" id="passwordStrength">
+                                <div class="strength-bar"></div>
+                                <span class="strength-text">قوة كلمة المرور</span>
                             </div>
                         </div>
                         <div class="form-group">
-                            <label for="registerConfirmPassword">تأكيد كلمة المرور</label>
-                            <input type="password" id="registerConfirmPassword" name="confirmPassword" required placeholder="أعد إدخال كلمة المرور">
-                        </div>
-                        <div class="form-group">
-                            <label for="registerRole">الدور</label>
+                            <label for="registerRole">
+                                <i class="fas fa-user-tag"></i>
+                                الدور
+                            </label>
                             <select id="registerRole" name="role" required>
                                 <option value="">اختر دورك</option>
                                 <option value="student">طالب</option>
                                 <option value="teacher">معلم</option>
                             </select>
                         </div>
-                        <div class="form-group">
-                            <label>
-                                <input type="checkbox" id="acceptTerms" required>
-                                أوافق على <a href="#" style="color: #4361ee;">شروط الاستخدام</a> و <a href="#" style="color: #4361ee;">سياسة الخصوصية</a>
+                        <div class="form-options">
+                            <label class="checkbox">
+                                <input type="checkbox" id="agreeTerms" required>
+                                <span class="checkmark"></span>
+                                أوافق على <a href="#" id="termsLink">الشروط والأحكام</a>
                             </label>
                         </div>
-                        <button type="submit" class="btn btn-primary btn-block">
+                        <button type="submit" class="btn btn-primary btn-block" id="registerSubmitBtn">
                             <i class="fas fa-user-plus"></i>
                             إنشاء حساب
                         </button>
@@ -626,95 +479,56 @@
                     <i class="fas fa-tachometer-alt"></i>
                     لوحة التحكم
                 </h1>
-                <p id="dashboardWelcome">مرحباً بك في المنصة التعليمية</p>
+                <div class="dashboard-actions">
+                    <button class="btn btn-outline" id="refreshDashboardBtn">
+                        <i class="fas fa-sync-alt"></i>
+                        تحديث
+                    </button>
+                </div>
             </div>
             
-            <div class="dashboard-stats">
-                <div class="stat-card">
-                    <div class="stat-icon">
-                        <i class="fas fa-users"></i>
+            <div class="dashboard-content">
+                <div class="welcome-card auth-only">
+                    <div class="welcome-message">
+                        <h2 id="dashboardWelcome">مرحباً، محمد!</h2>
+                        <p id="dashboardDate">الاثنين، 1 يناير 2024</p>
                     </div>
-                    <div class="stat-info">
-                        <div class="stat-number" id="totalUsers">0</div>
-                        <div class="stat-label">إجمالي المستخدمين</div>
-                    </div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon">
-                        <i class="fas fa-comments"></i>
-                    </div>
-                    <div class="stat-info">
-                        <div class="stat-number" id="totalMessages">0</div>
-                        <div class="stat-label">الرسائل المرسلة</div>
-                    </div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon">
-                        <i class="fas fa-history"></i>
-                    </div>
-                    <div class="stat-info">
-                        <div class="stat-number" id="totalStories">0</div>
-                        <div class="stat-label">القصص النشطة</div>
-                    </div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon">
-                        <i class="fas fa-broadcast-tower"></i>
-                    </div>
-                    <div class="stat-info">
-                        <div class="stat-number" id="totalChannels">0</div>
-                        <div class="stat-label">القنوات</div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="dashboard-content" style="display: grid; grid-template-columns: 2fr 1fr; gap: 2rem; margin-top: 2rem;">
-                <div class="recent-activities">
-                    <h3>النشاطات الأخيرة</h3>
-                    <div class="activities-list" id="activitiesList">
-                        <div class="activity-item">
-                            <i class="fas fa-user-plus" style="color: #4cc9f0;"></i>
-                            <div class="activity-content">
-                                <p>انضم مستخدم جديد إلى المنصة</p>
-                                <span class="activity-time">منذ قليل</span>
-                            </div>
-                        </div>
-                        <div class="activity-item">
-                            <i class="fas fa-comment" style="color: #4361ee;"></i>
-                            <div class="activity-content">
-                                <p>تم إرسال رسالة جديدة في المحادثة</p>
-                                <span class="activity-time">منذ 5 دقائق</span>
-                            </div>
-                        </div>
-                        <div class="activity-item">
-                            <i class="fas fa-camera" style="color: #f72585;"></i>
-                            <div class="activity-content">
-                                <p>تم نشر قصة جديدة</p>
-                                <span class="activity-time">منذ 15 دقيقة</span>
-                            </div>
-                        </div>
+                    <div class="quick-stats" id="dashboardQuickStats">
+                        <!-- سيتم ملؤها ديناميكياً -->
                     </div>
                 </div>
 
-                <div class="quick-actions">
-                    <h3>إجراءات سريعة</h3>
-                    <div class="actions-grid" style="display: grid; gap: 1rem;">
-                        <button class="btn btn-primary btn-block" data-page="chat">
-                            <i class="fas fa-comments"></i>
-                            بدء محادثة جديدة
-                        </button>
-                        <button class="btn btn-outline btn-block" data-page="groups">
-                            <i class="fas fa-users"></i>
-                            إنشاء مجموعة
-                        </button>
-                        <button class="btn btn-outline btn-block" data-page="channels">
-                            <i class="fas fa-broadcast-tower"></i>
-                            إنشاء قناة
-                        </button>
-                        <button class="btn btn-outline btn-block" data-page="stories">
-                            <i class="fas fa-camera"></i>
-                            نشر قصة
-                        </button>
+                <div class="dashboard-grid">
+                    <!-- الإحصائيات -->
+                    <div class="dashboard-section">
+                        <h3>الإحصائيات</h3>
+                        <div class="stats-cards" id="dashboardStats">
+                            <!-- سيتم ملؤها ديناميكياً -->
+                        </div>
+                    </div>
+
+                    <!-- النشاطات الأخيرة -->
+                    <div class="dashboard-section">
+                        <h3>النشاطات الأخيرة</h3>
+                        <div class="activities-list" id="recentActivities">
+                            <!-- سيتم ملؤها ديناميكياً -->
+                        </div>
+                    </div>
+
+                    <!-- المحادثات النشطة -->
+                    <div class="dashboard-section">
+                        <h3>المحادثات النشطة</h3>
+                        <div class="conversations-preview" id="activeConversations">
+                            <!-- سيتم ملؤها ديناميكياً -->
+                        </div>
+                    </div>
+
+                    <!-- الإشعارات -->
+                    <div class="dashboard-section">
+                        <h3>الإشعارات</h3>
+                        <div class="notifications-list" id="dashboardNotifications">
+                            <!-- سيتم ملؤها ديناميكياً -->
+                        </div>
                     </div>
                 </div>
             </div>
@@ -723,18 +537,34 @@
         <!-- صفحة الدردشة -->
         <div class="page" id="chat-page">
             <div class="chat-container">
-                <div class="chat-sidebar" id="chatSidebar">
+                <!-- الشريط الجانبي للمحادثات -->
+                <div class="chat-sidebar active" id="chatSidebar">
                     <div class="chat-header">
                         <h3>المحادثات</h3>
-                        <button class="btn btn-primary btn-sm" id="newChatBtn" style="margin-right: 10px;">
-                            <i class="fas fa-plus"></i>
-                            محادثة جديدة
-                        </button>
+                        <div class="chat-actions">
+                            <button class="btn btn-primary btn-sm" id="newChatBtn" title="محادثة جديدة">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                            <button class="btn btn-outline btn-sm" id="refreshChatsBtn" title="تحديث المحادثات">
+                                <i class="fas fa-sync-alt"></i>
+                            </button>
+                        </div>
                     </div>
                     
-                    <div class="chat-search" style="position: relative;">
-                        <input type="text" id="chatSearchInput" placeholder="بحث في المحادثات...">
-                        <div class="search-results" id="searchResults"></div>
+                    <div class="chat-search">
+                        <div class="search-input-wrapper">
+                            <i class="fas fa-search"></i>
+                            <input type="text" id="chatSearchInput" placeholder="بحث في المحادثات...">
+                            <button class="search-clear" id="clearSearchBtn" style="display: none;">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="conversations-tabs">
+                        <button class="tab-btn active" data-tab="all">الكل</button>
+                        <button class="tab-btn" data-tab="unread">غير المقروء</button>
+                        <button class="tab-btn" data-tab="groups">المجموعات</button>
                     </div>
                     
                     <div class="conversations-list" id="conversationsList">
@@ -742,13 +572,14 @@
                     </div>
                 </div>
                 
+                <!-- منطقة المحادثة الرئيسية -->
                 <div class="chat-main">
                     <div class="chat-header" id="activeChatHeader">
                         <div class="chat-user-info">
                             <div class="conversation-avatar small">
                                 <span id="activeChatAvatar">?</span>
                             </div>
-                            <div>
+                            <div class="conversation-details">
                                 <div class="conversation-name" id="activeChatName">اختر محادثة</div>
                                 <div class="user-status-text" id="activeChatStatus">غير متصل</div>
                             </div>
@@ -763,6 +594,9 @@
                             <button class="chat-tool-btn" id="chatInfoBtn" title="معلومات المحادثة">
                                 <i class="fas fa-info-circle"></i>
                             </button>
+                            <button class="chat-toggle" id="chatToggleMain">
+                                <i class="fas fa-bars"></i>
+                            </button>
                         </div>
                     </div>
                     
@@ -774,8 +608,14 @@
                         </div>
                     </div>
 
-                    <div class="typing-indicator" id="typingIndicator">
-                        <!-- سيتم ملء مؤشر الكتابة ديناميكياً -->
+                    <!-- مؤشر الكتابة -->
+                    <div class="typing-indicator" id="typingIndicator" style="display: none;">
+                        <div class="typing-dots">
+                            <span></span>
+                            <span></span>
+                            <span></span>
+                        </div>
+                        <span id="typingUsersText">شخص يكتب...</span>
                     </div>
                     
                     <div class="chat-input-container" id="chatInputContainer" style="display: none;">
@@ -783,23 +623,41 @@
                             <button class="chat-tool-btn" id="attachFileBtn" title="إرفاق ملف">
                                 <i class="fas fa-paperclip"></i>
                             </button>
+                            <button class="chat-tool-btn" id="attachImageBtn" title="إرسال صورة">
+                                <i class="fas fa-image"></i>
+                            </button>
                             <button class="chat-tool-btn" id="emojiToggle" title="إدراج إيموجي">
                                 <i class="fas fa-smile"></i>
                             </button>
-                            <input type="file" id="fileInput" style="display: none;" accept="image/*,video/*,audio/*,.pdf,.doc,.docx">
+                            <input type="file" id="fileInput" style="display: none;" accept="*/*">
+                            <input type="file" id="imageInput" style="display: none;" accept="image/*">
                         </div>
                         
                         <div class="chat-input-wrapper">
-                            <input type="text" placeholder="اكتب رسالة..." id="chatInput">
+                            <textarea placeholder="اكتب رسالة..." id="chatInput" rows="1"></textarea>
                         </div>
                         
-                        <button class="send-btn" id="sendMessageBtn">
+                        <button class="send-btn" id="sendMessageBtn" disabled>
                             <i class="fas fa-paper-plane"></i>
                         </button>
                     </div>
                     
+                    <!-- منتقي الإيموجي -->
                     <div class="emoji-picker-container" id="emojiPickerContainer">
                         <emoji-picker></emoji-picker>
+                    </div>
+                </div>
+
+                <!-- معلومات المحادثة -->
+                <div class="chat-info-sidebar" id="chatInfoSidebar">
+                    <div class="chat-info-header">
+                        <h4>معلومات المحادثة</h4>
+                        <button class="chat-info-close" id="chatInfoClose">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="chat-info-content" id="chatInfoContent">
+                        <!-- سيتم ملؤها ديناميكياً -->
                     </div>
                 </div>
             </div>
@@ -812,25 +670,35 @@
                     <i class="fas fa-history"></i>
                     القصص
                 </h1>
-                <button class="btn btn-primary" id="createStoryBtn">
-                    <i class="fas fa-plus"></i>
-                    إضافة قصة
-                </button>
+                <div class="stories-actions">
+                    <button class="btn btn-primary" id="createStoryBtn">
+                        <i class="fas fa-plus"></i>
+                        إضافة قصة
+                    </button>
+                    <button class="btn btn-outline" id="refreshStoriesBtn">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                </div>
             </div>
             
             <div class="stories-container" id="storiesContainer">
                 <!-- سيتم ملء القصص ديناميكياً -->
             </div>
 
-            <div class="story-viewer" id="storyViewer" style="display: none;">
-                <button class="story-close" id="storyClose">
-                    <i class="fas fa-times"></i>
-                </button>
+            <!-- مشغل القصص -->
+            <div class="story-viewer" id="storyViewer">
+                <div class="story-overlay"></div>
                 <div class="story-content">
+                    <button class="story-close" id="storyClose">
+                        <i class="fas fa-times"></i>
+                    </button>
                     <div class="story-progress" id="storyProgress">
                         <!-- سيتم ملء شريط التقدم ديناميكياً -->
                     </div>
-                    <img id="currentStoryImage" src="" alt="قصة" style="width: 100%; height: 100%; object-fit: cover;">
+                    <div class="story-media">
+                        <img id="currentStoryImage" src="" alt="قصة" style="display: none;">
+                        <video id="currentStoryVideo" controls style="display: none;"></video>
+                    </div>
                     <div class="story-info">
                         <div class="story-author-avatar">
                             <span id="storyAuthorAvatar">?</span>
@@ -838,6 +706,17 @@
                         <div class="story-author-info">
                             <div class="story-author-name" id="storyAuthorName"></div>
                             <div class="story-time" id="storyTime"></div>
+                        </div>
+                        <div class="story-actions">
+                            <button class="story-action-btn" id="likeStoryBtn">
+                                <i class="far fa-heart"></i>
+                            </button>
+                            <button class="story-action-btn" id="replyStoryBtn">
+                                <i class="far fa-comment"></i>
+                            </button>
+                            <button class="story-action-btn" id="shareStoryBtn">
+                                <i class="fas fa-share"></i>
+                            </button>
                         </div>
                     </div>
                     <div class="story-nav prev" id="storyPrev">
@@ -857,14 +736,27 @@
                     <i class="fas fa-users"></i>
                     المجموعات التعليمية
                 </h1>
-                <button class="btn btn-primary" id="createGroupBtn">
-                    <i class="fas fa-plus"></i>
-                    إنشاء مجموعة
-                </button>
+                <div class="groups-actions">
+                    <button class="btn btn-primary" id="createGroupBtn">
+                        <i class="fas fa-plus"></i>
+                        إنشاء مجموعة
+                    </button>
+                    <button class="btn btn-outline" id="refreshGroupsBtn">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                </div>
             </div>
             
-            <div class="groups-grid" id="groupsGrid">
-                <!-- سيتم ملء المجموعات ديناميكياً -->
+            <div class="groups-container">
+                <div class="groups-tabs">
+                    <button class="tab-btn active" data-tab="my-groups">مجموعاتي</button>
+                    <button class="tab-btn" data-tab="discover-groups">اكتشف المجموعات</button>
+                    <button class="tab-btn" data-tab="public-groups">المجموعات العامة</button>
+                </div>
+                
+                <div class="groups-grid" id="groupsGrid">
+                    <!-- سيتم ملء المجموعات ديناميكياً -->
+                </div>
             </div>
         </div>
 
@@ -875,14 +767,27 @@
                     <i class="fas fa-broadcast-tower"></i>
                     القنوات التعليمية
                 </h1>
-                <button class="btn btn-primary" id="createChannelBtn">
-                    <i class="fas fa-plus"></i>
-                    إنشاء قناة
-                </button>
+                <div class="channels-actions">
+                    <button class="btn btn-primary" id="createChannelBtn">
+                        <i class="fas fa-plus"></i>
+                        إنشاء قناة
+                    </button>
+                    <button class="btn btn-outline" id="refreshChannelsBtn">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                </div>
             </div>
             
-            <div class="channels-grid" id="channelsGrid">
-                <!-- سيتم ملء القنوات ديناميكياً -->
+            <div class="channels-container">
+                <div class="channels-tabs">
+                    <button class="tab-btn active" data-tab="my-channels">قنواتي</button>
+                    <button class="tab-btn" data-tab="discover-channels">اكتشف القنوات</button>
+                    <button class="tab-btn" data-tab="popular-channels">القنوات الشائعة</button>
+                </div>
+                
+                <div class="channels-grid" id="channelsGrid">
+                    <!-- سيتم ملء القنوات ديناميكياً -->
+                </div>
             </div>
         </div>
 
@@ -904,13 +809,30 @@
                             <option value="image">الصور</option>
                             <option value="video">الفيديوهات</option>
                             <option value="document">المستندات</option>
+                            <option value="audio">الصوتيات</option>
                         </select>
                     </div>
+                    <button class="btn btn-outline" id="refreshMediaBtn">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
                 </div>
             </div>
             
-            <div class="media-grid" id="mediaGrid">
-                <!-- سيتم ملء الوسائط ديناميكياً -->
+            <div class="media-container">
+                <div class="media-stats">
+                    <div class="media-stat">
+                        <span class="stat-number" id="totalMedia">0</span>
+                        <span class="stat-label">إجمالي الوسائط</span>
+                    </div>
+                    <div class="media-stat">
+                        <span class="stat-number" id="totalSize">0 MB</span>
+                        <span class="stat-label">الحجم الإجمالي</span>
+                    </div>
+                </div>
+                
+                <div class="media-grid" id="mediaGrid">
+                    <!-- سيتم ملء الوسائط ديناميكياً -->
+                </div>
             </div>
         </div>
 
@@ -945,196 +867,387 @@
                                 <i class="fas fa-lock"></i>
                                 الأمان
                             </button>
+                            <button class="settings-nav-item" data-tab="account">
+                                <i class="fas fa-cog"></i>
+                                إعدادات الحساب
+                            </button>
                         </div>
                     </div>
                     
                     <div class="settings-content">
+                        <!-- تبويب الملف الشخصي -->
                         <div class="settings-tab active" id="profile-tab">
                             <h3>الملف الشخصي</h3>
                             <form class="settings-form" id="profileForm">
-                                <div class="form-group">
-                                    <label for="profileName">الاسم الكامل</label>
-                                    <input type="text" id="profileName" value="محمد أحمد">
-                                </div>
-                                <div class="form-group">
-                                    <label for="profileEmail">البريد الإلكتروني</label>
-                                    <input type="email" id="profileEmail" value="mohamed@example.com">
-                                </div>
-                                <div class="form-group">
-                                    <label for="profilePhone">رقم الهاتف</label>
-                                    <input type="tel" id="profilePhone" placeholder="أدخل رقم هاتفك">
-                                </div>
-                                <div class="form-group">
-                                    <label for="profileBio">نبذة شخصية</label>
-                                    <textarea id="profileBio" rows="4" placeholder="اكتب نبذة عن نفسك..."></textarea>
-                                </div>
-                                <div class="form-group">
-                                    <label>صورة الملف الشخصي</label>
-                                    <div style="display: flex; align-items: center; gap: 1rem;">
-                                        <div class="user-avatar large">
-                                            <span id="profileAvatarText">م</span>
-                                        </div>
-                                        <button type="button" class="btn btn-outline">
-                                            <i class="fas fa-camera"></i>
+                                <div class="avatar-upload">
+                                    <div class="avatar-preview" id="avatarPreview">
+                                        <img id="avatarImage" src="" alt="الصورة الشخصية">
+                                        <span id="avatarInitials">م</span>
+                                    </div>
+                                    <div class="avatar-actions">
+                                        <button type="button" class="btn btn-outline btn-sm" id="changeAvatarBtn">
                                             تغيير الصورة
                                         </button>
+                                        <input type="file" id="avatarInput" accept="image/*" style="display: none;">
                                     </div>
                                 </div>
-                                <button type="submit" class="btn btn-primary">حفظ التغييرات</button>
+                                
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="profileName">الاسم الكامل</label>
+                                        <input type="text" id="profileName" name="fullName" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="profileEmail">البريد الإلكتروني</label>
+                                        <input type="email" id="profileEmail" name="email" required>
+                                    </div>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="profileBio">نبذة شخصية</label>
+                                    <textarea id="profileBio" name="bio" rows="4" placeholder="اكتب نبذة عن نفسك..."></textarea>
+                                    <div class="char-count">
+                                        <span id="bioCharCount">0</span>/500
+                                    </div>
+                                </div>
+                                
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="profilePhone">رقم الهاتف</label>
+                                        <input type="tel" id="profilePhone" name="phone">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="profileLocation">المكان</label>
+                                        <input type="text" id="profileLocation" name="location">
+                                    </div>
+                                </div>
+                                
+                                <div class="form-actions">
+                                    <button type="submit" class="btn btn-primary">حفظ التغييرات</button>
+                                    <button type="button" class="btn btn-outline" id="cancelProfileChanges">إلغاء</button>
+                                </div>
                             </form>
                         </div>
                         
+                        <!-- تبويب الخصوصية -->
                         <div class="settings-tab" id="privacy-tab">
                             <h3>إعدادات الخصوصية</h3>
                             <div class="privacy-settings">
-                                <div class="privacy-item">
-                                    <div class="privacy-info">
-                                        <h4>إظهار حالة الاتصال</h4>
-                                        <p>السماح للآخرين برؤية ما إذا كنت متصلاً أم لا</p>
+                                <div class="privacy-section">
+                                    <h4>الملف الشخصي</h4>
+                                    <div class="privacy-item">
+                                        <div class="privacy-info">
+                                            <h5>إظهار حالة الاتصال</h5>
+                                            <p>السماح للآخرين برؤية ما إذا كنت متصلاً أم لا</p>
+                                        </div>
+                                        <label class="switch">
+                                            <input type="checkbox" id="showOnlineStatus" checked>
+                                            <span class="slider"></span>
+                                        </label>
                                     </div>
-                                    <label class="switch">
-                                        <input type="checkbox" checked>
-                                        <span class="slider"></span>
-                                    </label>
+                                    <div class="privacy-item">
+                                        <div class="privacy-info">
+                                            <h5>إظهار آخر ظهور</h5>
+                                            <p>السماح للآخرين برؤية وقت آخر ظهور لك</p>
+                                        </div>
+                                        <label class="switch">
+                                            <input type="checkbox" id="showLastSeen" checked>
+                                            <span class="slider"></span>
+                                        </label>
+                                    </div>
+                                    <div class="privacy-item">
+                                        <div class="privacy-info">
+                                            <h5>الملف الشخصي العام</h5>
+                                            <p>جعل ملفك الشخصي مرئياً للجميع</p>
+                                        </div>
+                                        <label class="switch">
+                                            <input type="checkbox" id="publicProfile">
+                                            <span class="slider"></span>
+                                        </label>
+                                    </div>
                                 </div>
-                                <div class="privacy-item">
-                                    <div class="privacy-info">
-                                        <h4>إظهار آخر ظهور</h4>
-                                        <p>السماح للآخرين برؤية وقت آخر ظهور لك</p>
+                                
+                                <div class="privacy-section">
+                                    <h4>الرسائل</h4>
+                                    <div class="privacy-item">
+                                        <div class="privacy-info">
+                                            <h5>قبول الرسائل من الجميع</h5>
+                                            <p>السماح لأي شخص بإرسال رسائل لك</p>
+                                        </div>
+                                        <label class="switch">
+                                            <input type="checkbox" id="acceptAllMessages" checked>
+                                            <span class="slider"></span>
+                                        </label>
                                     </div>
-                                    <label class="switch">
-                                        <input type="checkbox" checked>
-                                        <span class="slider"></span>
-                                    </label>
+                                    <div class="privacy-item">
+                                        <div class="privacy-info">
+                                            <h5>طلب المصادقة</h5>
+                                            <p>طلب الموافقة قبل بدء محادثة جديدة</p>
+                                        </div>
+                                        <label class="switch">
+                                            <input type="checkbox" id="requireAuth">
+                                            <span class="slider"></span>
+                                        </label>
+                                    </div>
                                 </div>
-                                <div class="privacy-item">
-                                    <div class="privacy-info">
-                                        <h4>الملف الشخصي العام</h4>
-                                        <p>جعل ملفك الشخصي مرئياً للجميع</p>
-                                    </div>
-                                    <label class="switch">
-                                        <input type="checkbox">
-                                        <span class="slider"></span>
-                                    </label>
-                                </div>
-                                <div class="privacy-item">
-                                    <div class="privacy-info">
-                                        <h4>السماح بإرسال الرسائل</h4>
-                                        <p>السماح للآخرين بإرسال رسائل مباشرة لك</p>
-                                    </div>
-                                    <label class="switch">
-                                        <input type="checkbox" checked>
-                                        <span class="slider"></span>
-                                    </label>
+                                
+                                <div class="form-actions">
+                                    <button type="button" class="btn btn-primary" id="savePrivacySettings">حفظ الإعدادات</button>
                                 </div>
                             </div>
                         </div>
 
+                        <!-- تبويب الإشعارات -->
                         <div class="settings-tab" id="notifications-tab">
                             <h3>إعدادات الإشعارات</h3>
                             <div class="privacy-settings">
-                                <div class="privacy-item">
-                                    <div class="privacy-info">
-                                        <h4>إشعارات الرسائل</h4>
-                                        <p>تلقي إشعارات عند وصول رسائل جديدة</p>
+                                <div class="privacy-section">
+                                    <h4>الإشعارات العامة</h4>
+                                    <div class="privacy-item">
+                                        <div class="privacy-info">
+                                            <h5>تفعيل الإشعارات</h5>
+                                            <p>استقبال الإشعارات من المنصة</p>
+                                        </div>
+                                        <label class="switch">
+                                            <input type="checkbox" id="enableNotifications" checked>
+                                            <span class="slider"></span>
+                                        </label>
                                     </div>
-                                    <label class="switch">
-                                        <input type="checkbox" checked>
-                                        <span class="slider"></span>
-                                    </label>
+                                    <div class="privacy-item">
+                                        <div class="privacy-info">
+                                            <h5>الأصوات</h5>
+                                            <p>تشغيل أصوات للإشعارات</p>
+                                        </div>
+                                        <label class="switch">
+                                            <input type="checkbox" id="enableSounds" checked>
+                                            <span class="slider"></span>
+                                        </label>
+                                    </div>
                                 </div>
-                                <div class="privacy-item">
-                                    <div class="privacy-info">
-                                        <h4>إشعارات المجموعات</h4>
-                                        <p>تلقي إشعارات من المجموعات</p>
+                                
+                                <div class="privacy-section">
+                                    <h4>أنواع الإشعارات</h4>
+                                    <div class="privacy-item">
+                                        <div class="privacy-info">
+                                            <h5>إشعارات الرسائل</h5>
+                                            <p>تلقي إشعارات عند وصول رسائل جديدة</p>
+                                        </div>
+                                        <label class="switch">
+                                            <input type="checkbox" id="messageNotifications" checked>
+                                            <span class="slider"></span>
+                                        </label>
                                     </div>
-                                    <label class="switch">
-                                        <input type="checkbox" checked>
-                                        <span class="slider"></span>
-                                    </label>
+                                    <div class="privacy-item">
+                                        <div class="privacy-info">
+                                            <h5>إشعارات المجموعات</h5>
+                                            <p>تلقي إشعارات من المجموعات</p>
+                                        </div>
+                                        <label class="switch">
+                                            <input type="checkbox" id="groupNotifications" checked>
+                                            <span class="slider"></span>
+                                        </label>
+                                    </div>
+                                    <div class="privacy-item">
+                                        <div class="privacy-info">
+                                            <h5>إشعارات القنوات</h5>
+                                            <p>تلقي إشعارات من القنوات</p>
+                                        </div>
+                                        <label class="switch">
+                                            <input type="checkbox" id="channelNotifications" checked>
+                                            <span class="slider"></span>
+                                        </label>
+                                    </div>
+                                    <div class="privacy-item">
+                                        <div class="privacy-info">
+                                            <h5>إشعارات الستوريات</h5>
+                                            <p>تلقي إشعارات عند نشر ستوريات جديدة</p>
+                                        </div>
+                                        <label class="switch">
+                                            <input type="checkbox" id="storyNotifications" checked>
+                                            <span class="slider"></span>
+                                        </label>
+                                    </div>
                                 </div>
-                                <div class="privacy-item">
-                                    <div class="privacy-info">
-                                        <h4>إشعارات القنوات</h4>
-                                        <p>تلقي إشعارات من القنوات المشترك فيها</p>
-                                    </div>
-                                    <label class="switch">
-                                        <input type="checkbox" checked>
-                                        <span class="slider"></span>
-                                    </label>
-                                </div>
-                                <div class="privacy-item">
-                                    <div class="privacy-info">
-                                        <h4>إشعارات البريد الإلكتروني</h4>
-                                        <p>تلقي إشعارات عبر البريد الإلكتروني</p>
-                                    </div>
-                                    <label class="switch">
-                                        <input type="checkbox">
-                                        <span class="slider"></span>
-                                    </label>
+                                
+                                <div class="form-actions">
+                                    <button type="button" class="btn btn-primary" id="saveNotificationSettings">حفظ الإعدادات</button>
                                 </div>
                             </div>
                         </div>
 
+                        <!-- تبويب المظهر -->
                         <div class="settings-tab" id="appearance-tab">
                             <h3>إعدادات المظهر</h3>
-                            <div class="form-group">
-                                <label for="themeSelect">السمة</label>
-                                <select id="themeSelect" class="form-control">
-                                    <option value="auto">تلقائي</option>
-                                    <option value="light">فاتح</option>
-                                    <option value="dark">داكن</option>
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label for="fontSize">حجم الخط</label>
-                                <select id="fontSize" class="form-control">
-                                    <option value="small">صغير</option>
-                                    <option value="medium" selected>متوسط</option>
-                                    <option value="large">كبير</option>
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label for="language">اللغة</label>
-                                <select id="language" class="form-control">
-                                    <option value="ar" selected>العربية</option>
-                                    <option value="en">English</option>
-                                </select>
+                            <div class="appearance-settings">
+                                <div class="form-group">
+                                    <label for="themeSelect">السمة</label>
+                                    <select id="themeSelect" class="form-control">
+                                        <option value="auto">تلقائي (يتابع نظام الجهاز)</option>
+                                        <option value="light">فاتح</option>
+                                        <option value="dark">داكن</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="fontSize">حجم الخط</label>
+                                    <select id="fontSize" class="form-control">
+                                        <option value="small">صغير</option>
+                                        <option value="medium" selected>متوسط</option>
+                                        <option value="large">كبير</option>
+                                        <option value="x-large">كبير جداً</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="languageSelect">اللغة</label>
+                                    <select id="languageSelect" class="form-control">
+                                        <option value="ar" selected>العربية</option>
+                                        <option value="en">English</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label>كثافة العناصر</label>
+                                    <div class="density-options">
+                                        <label class="radio">
+                                            <input type="radio" name="density" value="compact" checked>
+                                            <span class="radio-checkmark"></span>
+                                            مدمج
+                                        </label>
+                                        <label class="radio">
+                                            <input type="radio" name="density" value="comfortable">
+                                            <span class="radio-checkmark"></span>
+                                            مريح
+                                        </label>
+                                        <label class="radio">
+                                            <input type="radio" name="density" value="spacious">
+                                            <span class="radio-checkmark"></span>
+                                            فسيح
+                                        </label>
+                                    </div>
+                                </div>
+                                
+                                <div class="form-actions">
+                                    <button type="button" class="btn btn-primary" id="saveAppearanceSettings">حفظ الإعدادات</button>
+                                    <button type="button" class="btn btn-outline" id="resetAppearanceSettings">إعادة التعيين</button>
+                                </div>
                             </div>
                         </div>
 
+                        <!-- تبويب الأمان -->
                         <div class="settings-tab" id="security-tab">
                             <h3>إعدادات الأمان</h3>
                             <div class="security-settings">
-                                <div class="security-item">
-                                    <h4>تغيير كلمة المرور</h4>
-                                    <form class="security-form">
+                                <div class="security-section">
+                                    <h4>كلمة المرور</h4>
+                                    <form class="security-form" id="changePasswordForm">
                                         <div class="form-group">
                                             <label for="currentPassword">كلمة المرور الحالية</label>
-                                            <input type="password" id="currentPassword" placeholder="أدخل كلمة المرور الحالية">
+                                            <input type="password" id="currentPassword" required>
                                         </div>
                                         <div class="form-group">
                                             <label for="newPassword">كلمة المرور الجديدة</label>
-                                            <input type="password" id="newPassword" placeholder="أدخل كلمة المرور الجديدة">
+                                            <input type="password" id="newPassword" required>
+                                            <div class="password-strength">
+                                                <div class="strength-bar"></div>
+                                                <span class="strength-text">قوة كلمة المرور</span>
+                                            </div>
                                         </div>
                                         <div class="form-group">
-                                            <label for="confirmNewPassword">تأكيد كلمة المرور الجديدة</label>
-                                            <input type="password" id="confirmNewPassword" placeholder="أعد إدخال كلمة المرور الجديدة">
+                                            <label for="confirmPassword">تأكيد كلمة المرور الجديدة</label>
+                                            <input type="password" id="confirmPassword" required>
                                         </div>
                                         <button type="submit" class="btn btn-primary">تغيير كلمة المرور</button>
                                     </form>
                                 </div>
-                                <div class="security-item">
+                                
+                                <div class="security-section">
                                     <h4>جلسات التسجيل</h4>
-                                    <div class="sessions-list">
-                                        <div class="session-item">
-                                            <div class="session-info">
-                                                <div class="session-device">Chrome على Windows</div>
-                                                <div class="session-location">الرياض، السعودية</div>
-                                                <div class="session-time">آخر نشاط: منذ 5 دقائق</div>
-                                            </div>
-                                            <button class="btn btn-outline btn-sm">إنهاء الجلسة</button>
+                                    <div class="sessions-list" id="sessionsList">
+                                        <!-- سيتم ملؤها ديناميكياً -->
+                                    </div>
+                                    <button type="button" class="btn btn-outline" id="logoutAllSessionsBtn">
+                                        تسجيل الخروج من جميع الجلسات
+                                    </button>
+                                </div>
+                                
+                                <div class="security-section">
+                                    <h4>خيارات متقدمة</h4>
+                                    <div class="privacy-item">
+                                        <div class="privacy-info">
+                                            <h5>المصادقة الثنائية</h5>
+                                            <p>إضافة طبقة أمان إضافية لحسابك</p>
                                         </div>
+                                        <label class="switch">
+                                            <input type="checkbox" id="twoFactorAuth">
+                                            <span class="slider"></span>
+                                        </label>
+                                    </div>
+                                    <div class="privacy-item">
+                                        <div class="privacy-info">
+                                            <h5>تسجيلات الدخول المشبوهة</h5>
+                                            <p>إشعارني عند محاولات تسجيل دخول غير معتادة</p>
+                                        </div>
+                                        <label class="switch">
+                                            <input type="checkbox" id="suspiciousLoginAlerts" checked>
+                                            <span class="slider"></span>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- تبويب إعدادات الحساب -->
+                        <div class="settings-tab" id="account-tab">
+                            <h3>إعدادات الحساب</h3>
+                            <div class="account-settings">
+                                <div class="account-section">
+                                    <h4>معلومات الحساب</h4>
+                                    <div class="account-info">
+                                        <div class="info-item">
+                                            <span class="info-label">تاريخ الإنشاء:</span>
+                                            <span class="info-value" id="accountCreatedAt">-</span>
+                                        </div>
+                                        <div class="info-item">
+                                            <span class="info-label">آخر نشاط:</span>
+                                            <span class="info-value" id="lastActivity">-</span>
+                                        </div>
+                                        <div class="info-item">
+                                            <span class="info-label">حالة الحساب:</span>
+                                            <span class="info-value status-active" id="accountStatus">نشط</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="account-section">
+                                    <h4>إجراءات الحساب</h4>
+                                    <div class="account-actions">
+                                        <button class="btn btn-outline" id="exportDataBtn">
+                                            <i class="fas fa-download"></i>
+                                            تصدير بياناتي
+                                        </button>
+                                        <button class="btn btn-outline" id="deactivateAccountBtn">
+                                            <i class="fas fa-user-slash"></i>
+                                            إلغاء تنشيط الحساب
+                                        </button>
+                                        <button class="btn btn-danger" id="deleteAccountBtn">
+                                            <i class="fas fa-trash"></i>
+                                            حذف الحساب
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <div class="account-section">
+                                    <h4>الاشتراك</h4>
+                                    <div class="subscription-info">
+                                        <div class="subscription-status">
+                                            <span class="status-badge free">مجاني</span>
+                                            <p>أنت تستخدم الخطة المجانية حالياً</p>
+                                        </div>
+                                        <button class="btn btn-primary" id="upgradePlanBtn">
+                                            <i class="fas fa-crown"></i>
+                                            الترقية إلى الخطة المميزة
+                                        </button>
                                     </div>
                                 </div>
                             </div>
@@ -1159,8 +1272,8 @@
         <button class="quick-action" data-page="channels" title="القنوات">
             <i class="fas fa-broadcast-tower"></i>
         </button>
-        <button class="quick-action" data-page="media" title="الوسائط">
-            <i class="fas fa-photo-video"></i>
+        <button class="quick-action" data-page="dashboard" title="لوحة التحكم">
+            <i class="fas fa-tachometer-alt"></i>
         </button>
     </div>
 
@@ -1169,7 +1282,28 @@
         <i class="fas fa-plus"></i>
     </button>
 
-    <!-- النماذج المنبثقة -->
+    <!-- القائمة العائمة -->
+    <div class="floating-menu" id="floatingMenu">
+        <button class="floating-menu-item" data-action="new-chat">
+            <i class="fas fa-comment"></i>
+            محادثة جديدة
+        </button>
+        <button class="floating-menu-item" data-action="new-group">
+            <i class="fas fa-users"></i>
+            مجموعة جديدة
+        </button>
+        <button class="floating-menu-item" data-action="new-channel">
+            <i class="fas fa-broadcast-tower"></i>
+            قناة جديدة
+        </button>
+        <button class="floating-menu-item" data-action="new-story">
+            <i class="fas fa-camera"></i>
+            قصة جديدة
+        </button>
+    </div>
+
+    <!-- === النماذج المنبثقة === -->
+
     <!-- نموذج إنشاء مجموعة -->
     <div class="modal" id="createGroupModal">
         <div class="modal-content">
@@ -1193,6 +1327,18 @@
                             <option value="public">عامة</option>
                             <option value="private">خاصة</option>
                         </select>
+                    </div>
+                    <div class="form-group">
+                        <label>صورة المجموعة</label>
+                        <div class="avatar-upload">
+                            <div class="avatar-preview" id="groupAvatarPreview">
+                                <i class="fas fa-users"></i>
+                            </div>
+                            <button type="button" class="btn btn-outline btn-sm" id="changeGroupAvatarBtn">
+                                تغيير الصورة
+                            </button>
+                            <input type="file" id="groupAvatarInput" accept="image/*" style="display: none;">
+                        </div>
                     </div>
                     <div class="modal-actions">
                         <button type="button" class="btn btn-outline" id="cancelGroupBtn">إلغاء</button>
@@ -1229,9 +1375,58 @@
                             <option value="technology">تكنولوجيا</option>
                         </select>
                     </div>
+                    <div class="form-group">
+                        <label>صورة القناة</label>
+                        <div class="avatar-upload">
+                            <div class="avatar-preview" id="channelAvatarPreview">
+                                <i class="fas fa-broadcast-tower"></i>
+                            </div>
+                            <button type="button" class="btn btn-outline btn-sm" id="changeChannelAvatarBtn">
+                                تغيير الصورة
+                            </button>
+                            <input type="file" id="channelAvatarInput" accept="image/*" style="display: none;">
+                        </div>
+                    </div>
                     <div class="modal-actions">
                         <button type="button" class="btn btn-outline" id="cancelChannelBtn">إلغاء</button>
                         <button type="submit" class="btn btn-primary">إنشاء القناة</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- نموذج رفع الوسائط -->
+    <div class="modal" id="uploadMediaModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>رفع وسائط جديدة</h3>
+                <button class="modal-close" id="closeUploadModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="uploadMediaForm">
+                    <div class="upload-area" id="uploadArea">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                        <p>اسحب وأفلت الملفات هنا أو انقر للاختيار</p>
+                        <input type="file" id="mediaFileInput" multiple style="display: none;" accept="image/*,video/*,.pdf,.doc,.docx,.mp3,.wav">
+                    </div>
+                    <div class="upload-progress" id="uploadProgress" style="display: none;">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progressFill"></div>
+                        </div>
+                        <span class="progress-text" id="progressText">0%</span>
+                    </div>
+                    <div class="form-group">
+                        <label for="mediaTitle">عنوان الوسائط</label>
+                        <input type="text" id="mediaTitle" placeholder="ادخل عنوان الوسائط">
+                    </div>
+                    <div class="form-group">
+                        <label for="mediaDescription">وصف الوسائط</label>
+                        <textarea id="mediaDescription" rows="3" placeholder="ادخل وصف الوسائط"></textarea>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" class="btn btn-outline" id="cancelUploadBtn">إلغاء</button>
+                        <button type="submit" class="btn btn-primary">رفع الوسائط</button>
                     </div>
                 </form>
             </div>
@@ -1252,6 +1447,10 @@
                         <p>انقر لاختيار صورة أو فيديو للقصة</p>
                         <input type="file" id="storyFileInput" style="display: none;" accept="image/*,video/*">
                     </div>
+                    <div class="story-preview" id="storyPreview" style="display: none;">
+                        <img id="storyPreviewImage" src="" alt="معاينة القصة">
+                        <video id="storyPreviewVideo" controls style="display: none;"></video>
+                    </div>
                     <div class="form-group">
                         <label for="storyCaption">تعليق القصة</label>
                         <textarea id="storyCaption" rows="3" placeholder="اكتب تعليقاً للقصة..."></textarea>
@@ -1265,31 +1464,41 @@
         </div>
     </div>
 
-    <!-- نموذج رفع الوسائط -->
-    <div class="modal" id="uploadMediaModal">
+    <!-- نموذج محادثة جديدة -->
+    <div class="modal" id="newChatModal">
         <div class="modal-content">
             <div class="modal-header">
-                <h3>رفع وسائط جديدة</h3>
-                <button class="modal-close" id="closeUploadModal">&times;</button>
+                <h3>بدء محادثة جديدة</h3>
+                <button class="modal-close" id="closeNewChatModal">&times;</button>
             </div>
             <div class="modal-body">
-                <form id="uploadMediaForm">
-                    <div class="upload-area" id="uploadArea">
-                        <i class="fas fa-cloud-upload-alt"></i>
-                        <p>اسحب وأفلت الملفات هنا أو انقر للاختيار</p>
-                        <input type="file" id="mediaFileInput" multiple style="display: none;" accept="image/*,video/*,.pdf,.doc,.docx">
-                    </div>
+                <div class="search-input-wrapper">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="userSearchInput" placeholder="ابحث عن مستخدم...">
+                </div>
+                <div class="users-list" id="usersList">
+                    <!-- سيتم ملؤها ديناميكياً -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- نموذج نسيان كلمة المرور -->
+    <div class="modal" id="forgotPasswordModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>استعادة كلمة المرور</h3>
+                <button class="modal-close" id="closeForgotPasswordModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="forgotPasswordForm">
                     <div class="form-group">
-                        <label for="mediaTitle">عنوان الوسائط</label>
-                        <input type="text" id="mediaTitle" placeholder="ادخل عنوان الوسائط">
-                    </div>
-                    <div class="form-group">
-                        <label for="mediaDescription">وصف الوسائط</label>
-                        <textarea id="mediaDescription" rows="3" placeholder="ادخل وصف الوسائط"></textarea>
+                        <label for="forgotPasswordEmail">البريد الإلكتروني</label>
+                        <input type="email" id="forgotPasswordEmail" required placeholder="ادخل بريدك الإلكتروني">
                     </div>
                     <div class="modal-actions">
-                        <button type="button" class="btn btn-outline" id="cancelUploadBtn">إلغاء</button>
-                        <button type="submit" class="btn btn-primary">رفع الوسائط</button>
+                        <button type="button" class="btn btn-outline" id="cancelForgotPasswordBtn">إلغاء</button>
+                        <button type="submit" class="btn btn-primary">إرسال رابط الاستعادة</button>
                     </div>
                 </form>
             </div>
@@ -1297,134 +1506,37 @@
     </div>
 
     <!-- السكريبتات -->
+    <script src="js/config.js"></script>
+    <script src="js/client.js"></script>
+    <script src="js/ui.js"></script>
     <script src="js/app.js"></script>
 
+    <!-- Service Worker للتطبيق التقدمي -->
     <script>
-        // تحسينات إضافية للواجهة
-        document.addEventListener('DOMContentLoaded', function() {
-            // إدارة النماذج المنبثقة
-            const modals = document.querySelectorAll('.modal');
-            const modalTriggers = document.querySelectorAll('[data-modal]');
-            
-            modalTriggers.forEach(trigger => {
-                trigger.addEventListener('click', function() {
-                    const modalId = this.getAttribute('data-modal');
-                    const modal = document.getElementById(modalId);
-                    if (modal) {
-                        modal.style.display = 'flex';
-                    }
-                });
-            });
-
-            // إغلاق النماذج
-            modals.forEach(modal => {
-                modal.addEventListener('click', function(e) {
-                    if (e.target === this) {
-                        this.style.display = 'none';
-                    }
-                });
-
-                const closeButtons = modal.querySelectorAll('.modal-close');
-                closeButtons.forEach(btn => {
-                    btn.addEventListener('click', function() {
-                        modal.style.display = 'none';
+        // تسجيل Service Worker للتطبيق التقدمي
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function() {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(function(registration) {
+                        console.log('ServiceWorker registered successfully');
+                    })
+                    .catch(function(error) {
+                        console.log('ServiceWorker registration failed: ', error);
                     });
-                });
             });
-
-            // تحسين تجربة المستخدم
-            const passwordInput = document.getElementById('registerPassword');
-            if (passwordInput) {
-                passwordInput.addEventListener('input', function() {
-                    const strengthBar = document.getElementById('passwordStrengthBar');
-                    const password = this.value;
-                    let strength = 0;
-
-                    if (password.length >= 8) strength += 25;
-                    if (/[A-Z]/.test(password)) strength += 25;
-                    if (/[0-9]/.test(password)) strength += 25;
-                    if (/[^A-Za-z0-9]/.test(password)) strength += 25;
-
-                    strengthBar.style.width = strength + '%';
-                    
-                    if (strength < 50) {
-                        strengthBar.style.background = '#f72585';
-                    } else if (strength < 75) {
-                        strengthBar.style.background = '#f8961e';
-                    } else {
-                        strengthBar.style.background = '#4cc9f0';
-                    }
-                });
-            }
-
-            // تحسين التنقل
-            const navItems = document.querySelectorAll('.nav-item');
-            navItems.forEach(item => {
-                item.addEventListener('click', function(e) {
-                    navItems.forEach(nav => nav.classList.remove('active'));
-                    this.classList.add('active');
-                });
-            });
-
-            // تحسينات للجوال
-            if (window.innerWidth <= 768) {
-                document.body.classList.add('mobile-view');
-            }
-
-            window.addEventListener('resize', function() {
-                if (window.innerWidth <= 768) {
-                    document.body.classList.add('mobile-view');
-                } else {
-                    document.body.classList.remove('mobile-view');
-                }
-            });
-
-            // تحميل سريع للصور
-            const images = document.querySelectorAll('img');
-            images.forEach(img => {
-                img.addEventListener('load', function() {
-                    this.classList.add('loaded');
-                });
-            });
-        });
-
-        // وظائف مساعدة
-        function showNotification(message, type = 'info') {
-            const notification = document.createElement('div');
-            notification.className = `notification ${type}`;
-            notification.innerHTML = `
-                <i class="fas fa-${type === 'success' ? 'check' : type === 'error' ? 'exclamation-triangle' : 'info'}"></i>
-                <span>${message}</span>
-                <button onclick="this.parentElement.remove()" style="background: none; border: none; cursor: pointer;">
-                    <i class="fas fa-times"></i>
-                </button>
-            `;
-            document.body.appendChild(notification);
-            
-            setTimeout(() => {
-                if (notification.parentElement) {
-                    notification.remove();
-                }
-            }, 5000);
         }
 
-        function showLoading(message = 'جاري التحميل...') {
-            const loading = document.createElement('div');
-            loading.className = 'loading-overlay';
-            loading.id = 'loading-overlay';
-            loading.innerHTML = `
-                <div class="loading-spinner">
-                    <div class="spinner"></div>
-                    <p>${message}</p>
-                </div>
-            `;
-            document.body.appendChild(loading);
-        }
+        // منع سلوك السحب للتحديث على الأجهزة المحمولة
+        document.addEventListener('touchmove', function(e) {
+            e.preventDefault();
+        }, { passive: false });
 
-        function hideLoading() {
-            const loading = document.getElementById('loading-overlay');
-            if (loading) {
-                loading.remove();
+        // إعدادات الأداء
+        if ('connection' in navigator) {
+            const connection = navigator.connection;
+            if (connection.saveData) {
+                // تقليل جودة الصور إذا كان وضع توفير البيانات مفعلاً
+                document.documentElement.classList.add('save-data');
             }
         }
     </script>
