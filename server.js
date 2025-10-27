@@ -1,4 +1,4 @@
-// server.js - الخادم الكامل للمنصة التعليمية (محدث ومدمج)
+// server.js - الخادم الكامل للمنصة التعليمية (محدث)
 import express from 'express';
 import http from 'http';
 import { Server } from 'socket.io';
@@ -39,7 +39,6 @@ const NODE_ENV = process.env.NODE_ENV || 'development';
 const BACKUP_DIR = path.join(__dirname, 'backups');
 const EXPORT_DIR = path.join(__dirname, 'exports');
 const UPLOAD_DIR = path.join(__dirname, 'uploads');
-const PUBLIC_DIR = path.join(__dirname, 'public');
 
 // إنشاء المجلدات اللازمة
 const requiredDirs = [
@@ -51,7 +50,7 @@ const requiredDirs = [
     path.join(UPLOAD_DIR, 'groups'),
     BACKUP_DIR, 
     EXPORT_DIR,
-    PUBLIC_DIR
+    path.join(__dirname, 'public')
 ];
 
 requiredDirs.forEach(dir => {
@@ -98,8 +97,63 @@ app.use('/uploads', express.static(UPLOAD_DIR, {
     etag: true
 }));
 app.use('/exports', express.static(EXPORT_DIR));
+app.use(express.static(path.join(__dirname, 'public'), {
+    maxAge: '1h',
+    etag: true
+}));
 
-// ============ نظام التخزين المحلي المحسن ============
+// إعداد multer للتحميلات
+const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        let uploadPath = UPLOAD_DIR;
+        if (file.fieldname === 'avatar') uploadPath = path.join(UPLOAD_DIR, 'profiles');
+        else if (file.fieldname === 'story') uploadPath = path.join(UPLOAD_DIR, 'stories');
+        else if (file.fieldname === 'channelAvatar') uploadPath = path.join(UPLOAD_DIR, 'channels');
+        else if (file.fieldname === 'groupAvatar') uploadPath = path.join(UPLOAD_DIR, 'groups');
+        else if (file.fieldname === 'file') uploadPath = path.join(UPLOAD_DIR, 'files');
+        else if (file.fieldname === 'backup') uploadPath = BACKUP_DIR;
+        
+        if (!fs.existsSync(uploadPath)) {
+            fs.mkdirSync(uploadPath, { recursive: true });
+        }
+        cb(null, uploadPath);
+    },
+    filename: function (req, file, cb) {
+        const fileExt = path.extname(file.originalname);
+        const fileName = `${Date.now()}-${Math.round(Math.random() * 1E9)}${fileExt}`;
+        cb(null, fileName);
+    }
+});
+
+const fileFilter = (req, file, cb) => {
+    const allowedTypes = {
+        'avatar': ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
+        'story': ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'video/mp4', 'video/quicktime', 'video/webm'],
+        'channelAvatar': ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
+        'groupAvatar': ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
+        'file': ['image/jpeg', 'image/png', 'image/gif', 'application/pdf', 'text/plain', 
+                'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.sheet',
+                'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                'application/zip', 'application/vnd.rar'],
+        'backup': ['application/json']
+    };
+    
+    if (allowedTypes[file.fieldname]?.includes(file.mimetype)) {
+        cb(null, true);
+    } else {
+        cb(new Error(`نوع الملف غير مدعوم للمجال: ${file.fieldname}`), false);
+    }
+};
+
+const upload = multer({
+    storage: storage,
+    limits: {
+        fileSize: 100 * 1024 * 1024
+    },
+    fileFilter: fileFilter
+});
+
+// نظام التخزين المحلي المحسن
 class EnhancedLocalStorageService {
     constructor() {
         this.dataFile = path.join(__dirname, 'local_data.json');
@@ -1140,16 +1194,8 @@ app.post('/api/auth/login', async (req, res) => {
         }
 
         const user = await localStorageService.findUserByEmail(email);
+        
         if (!user) {
-            return res.status(401).json({
-                success: false,
-                message: 'البريد الإلكتروني أو كلمة المرور غير صحيحة',
-                code: 'INVALID_CREDENTIALS'
-            });
-        }
-
-        const isPasswordValid = await bcrypt.compare(password, user.password);
-        if (!isPasswordValid) {
             return res.status(401).json({
                 success: false,
                 message: 'البريد الإلكتروني أو كلمة المرور غير صحيحة',
@@ -1165,21 +1211,31 @@ app.post('/api/auth/login', async (req, res) => {
             });
         }
 
-        await localStorageService.updateUser(user._id, {
-            lastSeen: new Date().toISOString(),
-            isOnline: true
-        });
+        const isPasswordValid = await bcrypt.compare(password, user.password);
 
-        await auditLog('LOGIN', user._id, 'user', user._id, { email });
+        if (!isPasswordValid) {
+            return res.status(401).json({
+                success: false,
+                message: 'البريد الإلكتروني أو كلمة المرور غير صحيحة',
+                code: 'INVALID_CREDENTIALS'
+            });
+        }
+
+        const updatedUser = await localStorageService.updateUser(user._id, {
+            isOnline: true,
+            lastSeen: new Date().toISOString()
+        });
 
         const token = generateToken(user._id);
         const refreshToken = generateRefreshToken(user._id);
+
+        await auditLog('LOGIN', user._id, 'user', user._id, { email });
 
         res.json({
             success: true,
             message: 'تم تسجيل الدخول بنجاح',
             data: {
-                user: localStorageService.formatUserResponse(user),
+                user: localStorageService.formatUserResponse(updatedUser || user),
                 token,
                 refreshToken
             }
@@ -1189,61 +1245,9 @@ app.post('/api/auth/login', async (req, res) => {
         console.error('❌ خطأ في تسجيل الدخول:', error);
         res.status(500).json({
             success: false,
-            message: 'حدث خطأ في الخادم',
-            code: 'SERVER_ERROR',
+            message: 'حدث خطأ أثناء تسجيل الدخول',
+            code: 'LOGIN_ERROR',
             error: error.message
-        });
-    }
-});
-
-app.post('/api/auth/refresh', async (req, res) => {
-    try {
-        const { refreshToken } = req.body;
-
-        if (!refreshToken) {
-            return res.status(401).json({
-                success: false,
-                message: 'رمز التحديث مطلوب',
-                code: 'REFRESH_TOKEN_REQUIRED'
-            });
-        }
-
-        const decoded = jwt.verify(refreshToken, JWT_SECRET);
-        if (decoded.type !== 'refresh') {
-            return res.status(401).json({
-                success: false,
-                message: 'رمز تحديث غير صالح',
-                code: 'INVALID_REFRESH_TOKEN'
-            });
-        }
-
-        const user = await localStorageService.findUserById(decoded.userId);
-        if (!user) {
-            return res.status(401).json({
-                success: false,
-                message: 'المستخدم غير موجود',
-                code: 'USER_NOT_FOUND'
-            });
-        }
-
-        const newToken = generateToken(user._id);
-        const newRefreshToken = generateRefreshToken(user._id);
-
-        res.json({
-            success: true,
-            message: 'تم تحديث الرمز بنجاح',
-            data: {
-                token: newToken,
-                refreshToken: newRefreshToken
-            }
-        });
-
-    } catch (error) {
-        console.error('❌ خطأ في تحديث الرمز:', error);
-        res.status(401).json({
-            success: false,
-            message: 'رمز تحديث غير صالح',
-            code: 'INVALID_REFRESH_TOKEN'
         });
     }
 });
@@ -1291,35 +1295,17 @@ app.get('/api/users/me', authenticateToken, async (req, res) => {
     }
 });
 
-app.put('/api/users/profile', authenticateToken, async (req, res) => {
+app.get('/api/users', authenticateToken, async (req, res) => {
     try {
-        const { fullName, bio, avatar } = req.body;
-        const updates = {};
-
-        if (fullName) updates.fullName = fullName;
-        if (bio !== undefined) updates.bio = bio;
-        if (avatar) updates.avatar = avatar;
-
-        const updatedUser = await localStorageService.updateUser(req.user._id, updates);
-        
-        if (!updatedUser) {
-            return res.status(404).json({
-                success: false,
-                message: 'المستخدم غير موجود',
-                code: 'USER_NOT_FOUND'
-            });
-        }
-
+        const users = await localStorageService.getAllUsers();
         res.json({
             success: true,
-            message: 'تم تحديث الملف الشخصي بنجاح',
             data: {
-                user: localStorageService.formatUserResponse(updatedUser)
+                users: users.map(user => localStorageService.formatUserResponse(user))
             }
         });
-
     } catch (error) {
-        console.error('❌ خطأ في تحديث الملف الشخصي:', error);
+        console.error('❌ خطأ في جلب المستخدمين:', error);
         res.status(500).json({
             success: false,
             message: 'حدث خطأ في الخادم',
@@ -1328,64 +1314,52 @@ app.put('/api/users/profile', authenticateToken, async (req, res) => {
     }
 });
 
+// البحث عن المستخدمين
 app.get('/api/users/search', authenticateToken, async (req, res) => {
     try {
         const { q } = req.query;
-        
+
         if (!q || q.length < 2) {
             return res.status(400).json({
                 success: false,
                 message: 'يرجى إدخال مصطلح بحث مكون من حرفين على الأقل',
-                code: 'INVALID_SEARCH_QUERY'
+                code: 'SEARCH_TERM_TOO_SHORT'
             });
         }
 
         const users = await localStorageService.searchUsers(q, 20);
-        
+
         res.json({
             success: true,
             data: {
                 users,
+                query: q,
                 total: users.length
             }
         });
 
     } catch (error) {
-        console.error('❌ خطأ في البحث:', error);
+        console.error('❌ خطأ في البحث عن المستخدمين:', error);
         res.status(500).json({
             success: false,
-            message: 'حدث خطأ في الخادم',
-            code: 'SERVER_ERROR'
+            message: 'حدث خطأ أثناء البحث',
+            code: 'SEARCH_ERROR'
         });
     }
 });
 
-// مسارات المحادثات
-app.get('/api/conversations', authenticateToken, async (req, res) => {
+// مسارات الدردشة
+app.get('/api/chat/conversations', authenticateToken, async (req, res) => {
     try {
         const conversations = await localStorageService.getConversationsByUserId(req.user._id);
         
-        const conversationsWithDetails = await Promise.all(
+        const conversationsWithLastMessage = await Promise.all(
             conversations.map(async (conv) => {
-                const lastMessage = conv.lastMessage;
-                const otherParticipants = conv.participants.filter(p => p !== req.user._id);
-                
-                let conversationName = conv.name;
-                let conversationAvatar = null;
-                
-                if (!conv.isGroup && otherParticipants.length === 1) {
-                    const otherUser = await localStorageService.findUserById(otherParticipants[0]);
-                    if (otherUser) {
-                        conversationName = otherUser.fullName;
-                        conversationAvatar = otherUser.avatar;
-                    }
-                }
-                
+                const messages = await localStorageService.getMessagesByConversation(conv._id, 1);
+                const lastMessage = messages[messages.length - 1];
                 return {
                     ...conv,
-                    name: conversationName,
-                    avatar: conversationAvatar,
-                    unreadCount: conv.unreadCount[req.user._id] || 0
+                    lastMessage: lastMessage || null
                 };
             })
         );
@@ -1393,12 +1367,9 @@ app.get('/api/conversations', authenticateToken, async (req, res) => {
         res.json({
             success: true,
             data: {
-                conversations: conversationsWithDetails.sort((a, b) => 
-                    new Date(b.updatedAt) - new Date(a.updatedAt)
-                )
+                conversations: conversationsWithLastMessage
             }
         });
-
     } catch (error) {
         console.error('❌ خطأ في جلب المحادثات:', error);
         res.status(500).json({
@@ -1409,28 +1380,53 @@ app.get('/api/conversations', authenticateToken, async (req, res) => {
     }
 });
 
-app.get('/api/conversations/:conversationId/messages', authenticateToken, async (req, res) => {
+app.post('/api/chat/conversations', authenticateToken, async (req, res) => {
+    try {
+        const { participantId } = req.body;
+        
+        if (!participantId) {
+            return res.status(400).json({
+                success: false,
+                message: 'معرف المشارك مطلوب',
+                code: 'MISSING_PARTICIPANT'
+            });
+        }
+
+        const participant = await localStorageService.findUserById(participantId);
+        if (!participant) {
+            return res.status(404).json({
+                success: false,
+                message: 'المستخدم غير موجود',
+                code: 'USER_NOT_FOUND'
+            });
+        }
+
+        const conversation = await localStorageService.getOrCreateConversation(
+            req.user._id,
+            participantId
+        );
+
+        res.json({
+            success: true,
+            data: {
+                conversation
+            }
+        });
+    } catch (error) {
+        console.error('❌ خطأ في إنشاء المحادثة:', error);
+        res.status(500).json({
+            success: false,
+            message: 'حدث خطأ في الخادم',
+            code: 'SERVER_ERROR'
+        });
+    }
+});
+
+app.get('/api/chat/conversations/:conversationId/messages', authenticateToken, async (req, res) => {
     try {
         const { conversationId } = req.params;
         const { limit = 50 } = req.query;
-
-        const conversation = await localStorageService.getConversationById(conversationId);
-        if (!conversation) {
-            return res.status(404).json({
-                success: false,
-                message: 'المحادثة غير موجودة',
-                code: 'CONVERSATION_NOT_FOUND'
-            });
-        }
-
-        if (!conversation.participants.includes(req.user._id)) {
-            return res.status(403).json({
-                success: false,
-                message: 'غير مصرح لك بالوصول لهذه المحادثة',
-                code: 'ACCESS_DENIED'
-            });
-        }
-
+        
         const messages = await localStorageService.getMessagesByConversation(conversationId, parseInt(limit));
         
         await localStorageService.markMessagesAsRead(conversationId, req.user._id);
@@ -1439,13 +1435,12 @@ app.get('/api/conversations/:conversationId/messages', authenticateToken, async 
             success: true,
             data: {
                 messages,
-                conversation: {
-                    ...conversation,
-                    unreadCount: conversation.unreadCount[req.user._id] || 0
+                pagination: {
+                    hasMore: messages.length === parseInt(limit),
+                    limit: parseInt(limit)
                 }
             }
         });
-
     } catch (error) {
         console.error('❌ خطأ في جلب الرسائل:', error);
         res.status(500).json({
@@ -1459,19 +1454,13 @@ app.get('/api/conversations/:conversationId/messages', authenticateToken, async 
 // مسارات القنوات
 app.get('/api/channels', authenticateToken, async (req, res) => {
     try {
-        const channels = await localStorageService.getAllChannels();
-        
+        const channels = await localStorageService.getUserChannels(req.user._id);
         res.json({
             success: true,
             data: {
-                channels: channels.filter(channel => 
-                    channel.isPublic || 
-                    channel.members.includes(req.user._id) ||
-                    channel.admins.includes(req.user._id)
-                )
+                channels
             }
         });
-
     } catch (error) {
         console.error('❌ خطأ في جلب القنوات:', error);
         res.status(500).json({
@@ -1482,47 +1471,33 @@ app.get('/api/channels', authenticateToken, async (req, res) => {
     }
 });
 
-app.get('/api/channels/my', authenticateToken, async (req, res) => {
-    try {
-        const channels = await localStorageService.getUserChannels(req.user._id);
-        
-        res.json({
-            success: true,
-            data: {
-                channels
-            }
-        });
-
-    } catch (error) {
-        console.error('❌ خطأ في جلب قنوات المستخدم:', error);
-        res.status(500).json({
-            success: false,
-            message: 'حدث خطأ في الخادم',
-            code: 'SERVER_ERROR'
-        });
-    }
-});
-
-app.post('/api/channels', authenticateToken, async (req, res) => {
+app.post('/api/channels', authenticateToken, upload.single('channelAvatar'), async (req, res) => {
     try {
         const { name, description, isPublic = true } = req.body;
-
+        
         if (!name) {
             return res.status(400).json({
                 success: false,
                 message: 'اسم القناة مطلوب',
-                code: 'CHANNEL_NAME_REQUIRED'
+                code: 'MISSING_NAME'
             });
         }
 
-        const channel = await localStorageService.createChannel({
-            name: name.trim(),
-            description: description?.trim(),
+        const channelData = {
+            name,
+            description,
+            isPublic: isPublic === 'true' || isPublic === true,
             creatorId: req.user._id,
-            isPublic: isPublic !== false
-        });
+            members: [req.user._id]
+        };
 
-        await auditLog('CREATE_CHANNEL', req.user._id, 'channel', channel._id, { name, isPublic });
+        if (req.file) {
+            channelData.avatar = `/uploads/channels/${req.file.filename}`;
+        }
+
+        const channel = await localStorageService.createChannel(channelData);
+
+        await auditLog('CREATE_CHANNEL', req.user._id, 'channel', channel._id, { name });
 
         res.status(201).json({
             success: true,
@@ -1531,63 +1506,8 @@ app.post('/api/channels', authenticateToken, async (req, res) => {
                 channel
             }
         });
-
     } catch (error) {
         console.error('❌ خطأ في إنشاء القناة:', error);
-        res.status(500).json({
-            success: false,
-            message: 'حدث خطأ في الخادم',
-            code: 'SERVER_ERROR'
-        });
-    }
-});
-
-app.post('/api/channels/:channelId/join', authenticateToken, async (req, res) => {
-    try {
-        const { channelId } = req.params;
-
-        const channel = await localStorageService.getChannelById(channelId);
-        if (!channel) {
-            return res.status(404).json({
-                success: false,
-                message: 'القناة غير موجودة',
-                code: 'CHANNEL_NOT_FOUND'
-            });
-        }
-
-        if (!channel.isPublic && !channel.admins.includes(req.user._id)) {
-            return res.status(403).json({
-                success: false,
-                message: 'هذه القناة خاصة وتحتاج إلى دعوة',
-                code: 'CHANNEL_PRIVATE'
-            });
-        }
-
-        const success = await localStorageService.addMemberToChannel(channelId, req.user._id);
-        
-        if (success) {
-            await auditLog('JOIN_CHANNEL', req.user._id, 'channel', channelId);
-            
-            res.json({
-                success: true,
-                message: 'تم الانضمام للقناة بنجاح',
-                data: {
-                    channel: {
-                        ...channel,
-                        members: [...channel.members, req.user._id]
-                    }
-                }
-            });
-        } else {
-            res.status(400).json({
-                success: false,
-                message: 'أنت بالفعل عضو في هذه القناة',
-                code: 'ALREADY_MEMBER'
-            });
-        }
-
-    } catch (error) {
-        console.error('❌ خطأ في الانضمام للقناة:', error);
         res.status(500).json({
             success: false,
             message: 'حدث خطأ في الخادم',
@@ -1600,36 +1520,42 @@ app.get('/api/channels/:channelId/messages', authenticateToken, async (req, res)
     try {
         const { channelId } = req.params;
         const { limit = 50 } = req.query;
-
-        const channel = await localStorageService.getChannelById(channelId);
-        if (!channel) {
-            return res.status(404).json({
-                success: false,
-                message: 'القناة غير موجودة',
-                code: 'CHANNEL_NOT_FOUND'
-            });
-        }
-
-        if (!channel.members.includes(req.user._id) && !channel.admins.includes(req.user._id)) {
-            return res.status(403).json({
-                success: false,
-                message: 'غير مصرح لك بالوصول لهذه القناة',
-                code: 'ACCESS_DENIED'
-            });
-        }
-
+        
         const messages = await localStorageService.getChannelMessages(channelId, parseInt(limit));
-
         res.json({
             success: true,
             data: {
-                messages,
-                channel
+                messages
             }
         });
-
     } catch (error) {
         console.error('❌ خطأ في جلب رسائل القناة:', error);
+        res.status(500).json({
+            success: false,
+            message: 'حدث خطأ في الخادم',
+            code: 'SERVER_ERROR'
+        });
+    }
+});
+
+app.post('/api/channels/:channelId/join', authenticateToken, async (req, res) => {
+    try {
+        const { channelId } = req.params;
+        const success = await localStorageService.addMemberToChannel(channelId, req.user._id);
+        
+        if (success) {
+            res.json({
+                success: true,
+                message: 'تم الانضمام إلى القناة بنجاح'
+            });
+        } else {
+            res.status(400).json({
+                success: false,
+                message: 'لم يتمكن من الانضمام إلى القناة'
+            });
+        }
+    } catch (error) {
+        console.error('❌ خطأ في الانضمام إلى القناة:', error);
         res.status(500).json({
             success: false,
             message: 'حدث خطأ في الخادم',
@@ -1641,18 +1567,13 @@ app.get('/api/channels/:channelId/messages', authenticateToken, async (req, res)
 // مسارات المجموعات
 app.get('/api/groups', authenticateToken, async (req, res) => {
     try {
-        const groups = await localStorageService.getAllGroups();
-        
+        const groups = await localStorageService.getUserGroups(req.user._id);
         res.json({
             success: true,
             data: {
-                groups: groups.filter(group => 
-                    group.isPublic || 
-                    group.members.includes(req.user._id)
-                )
+                groups
             }
         });
-
     } catch (error) {
         console.error('❌ خطأ في جلب المجموعات:', error);
         res.status(500).json({
@@ -1663,47 +1584,33 @@ app.get('/api/groups', authenticateToken, async (req, res) => {
     }
 });
 
-app.get('/api/groups/my', authenticateToken, async (req, res) => {
-    try {
-        const groups = await localStorageService.getUserGroups(req.user._id);
-        
-        res.json({
-            success: true,
-            data: {
-                groups
-            }
-        });
-
-    } catch (error) {
-        console.error('❌ خطأ في جلب مجموعات المستخدم:', error);
-        res.status(500).json({
-            success: false,
-            message: 'حدث خطأ في الخادم',
-            code: 'SERVER_ERROR'
-        });
-    }
-});
-
-app.post('/api/groups', authenticateToken, async (req, res) => {
+app.post('/api/groups', authenticateToken, upload.single('groupAvatar'), async (req, res) => {
     try {
         const { name, description, isPublic = true } = req.body;
-
+        
         if (!name) {
             return res.status(400).json({
                 success: false,
                 message: 'اسم المجموعة مطلوب',
-                code: 'GROUP_NAME_REQUIRED'
+                code: 'MISSING_NAME'
             });
         }
 
-        const group = await localStorageService.createGroup({
-            name: name.trim(),
-            description: description?.trim(),
+        const groupData = {
+            name,
+            description,
+            isPublic: isPublic === 'true' || isPublic === true,
             creatorId: req.user._id,
-            isPublic: isPublic !== false
-        });
+            members: [req.user._id]
+        };
 
-        await auditLog('CREATE_GROUP', req.user._id, 'group', group._id, { name, isPublic });
+        if (req.file) {
+            groupData.avatar = `/uploads/groups/${req.file.filename}`;
+        }
+
+        const group = await localStorageService.createGroup(groupData);
+
+        await auditLog('CREATE_GROUP', req.user._id, 'group', group._id, { name });
 
         res.status(201).json({
             success: true,
@@ -1712,63 +1619,8 @@ app.post('/api/groups', authenticateToken, async (req, res) => {
                 group
             }
         });
-
     } catch (error) {
         console.error('❌ خطأ في إنشاء المجموعة:', error);
-        res.status(500).json({
-            success: false,
-            message: 'حدث خطأ في الخادم',
-            code: 'SERVER_ERROR'
-        });
-    }
-});
-
-app.post('/api/groups/:groupId/join', authenticateToken, async (req, res) => {
-    try {
-        const { groupId } = req.params;
-
-        const group = await localStorageService.getGroupById(groupId);
-        if (!group) {
-            return res.status(404).json({
-                success: false,
-                message: 'المجموعة غير موجودة',
-                code: 'GROUP_NOT_FOUND'
-            });
-        }
-
-        if (!group.isPublic && !group.admins.includes(req.user._id)) {
-            return res.status(403).json({
-                success: false,
-                message: 'هذه المجموعة خاصة وتحتاج إلى دعوة',
-                code: 'GROUP_PRIVATE'
-            });
-        }
-
-        const success = await localStorageService.addMemberToGroup(groupId, req.user._id);
-        
-        if (success) {
-            await auditLog('JOIN_GROUP', req.user._id, 'group', groupId);
-            
-            res.json({
-                success: true,
-                message: 'تم الانضمام للمجموعة بنجاح',
-                data: {
-                    group: {
-                        ...group,
-                        members: [...group.members, req.user._id]
-                    }
-                }
-            });
-        } else {
-            res.status(400).json({
-                success: false,
-                message: 'أنت بالفعل عضو في هذه المجموعة',
-                code: 'ALREADY_MEMBER'
-            });
-        }
-
-    } catch (error) {
-        console.error('❌ خطأ في الانضمام للمجموعة:', error);
         res.status(500).json({
             success: false,
             message: 'حدث خطأ في الخادم',
@@ -1781,36 +1633,42 @@ app.get('/api/groups/:groupId/messages', authenticateToken, async (req, res) => 
     try {
         const { groupId } = req.params;
         const { limit = 50 } = req.query;
-
-        const group = await localStorageService.getGroupById(groupId);
-        if (!group) {
-            return res.status(404).json({
-                success: false,
-                message: 'المجموعة غير موجودة',
-                code: 'GROUP_NOT_FOUND'
-            });
-        }
-
-        if (!group.members.includes(req.user._id)) {
-            return res.status(403).json({
-                success: false,
-                message: 'غير مصرح لك بالوصول لهذه المجموعة',
-                code: 'ACCESS_DENIED'
-            });
-        }
-
+        
         const messages = await localStorageService.getGroupMessages(groupId, parseInt(limit));
-
         res.json({
             success: true,
             data: {
-                messages,
-                group
+                messages
             }
         });
-
     } catch (error) {
         console.error('❌ خطأ في جلب رسائل المجموعة:', error);
+        res.status(500).json({
+            success: false,
+            message: 'حدث خطأ في الخادم',
+            code: 'SERVER_ERROR'
+        });
+    }
+});
+
+app.post('/api/groups/:groupId/join', authenticateToken, async (req, res) => {
+    try {
+        const { groupId } = req.params;
+        const success = await localStorageService.addMemberToGroup(groupId, req.user._id);
+        
+        if (success) {
+            res.json({
+                success: true,
+                message: 'تم الانضمام إلى المجموعة بنجاح'
+            });
+        } else {
+            res.status(400).json({
+                success: false,
+                message: 'لم يتمكن من الانضمام إلى المجموعة'
+            });
+        }
+    } catch (error) {
+        console.error('❌ خطأ في الانضمام إلى المجموعة:', error);
         res.status(500).json({
             success: false,
             message: 'حدث خطأ في الخادم',
@@ -1823,25 +1681,12 @@ app.get('/api/groups/:groupId/messages', authenticateToken, async (req, res) => 
 app.get('/api/stories', authenticateToken, async (req, res) => {
     try {
         const stories = await localStorageService.getActiveStories();
-        
-        const storiesWithUserDetails = await Promise.all(
-            stories.map(async (story) => {
-                const user = await localStorageService.findUserById(story.userId);
-                return {
-                    ...story,
-                    user: user ? localStorageService.formatUserResponse(user) : null,
-                    hasViewed: story.views.includes(req.user._id)
-                };
-            })
-        );
-
         res.json({
             success: true,
             data: {
-                stories: storiesWithUserDetails
+                stories
             }
         });
-
     } catch (error) {
         console.error('❌ خطأ في جلب الستوريات:', error);
         res.status(500).json({
@@ -1852,44 +1697,37 @@ app.get('/api/stories', authenticateToken, async (req, res) => {
     }
 });
 
-app.post('/api/stories', authenticateToken, async (req, res) => {
+app.post('/api/stories', authenticateToken, upload.single('media'), async (req, res) => {
     try {
-        const { content, type = 'text', mediaUrl, caption } = req.body;
-
-        if (!content && !mediaUrl) {
+        const { caption } = req.body;
+        
+        if (!req.file) {
             return res.status(400).json({
                 success: false,
-                message: 'المحتوى أو الوسائط مطلوبة',
-                code: 'CONTENT_REQUIRED'
+                message: 'الوسائط مطلوبة',
+                code: 'MISSING_MEDIA'
             });
         }
 
         const story = await localStorageService.createStory({
             userId: req.user._id,
-            content,
-            type,
-            mediaUrl,
+            mediaUrl: `/uploads/stories/${req.file.filename}`,
+            mediaType: req.file.mimetype.startsWith('image/') ? 'image' : 'video',
             caption,
-            metrics: {
-                viewCount: 0,
-                replyCount: 0,
-                reactionCount: 0,
-                shareCount: 0
-            }
+            createdAt: new Date().toISOString()
         });
 
-        await auditLog('CREATE_STORY', req.user._id, 'story', story._id, { type });
+        await auditLog('CREATE_STORY', req.user._id, 'story', story._id);
 
         res.status(201).json({
             success: true,
-            message: 'تم نشر الستوري بنجاح',
+            message: 'تم نشر القصة بنجاح',
             data: {
                 story
             }
         });
-
     } catch (error) {
-        console.error('❌ خطأ في إنشاء الستوري:', error);
+        console.error('❌ خطأ في نشر القصة:', error);
         res.status(500).json({
             success: false,
             message: 'حدث خطأ في الخادم',
@@ -1901,7 +1739,6 @@ app.post('/api/stories', authenticateToken, async (req, res) => {
 app.post('/api/stories/:storyId/view', authenticateToken, async (req, res) => {
     try {
         const { storyId } = req.params;
-
         const success = await localStorageService.addStoryView(storyId, req.user._id);
         
         if (success) {
@@ -1912,11 +1749,9 @@ app.post('/api/stories/:storyId/view', authenticateToken, async (req, res) => {
         } else {
             res.status(400).json({
                 success: false,
-                message: 'تمت مشاهدة الستوري مسبقاً',
-                code: 'ALREADY_VIEWED'
+                message: 'لم يتم تسجيل المشاهدة'
             });
         }
-
     } catch (error) {
         console.error('❌ خطأ في تسجيل المشاهدة:', error);
         res.status(500).json({
@@ -1927,157 +1762,7 @@ app.post('/api/stories/:storyId/view', authenticateToken, async (req, res) => {
     }
 });
 
-// مسارات الإدارة
-app.get('/api/admin/stats', authenticateToken, requireAdmin, async (req, res) => {
-    try {
-        const stats = localStorageService.getStats();
-        
-        res.json({
-            success: true,
-            data: {
-                stats
-            }
-        });
-
-    } catch (error) {
-        console.error('❌ خطأ في جلب إحصائيات المدير:', error);
-        res.status(500).json({
-            success: false,
-            message: 'حدث خطأ في الخادم',
-            code: 'SERVER_ERROR'
-        });
-    }
-});
-
-app.post('/api/admin/backup', authenticateToken, requireAdmin, async (req, res) => {
-    try {
-        const result = await localStorageService.createBackup();
-        
-        if (result.success) {
-            res.json({
-                success: true,
-                message: 'تم إنشاء النسخة الاحتياطية بنجاح',
-                data: {
-                    filename: result.filename
-                }
-            });
-        } else {
-            res.status(500).json({
-                success: false,
-                message: 'فشل في إنشاء النسخة الاحتياطية',
-                code: 'BACKUP_FAILED'
-            });
-        }
-
-    } catch (error) {
-        console.error('❌ خطأ في إنشاء النسخة الاحتياطية:', error);
-        res.status(500).json({
-            success: false,
-            message: 'حدث خطأ في الخادم',
-            code: 'SERVER_ERROR'
-        });
-    }
-});
-
-app.get('/api/admin/backups', authenticateToken, requireAdmin, async (req, res) => {
-    try {
-        const data = localStorageService.loadData();
-        
-        res.json({
-            success: true,
-            data: {
-                backups: data.backups || []
-            }
-        });
-
-    } catch (error) {
-        console.error('❌ خطأ في جلب النسخ الاحتياطية:', error);
-        res.status(500).json({
-            success: false,
-            message: 'حدث خطأ في الخادم',
-            code: 'SERVER_ERROR'
-        });
-    }
-});
-
-// مسار تحميل الملفات
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        const uploadPath = path.join(UPLOAD_DIR, file.fieldname);
-        if (!fs.existsSync(uploadPath)) {
-            fs.mkdirSync(uploadPath, { recursive: true });
-        }
-        cb(null, uploadPath);
-    },
-    filename: (req, file, cb) => {
-        const uniqueName = `${Date.now()}-${Math.round(Math.random() * 1E9)}${path.extname(file.originalname)}`;
-        cb(null, uniqueName);
-    }
-});
-
-const upload = multer({
-    storage: storage,
-    limits: {
-        fileSize: 50 * 1024 * 1024 // 50MB
-    },
-    fileFilter: (req, file, cb) => {
-        const allowedTypes = {
-            'images': ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
-            'videos': ['video/mp4', 'video/mpeg', 'video/quicktime'],
-            'files': ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']
-        };
-
-        let isValid = false;
-        for (const [field, types] of Object.entries(allowedTypes)) {
-            if (types.includes(file.mimetype)) {
-                isValid = true;
-                break;
-            }
-        }
-
-        if (isValid) {
-            cb(null, true);
-        } else {
-            cb(new Error('نوع الملف غير مدعوم'), false);
-        }
-    }
-});
-
-app.post('/api/upload', authenticateToken, upload.single('file'), (req, res) => {
-    try {
-        if (!req.file) {
-            return res.status(400).json({
-                success: false,
-                message: 'لم يتم تحميل أي ملف',
-                code: 'NO_FILE_UPLOADED'
-            });
-        }
-
-        const fileUrl = `/uploads/${req.file.fieldname}/${req.file.filename}`;
-
-        res.json({
-            success: true,
-            message: 'تم تحميل الملف بنجاح',
-            data: {
-                filename: req.file.filename,
-                originalName: req.file.originalname,
-                size: req.file.size,
-                mimetype: req.file.mimetype,
-                url: fileUrl
-            }
-        });
-
-    } catch (error) {
-        console.error('❌ خطأ في تحميل الملف:', error);
-        res.status(500).json({
-            success: false,
-            message: 'حدث خطأ في تحميل الملف',
-            code: 'UPLOAD_ERROR'
-        });
-    }
-});
-
-// مسار الصحة
+// مسار الحالة الصحية
 app.get('/api/health', (req, res) => {
     const stats = localStorageService.getStats();
     
@@ -2088,87 +1773,130 @@ app.get('/api/health', (req, res) => {
             timestamp: new Date().toISOString(),
             uptime: process.uptime(),
             memory: process.memoryUsage(),
-            stats: stats,
-            connectedUsers: connectedUsers.size
+            connectedUsers: connectedUsers.size,
+            stats: stats
         }
     });
 });
 
-// ==================== WebSocket Events ====================
-
-io.use(async (socket, next) => {
+// مسار تحميل الملفات
+app.post('/api/upload', authenticateToken, upload.single('file'), async (req, res) => {
     try {
-        const token = socket.handshake.auth.token;
-        
-        if (!token) {
-            return next(new Error('رمز المصادقة مطلوب'));
+        if (!req.file) {
+            return res.status(400).json({
+                success: false,
+                message: 'لم يتم تحميل أي ملف',
+                code: 'NO_FILE_UPLOADED'
+            });
         }
 
-        const decoded = jwt.verify(token, JWT_SECRET);
-        const user = await localStorageService.findUserById(decoded.userId);
-        
-        if (!user) {
-            return next(new Error('المستخدم غير موجود'));
-        }
+        const fileInfo = {
+            filename: req.file.filename,
+            originalName: req.file.originalname,
+            mimetype: req.file.mimetype,
+            size: req.file.size,
+            url: `/uploads/files/${req.file.filename}`,
+            uploadedBy: req.user._id,
+            uploadedAt: new Date().toISOString()
+        };
 
-        if (!user.isActive) {
-            return next(new Error('الحساب موقوف'));
-        }
+        await auditLog('UPLOAD_FILE', req.user._id, 'FILE', req.file.filename, {
+            size: req.file.size,
+            type: req.file.mimetype
+        });
 
-        socket.userId = user._id;
-        socket.user = user;
-        next();
+        res.json({
+            success: true,
+            message: 'تم تحميل الملف بنجاح',
+            data: fileInfo
+        });
+
     } catch (error) {
-        console.error('❌ خطأ في مصادقة WebSocket:', error);
-        next(new Error('مصادقة غير صالحة'));
+        console.error('❌ خطأ في تحميل الملف:', error);
+        res.status(500).json({
+            success: false,
+            message: 'حدث خطأ أثناء تحميل الملف',
+            code: 'UPLOAD_ERROR'
+        });
     }
 });
 
-io.on('connection', async (socket) => {
-    console.log(`🔗 مستخدم متصل: ${socket.user.fullName} (${socket.userId})`);
-    
-    // تخزين بيانات المستخدم المتصل
-    connectedUsers.set(socket.userId, {
-        socketId: socket.id,
-        user: socket.user,
-        connectedAt: new Date().toISOString()
-    });
-    
-    userSockets.set(socket.userId, socket.id);
+// ==================== نظام السوكت المحسن ====================
 
-    // تحديث حالة المستخدم إلى متصل
-    await localStorageService.updateUser(socket.userId, {
-        isOnline: true,
-        lastSeen: new Date().toISOString()
+io.on('connection', (socket) => {
+    console.log('🔌 مستخدم متصل:', socket.id);
+
+    socket.on('authenticate', async (data) => {
+        try {
+            const { token } = data;
+            if (!token) {
+                socket.emit('authentication_failed', { message: 'رمز المصادقة مطلوب' });
+                return;
+            }
+
+            const decoded = jwt.verify(token, JWT_SECRET);
+            const user = await localStorageService.findUserById(decoded.userId);
+            
+            if (!user) {
+                socket.emit('authentication_failed', { message: 'المستخدم غير موجود' });
+                return;
+            }
+
+            socket.userId = user._id;
+            connectedUsers.set(user._id, {
+                socketId: socket.id,
+                user: localStorageService.formatUserResponse(user),
+                lastSeen: new Date().toISOString()
+            });
+            userSockets.set(socket.id, user._id);
+
+            await localStorageService.updateUser(user._id, {
+                isOnline: true,
+                lastSeen: new Date().toISOString()
+            });
+
+            socket.join(`user:${user._id}`);
+            
+            const userChannels = await localStorageService.getUserChannels(user._id);
+            userChannels.forEach(channel => {
+                socket.join(`channel:${channel._id}`);
+            });
+
+            const userGroups = await localStorageService.getUserGroups(user._id);
+            userGroups.forEach(group => {
+                socket.join(`group:${group._id}`);
+            });
+
+            io.emit('user_status_changed', {
+                userId: user._id,
+                isOnline: true,
+                lastSeen: new Date().toISOString()
+            });
+
+            socket.emit('authenticated', { 
+                user: localStorageService.formatUserResponse(user),
+                message: 'تم المصادقة بنجاح'
+            });
+
+            console.log(`✅ تم مصادقة المستخدم: ${user.fullName} (${socket.id})`);
+
+        } catch (error) {
+            console.error('❌ خطأ في مصادقة السوكت:', error);
+            socket.emit('authentication_failed', { message: 'فشل المصادقة' });
+        }
     });
 
-    // الانضمام إلى غرف المستخدم
-    socket.join(socket.userId);
-    
-    // الانضمام إلى القنوات والمجموعات التي ينتمي إليها المستخدم
-    const userChannels = await localStorageService.getUserChannels(socket.userId);
-    userChannels.forEach(channel => {
-        socket.join(`channel_${channel._id}`);
-    });
-
-    const userGroups = await localStorageService.getUserGroups(socket.userId);
-    userGroups.forEach(group => {
-        socket.join(`group_${group._id}`);
-    });
-
-    // إرسال حدث اتصال للمستخدمين الآخرين
-    socket.broadcast.emit('user_online', {
-        userId: socket.userId,
-        user: localStorageService.formatUserResponse(socket.user)
-    });
-
-    // ============ أحداث المحادثات الفردية ============
     socket.on('send_message', async (data) => {
         try {
-            const { conversationId, content, type = 'text', mediaUrl } = data;
+            if (!socket.userId) {
+                socket.emit('error', { message: 'غير مصرح به' });
+                return;
+            }
 
-            if (!conversationId || (!content && !mediaUrl)) {
-                socket.emit('error', { message: 'معرّف المحادثة والمحتوى مطلوبان' });
+            const { conversationId, content, type = 'text' } = data;
+            
+            if (!conversationId || !content) {
+                socket.emit('error', { message: 'معرف المحادثة والمحتوى مطلوبان' });
                 return;
             }
 
@@ -2178,141 +1906,45 @@ io.on('connection', async (socket) => {
                 return;
             }
 
-            if (!conversation.participants.includes(socket.userId)) {
-                socket.emit('error', { message: 'غير مصرح لك بإرسال رسالة في هذه المحادثة' });
-                return;
-            }
-
             const message = await localStorageService.createMessage({
                 conversationId,
                 senderId: socket.userId,
                 content,
                 type,
-                mediaUrl
+                createdAt: new Date().toISOString()
             });
 
-            // إرسال الرسالة لجميع المشاركين في المحادثة
+            const sender = await localStorageService.findUserById(socket.userId);
+
             conversation.participants.forEach(participantId => {
-                if (connectedUsers.has(participantId)) {
-                    io.to(participantId).emit('new_message', {
-                        message,
-                        conversationId
-                    });
-                }
+                io.to(`user:${participantId}`).emit('new_message', {
+                    conversationId,
+                    message: {
+                        ...message,
+                        sender: localStorageService.formatUserResponse(sender)
+                    }
+                });
             });
 
-            console.log(`💬 رسالة جديدة في المحادثة ${conversationId} من ${socket.user.fullName}`);
+            console.log(`💬 رسالة جديدة في المحادثة ${conversationId}`);
 
         } catch (error) {
             console.error('❌ خطأ في إرسال الرسالة:', error);
-            socket.emit('error', { message: 'فشل في إرسال الرسالة' });
+            socket.emit('error', { message: 'فشل إرسال الرسالة' });
         }
     });
 
-    socket.on('start_conversation', async (data) => {
+    socket.on('send_channel_message', async (data) => {
         try {
-            const { participantIds, name } = data;
-
-            if (!participantIds || participantIds.length === 0) {
-                socket.emit('error', { message: 'يجب تحديد مشاركين على الأقل' });
+            if (!socket.userId) {
+                socket.emit('error', { message: 'غير مصرح به' });
                 return;
             }
 
-            const allParticipants = [...new Set([socket.userId, ...participantIds])];
-            const isGroup = allParticipants.length > 2;
-
-            const conversation = await localStorageService.createConversation(
-                allParticipants, 
-                name, 
-                isGroup
-            );
-
-            // إرسال المحادثة الجديدة لجميع المشاركين
-            allParticipants.forEach(participantId => {
-                if (connectedUsers.has(participantId)) {
-                    io.to(participantId).emit('conversation_created', {
-                        conversation
-                    });
-                }
-            });
-
-            socket.emit('conversation_started', { conversation });
-
-        } catch (error) {
-            console.error('❌ خطأ في بدء المحادثة:', error);
-            socket.emit('error', { message: 'فشل في بدء المحادثة' });
-        }
-    });
-
-    socket.on('typing_start', async (data) => {
-        try {
-            const { conversationId } = data;
-            const conversation = await localStorageService.getConversationById(conversationId);
+            const { channelId, content, type = 'text' } = data;
             
-            if (conversation) {
-                conversation.participants.forEach(participantId => {
-                    if (participantId !== socket.userId && connectedUsers.has(participantId)) {
-                        io.to(participantId).emit('user_typing', {
-                            conversationId,
-                            userId: socket.userId,
-                            userName: socket.user.fullName
-                        });
-                    }
-                });
-            }
-        } catch (error) {
-            console.error('❌ خطأ في إرسال حدث الكتابة:', error);
-        }
-    });
-
-    socket.on('typing_stop', async (data) => {
-        try {
-            const { conversationId } = data;
-            const conversation = await localStorageService.getConversationById(conversationId);
-            
-            if (conversation) {
-                conversation.participants.forEach(participantId => {
-                    if (participantId !== socket.userId && connectedUsers.has(participantId)) {
-                        io.to(participantId).emit('user_stop_typing', {
-                            conversationId,
-                            userId: socket.userId
-                        });
-                    }
-                });
-            }
-        } catch (error) {
-            console.error('❌ خطأ في إرسال حدث توقف الكتابة:', error);
-        }
-    });
-
-    socket.on('mark_messages_read', async (data) => {
-        try {
-            const { conversationId } = data;
-            await localStorageService.markMessagesAsRead(conversationId, socket.userId);
-            
-            const conversation = await localStorageService.getConversationById(conversationId);
-            if (conversation) {
-                conversation.participants.forEach(participantId => {
-                    if (participantId !== socket.userId && connectedUsers.has(participantId)) {
-                        io.to(participantId).emit('messages_read', {
-                            conversationId,
-                            userId: socket.userId
-                        });
-                    }
-                });
-            }
-        } catch (error) {
-            console.error('❌ خطأ في تعليم الرسائل كمقروءة:', error);
-        }
-    });
-
-    // ============ أحداث القنوات ============
-    socket.on('send_channel_message', async (data) => {
-        try {
-            const { channelId, content, type = 'text', mediaUrl } = data;
-
-            if (!channelId || (!content && !mediaUrl)) {
-                socket.emit('error', { message: 'معرّف القناة والمحتوى مطلوبان' });
+            if (!channelId || !content) {
+                socket.emit('error', { message: 'معرف القناة والمحتوى مطلوبان' });
                 return;
             }
 
@@ -2323,7 +1955,7 @@ io.on('connection', async (socket) => {
             }
 
             if (!channel.members.includes(socket.userId) && !channel.admins.includes(socket.userId)) {
-                socket.emit('error', { message: 'غير مصرح لك بإرسال رسالة في هذه القناة' });
+                socket.emit('error', { message: 'لست عضواً في هذه القناة' });
                 return;
             }
 
@@ -2332,51 +1964,38 @@ io.on('connection', async (socket) => {
                 senderId: socket.userId,
                 content,
                 type,
-                mediaUrl
+                createdAt: new Date().toISOString()
             });
 
-            // إرسال الرسالة لجميع أعضاء القناة
-            io.to(`channel_${channelId}`).emit('new_channel_message', {
-                message,
-                channelId
+            const sender = await localStorageService.findUserById(socket.userId);
+
+            io.to(`channel:${channelId}`).emit('new_channel_message', {
+                channelId,
+                message: {
+                    ...message,
+                    sender: localStorageService.formatUserResponse(sender)
+                }
             });
 
-            console.log(`📢 رسالة جديدة في القناة ${channel.name} من ${socket.user.fullName}`);
+            console.log(`📢 رسالة جديدة في القناة ${channelId}`);
 
         } catch (error) {
             console.error('❌ خطأ في إرسال رسالة القناة:', error);
-            socket.emit('error', { message: 'فشل في إرسال الرسالة' });
+            socket.emit('error', { message: 'فشل إرسال رسالة القناة' });
         }
     });
 
-    socket.on('join_channel', async (data) => {
-        try {
-            const { channelId } = data;
-            const channel = await localStorageService.getChannelById(channelId);
-            
-            if (channel && (channel.isPublic || channel.members.includes(socket.userId))) {
-                socket.join(`channel_${channelId}`);
-                socket.emit('channel_joined', { channelId });
-                
-                // إعلام الأعضاء الآخرين
-                socket.to(`channel_${channelId}`).emit('user_joined_channel', {
-                    channelId,
-                    user: localStorageService.formatUserResponse(socket.user)
-                });
-            }
-        } catch (error) {
-            console.error('❌ خطأ في الانضمام للقناة:', error);
-            socket.emit('error', { message: 'فشل في الانضمام للقناة' });
-        }
-    });
-
-    // ============ أحداث المجموعات ============
     socket.on('send_group_message', async (data) => {
         try {
-            const { groupId, content, type = 'text', mediaUrl } = data;
+            if (!socket.userId) {
+                socket.emit('error', { message: 'غير مصرح به' });
+                return;
+            }
 
-            if (!groupId || (!content && !mediaUrl)) {
-                socket.emit('error', { message: 'معرّف المجموعة والمحتوى مطلوبان' });
+            const { groupId, content, type = 'text' } = data;
+            
+            if (!groupId || !content) {
+                socket.emit('error', { message: 'معرف المجموعة والمحتوى مطلوبان' });
                 return;
             }
 
@@ -2387,7 +2006,7 @@ io.on('connection', async (socket) => {
             }
 
             if (!group.members.includes(socket.userId)) {
-                socket.emit('error', { message: 'غير مصرح لك بإرسال رسالة في هذه المجموعة' });
+                socket.emit('error', { message: 'لست عضواً في هذه المجموعة' });
                 return;
             }
 
@@ -2396,190 +2015,146 @@ io.on('connection', async (socket) => {
                 senderId: socket.userId,
                 content,
                 type,
-                mediaUrl
+                createdAt: new Date().toISOString()
             });
 
-            // إرسال الرسالة لجميع أعضاء المجموعة
-            io.to(`group_${groupId}`).emit('new_group_message', {
-                message,
-                groupId
+            const sender = await localStorageService.findUserById(socket.userId);
+
+            io.to(`group:${groupId}`).emit('new_group_message', {
+                groupId,
+                message: {
+                    ...message,
+                    sender: localStorageService.formatUserResponse(sender)
+                }
             });
 
-            console.log(`👥 رسالة جديدة في المجموعة ${group.name} من ${socket.user.fullName}`);
+            console.log(`👥 رسالة جديدة في المجموعة ${groupId}`);
 
         } catch (error) {
             console.error('❌ خطأ في إرسال رسالة المجموعة:', error);
-            socket.emit('error', { message: 'فشل في إرسال الرسالة' });
+            socket.emit('error', { message: 'فشل إرسال رسالة المجموعة' });
+        }
+    });
+
+    socket.on('join_channel', async (data) => {
+        try {
+            const { channelId } = data;
+            if (channelId && socket.userId) {
+                const success = await localStorageService.addMemberToChannel(channelId, socket.userId);
+                if (success) {
+                    socket.join(`channel:${channelId}`);
+                    socket.emit('channel_joined', { channelId });
+                    console.log(`✅ المستخدم ${socket.userId} انضم إلى القناة ${channelId}`);
+                }
+            }
+        } catch (error) {
+            console.error('❌ خطأ في الانضمام إلى القناة:', error);
         }
     });
 
     socket.on('join_group', async (data) => {
         try {
             const { groupId } = data;
-            const group = await localStorageService.getGroupById(groupId);
-            
-            if (group && (group.isPublic || group.members.includes(socket.userId))) {
-                socket.join(`group_${groupId}`);
-                socket.emit('group_joined', { groupId });
-                
-                // إعلام الأعضاء الآخرين
-                socket.to(`group_${groupId}`).emit('user_joined_group', {
-                    groupId,
-                    user: localStorageService.formatUserResponse(socket.user)
-                });
+            if (groupId && socket.userId) {
+                const success = await localStorageService.addMemberToGroup(groupId, socket.userId);
+                if (success) {
+                    socket.join(`group:${groupId}`);
+                    socket.emit('group_joined', { groupId });
+                    console.log(`✅ المستخدم ${socket.userId} انضم إلى المجموعة ${groupId}`);
+                }
             }
         } catch (error) {
-            console.error('❌ خطأ في الانضمام للمجموعة:', error);
-            socket.emit('error', { message: 'فشل في الانضمام للمجموعة' });
+            console.error('❌ خطأ في الانضمام إلى المجموعة:', error);
         }
     });
 
-    // ============ أحداث الستوريات ============
-    socket.on('create_story', async (data) => {
-        try {
-            const { content, type = 'text', mediaUrl, caption } = data;
-
-            if (!content && !mediaUrl) {
-                socket.emit('error', { message: 'المحتوى أو الوسائط مطلوبة' });
-                return;
-            }
-
-            const story = await localStorageService.createStory({
+    socket.on('typing_start', (data) => {
+        const { conversationId } = data;
+        if (conversationId && socket.userId) {
+            socket.to(conversationId).emit('user_typing', {
                 userId: socket.userId,
-                content,
-                type,
-                mediaUrl,
-                caption
+                conversationId,
+                isTyping: true
             });
-
-            // إرسال الستوري الجديد لجميع الأصدقاء/المتابعين
-            socket.broadcast.emit('new_story', {
-                story: {
-                    ...story,
-                    user: localStorageService.formatUserResponse(socket.user)
-                }
-            });
-
-            socket.emit('story_created', { story });
-
-            console.log(`📸 ستوري جديد من ${socket.user.fullName}`);
-
-        } catch (error) {
-            console.error('❌ خطأ في إنشاء الستوري:', error);
-            socket.emit('error', { message: 'فشل في إنشاء الستوري' });
         }
     });
 
-    socket.on('view_story', async (data) => {
+    socket.on('typing_stop', (data) => {
+        const { conversationId } = data;
+        if (conversationId && socket.userId) {
+            socket.to(conversationId).emit('user_typing', {
+                userId: socket.userId,
+                conversationId,
+                isTyping: false
+            });
+        }
+    });
+
+    socket.on('mark_messages_read', async (data) => {
         try {
-            const { storyId } = data;
-            const success = await localStorageService.addStoryView(storyId, socket.userId);
-            
-            if (success) {
-                const story = await localStorageService.updateStory(storyId, {});
-                if (story) {
-                    // إعلام صاحب الستوري بالمشاهدة
-                    if (story.userId !== socket.userId && connectedUsers.has(story.userId)) {
-                        io.to(story.userId).emit('story_viewed', {
-                            storyId,
-                            viewerId: socket.userId,
-                            viewerName: socket.user.fullName
-                        });
-                    }
-                }
+            const { conversationId } = data;
+            if (conversationId && socket.userId) {
+                await localStorageService.markMessagesAsRead(conversationId, socket.userId);
+                socket.emit('messages_marked_read', { conversationId });
             }
         } catch (error) {
-            console.error('❌ خطأ في تسجيل مشاهدة الستوري:', error);
+            console.error('❌ خطأ في تحديد الرسائل كمقروءة:', error);
         }
     });
 
-    // ============ أحداث عامة ============
     socket.on('disconnect', async () => {
-        console.log(`🔌 مستخدم منفصل: ${socket.user.fullName} (${socket.userId})`);
+        console.log('🔌 مستخدم منفصل:', socket.id);
         
-        connectedUsers.delete(socket.userId);
-        userSockets.delete(socket.userId);
+        const userId = userSockets.get(socket.id);
+        if (userId) {
+            await localStorageService.updateUser(userId, {
+                isOnline: false,
+                lastSeen: new Date().toISOString()
+            });
 
-        await localStorageService.updateUser(socket.userId, {
-            isOnline: false,
-            lastSeen: new Date().toISOString()
-        });
+            io.emit('user_status_changed', {
+                userId,
+                isOnline: false,
+                lastSeen: new Date().toISOString()
+            });
 
-        // إرسال حدث انفصال للمستخدمين الآخرين
-        socket.broadcast.emit('user_offline', {
-            userId: socket.userId,
-            lastSeen: new Date().toISOString()
-        });
-    });
-
-    socket.on('error', (error) => {
-        console.error('❌ خطأ في WebSocket:', error);
+            connectedUsers.delete(userId);
+            userSockets.delete(socket.id);
+        }
     });
 });
 
-// ==================== وظائف الخلفية ====================
-
-// تنظيف البيانات القديمة كل ساعة
+// وظائف الخلفية
 setInterval(async () => {
     try {
         await localStorageService.cleanupOldData();
     } catch (error) {
-        console.error('❌ خطأ في تنظيف البيانات:', error);
+        console.error('❌ خطأ في تنظيف البيانات التلقائي:', error);
     }
 }, 60 * 60 * 1000);
 
-// النسخ الاحتياطي التلقائي كل 24 ساعة
-setInterval(async () => {
-    try {
-        const result = await localStorageService.createBackup();
-        if (result.success) {
-            console.log('✅ تم إنشاء النسخة الاحتياطية التلقائية');
-        } else {
-            console.error('❌ فشل في النسخ الاحتياطي التلقائي:', result.error);
-        }
-    } catch (error) {
-        console.error('❌ خطأ في النسخ الاحتياطي التلقائي:', error);
-    }
-}, 24 * 60 * 60 * 1000);
-
-// ==================== تشغيل الخادم ====================
-
+// بدء الخادم
 server.listen(PORT, '0.0.0.0', () => {
-    console.log('\n' + '='.repeat(60));
-    console.log('🚀 خادم المنصة التعليمية المحسن يعمل بنجاح!');
-    console.log('='.repeat(60));
-    console.log(`📍 العنوان: http://localhost:${PORT}`);
-    console.log(`🌐 البيئة: ${NODE_ENV}`);
-    console.log(`👥 المستخدمون المتصلون: ${connectedUsers.size}`);
-    console.log(`💾 قاعدة البيانات: ${__dirname}/local_data.json`);
-    console.log(`📁 الملفات المحملة: ${UPLOAD_DIR}`);
-    console.log('='.repeat(60));
-    console.log('🔐 حساب المدير الافتراضي:');
-    console.log('📧 البريد الإلكتروني: admin@platform.edu');
-    console.log('🔑 كلمة المرور: 77007700');
-    console.log('='.repeat(60));
-    
-    // عرض الإحصائيات الأولية
-    setTimeout(() => {
-        const stats = localStorageService.getStats();
-        console.log('📊 إحصائيات النظام:');
-        console.log(`   👤 المستخدمون: ${stats.totalUsers}`);
-        console.log(`   💬 الرسائل: ${stats.totalMessages}`);
-        console.log(`   📸 الستوريات: ${stats.totalStories}`);
-        console.log(`   📢 القنوات: ${stats.totalChannels}`);
-        console.log(`   👥 المجموعات: ${stats.totalGroups}`);
-        console.log(`   💭 المحادثات: ${stats.totalConversations}`);
-        console.log('='.repeat(60));
-    }, 2000);
-});
+    console.log(`
+🚀 خادم المنصة التعليمية المحسن يعمل بنجاح!
+📍 العنوان: http://localhost:${PORT}
+📊 البيئة: ${NODE_ENV}
+⏰ الوقت: ${new Date().toLocaleString('ar-SA')}
+🗄️  التخزين: محلي مع تخزين مؤقت
+👥 المستخدمون المتصلون: ${connectedUsers.size}
 
-// معالجة الأخطاء غير المتوقعة
-process.on('uncaughtException', (error) => {
-    console.error('❌ خطأ غير متوقع:', error);
-});
+🔐 حساب المدير الافتراضي:
+   📧 البريد الإلكتروني: admin@platform.edu
+   🔑 كلمة المرور: 77007700
 
-process.on('unhandledRejection', (reason, promise) => {
-    console.error('❌ وعد مرفوض غير معالج:', reason);
+✨ المميزات المحسنة:
+   💬 دردشة فورية مع التخزين المؤقت
+   🔍 بحث متقدم عن المستخدمين
+   📁 تحميل ملفات محسن
+   🚀 أداء محسن مع التجميع
+   🧹 تنظيف تلقائي للبيانات
+   📊 مراقبة صحة النظام
+    `);
 });
 
 export default app;
