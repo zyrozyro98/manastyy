@@ -351,7 +351,58 @@
 
         <!-- صفحة لوحة التحكم -->
         <div class="page" id="dashboard-page">
-            <!-- سيتم تحميل المحتوى ديناميكياً -->
+            <div class="dashboard-content">
+                <h1 class="section-title">
+                    <i class="fas fa-tachometer-alt"></i>
+                    لوحة التحكم
+                </h1>
+                
+                <div class="dashboard-stats">
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-users"></i>
+                        </div>
+                        <div>
+                            <div class="stat-number" id="totalUsers">0</div>
+                            <div class="stat-label">إجمالي المستخدمين</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-comments"></i>
+                        </div>
+                        <div>
+                            <div class="stat-number" id="totalMessages">0</div>
+                            <div class="stat-label">الرسائل المرسلة</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-history"></i>
+                        </div>
+                        <div>
+                            <div class="stat-number" id="totalStories">0</div>
+                            <div class="stat-label">القصص المنشورة</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-broadcast-tower"></i>
+                        </div>
+                        <div>
+                            <div class="stat-number" id="totalChannels">0</div>
+                            <div class="stat-label">القنوات النشطة</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="recent-activities">
+                    <h3>النشاطات الأخيرة</h3>
+                    <div id="recentActivitiesList">
+                        <!-- سيتم ملء النشاطات ديناميكياً -->
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- صفحة الدردشة -->
@@ -810,388 +861,5 @@
     <!-- السكريبتات -->
     <script src="js/config.js"></script>
     <script src="js/app.js"></script>
-
-    <style>
-        /* أنماط إضافية للصفحة الرئيسية */
-        .home-hero {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 4rem 2rem;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border-radius: var(--border-radius);
-            margin-bottom: 3rem;
-        }
-
-        .hero-content h1 {
-            font-size: 3rem;
-            margin-bottom: 1rem;
-        }
-
-        .hero-content p {
-            font-size: 1.2rem;
-            margin-bottom: 2rem;
-            opacity: 0.9;
-        }
-
-        .hero-actions {
-            display: flex;
-            gap: 1rem;
-        }
-
-        .hero-image {
-            font-size: 8rem;
-            opacity: 0.8;
-        }
-
-        .features-section {
-            padding: 2rem 0;
-        }
-
-        .features-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 2rem;
-            margin-top: 2rem;
-        }
-
-        .feature-card {
-            background: white;
-            padding: 2rem;
-            border-radius: var(--border-radius);
-            box-shadow: var(--shadow);
-            text-align: center;
-            transition: var(--transition);
-        }
-
-        .feature-card:hover {
-            transform: translateY(-5px);
-        }
-
-        .feature-icon {
-            font-size: 3rem;
-            color: var(--primary-color);
-            margin-bottom: 1rem;
-        }
-
-        .feature-card h3 {
-            margin-bottom: 1rem;
-            color: var(--dark-color);
-        }
-
-        .feature-card p {
-            color: var(--gray-color);
-            line-height: 1.6;
-        }
-
-        /* أنماط لوحة التحكم */
-        .dashboard-stats {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 1.5rem;
-            margin: 2rem 0;
-        }
-
-        .stat-card {
-            background: white;
-            padding: 1.5rem;
-            border-radius: var(--border-radius);
-            box-shadow: var(--shadow);
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-        }
-
-        .stat-icon {
-            width: 60px;
-            height: 60px;
-            background: var(--primary-color);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 1.5rem;
-        }
-
-        .stat-number {
-            font-size: 2rem;
-            font-weight: bold;
-            color: var(--dark-color);
-        }
-
-        .stat-label {
-            color: var(--gray-color);
-            font-size: 0.9rem;
-        }
-
-        .recent-activities {
-            background: white;
-            padding: 1.5rem;
-            border-radius: var(--border-radius);
-            box-shadow: var(--shadow);
-            margin-top: 2rem;
-        }
-
-        .activity-item {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-            padding: 1rem 0;
-            border-bottom: 1px solid var(--border-color);
-        }
-
-        .activity-item:last-child {
-            border-bottom: none;
-        }
-
-        .activity-item i {
-            color: var(--primary-color);
-            font-size: 1.2rem;
-        }
-
-        .activity-content p {
-            margin: 0;
-            color: var(--dark-color);
-        }
-
-        .activity-time {
-            font-size: 0.8rem;
-            color: var(--gray-color);
-        }
-
-        /* أنماط الإعدادات */
-        .settings-grid {
-            display: grid;
-            grid-template-columns: 250px 1fr;
-            gap: 2rem;
-            margin-top: 2rem;
-        }
-
-        .settings-sidebar {
-            background: white;
-            border-radius: var(--border-radius);
-            box-shadow: var(--shadow);
-            padding: 1rem;
-        }
-
-        .settings-nav {
-            display: flex;
-            flex-direction: column;
-            gap: 0.5rem;
-        }
-
-        .settings-nav-item {
-            padding: 1rem;
-            border: none;
-            background: none;
-            text-align: right;
-            border-radius: var(--border-radius);
-            cursor: pointer;
-            transition: var(--transition);
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            color: var(--dark-color);
-        }
-
-        .settings-nav-item:hover,
-        .settings-nav-item.active {
-            background: var(--primary-color);
-            color: white;
-        }
-
-        .settings-content {
-            background: white;
-            border-radius: var(--border-radius);
-            box-shadow: var(--shadow);
-            padding: 2rem;
-        }
-
-        .settings-tab {
-            display: none;
-        }
-
-        .settings-tab.active {
-            display: block;
-        }
-
-        .privacy-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 1rem 0;
-            border-bottom: 1px solid var(--border-color);
-        }
-
-        .privacy-item:last-child {
-            border-bottom: none;
-        }
-
-        .switch {
-            position: relative;
-            display: inline-block;
-            width: 60px;
-            height: 34px;
-        }
-
-        .switch input {
-            opacity: 0;
-            width: 0;
-            height: 0;
-        }
-
-        .slider {
-            position: absolute;
-            cursor: pointer;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background-color: #ccc;
-            transition: .4s;
-            border-radius: 34px;
-        }
-
-        .slider:before {
-            position: absolute;
-            content: "";
-            height: 26px;
-            width: 26px;
-            left: 4px;
-            bottom: 4px;
-            background-color: white;
-            transition: .4s;
-            border-radius: 50%;
-        }
-
-        input:checked + .slider {
-            background-color: var(--primary-color);
-        }
-
-        input:checked + .slider:before {
-            transform: translateX(26px);
-        }
-
-        /* أنماط الرفع */
-        .upload-area {
-            border: 2px dashed var(--border-color);
-            border-radius: var(--border-radius);
-            padding: 3rem;
-            text-align: center;
-            cursor: pointer;
-            transition: var(--transition);
-            margin-bottom: 1.5rem;
-        }
-
-        .upload-area:hover {
-            border-color: var(--primary-color);
-            background: rgba(67, 97, 238, 0.05);
-        }
-
-        .upload-area i {
-            font-size: 3rem;
-            color: var(--gray-color);
-            margin-bottom: 1rem;
-        }
-
-        .stories-header,
-        .media-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 2rem;
-        }
-
-        .media-actions {
-            display: flex;
-            gap: 1rem;
-            align-items: center;
-        }
-
-        /* أنماط جديدة للدردشة */
-        .chat-header-actions {
-            display: flex;
-            gap: 0.5rem;
-        }
-
-        .mobile-menu-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 1rem;
-            border-bottom: 1px solid var(--border-color);
-            background: var(--light-color);
-        }
-
-        .mobile-menu-close {
-            background: none;
-            border: none;
-            font-size: 1.2rem;
-            color: var(--gray-color);
-            cursor: pointer;
-        }
-
-        .users-list {
-            max-height: 300px;
-            overflow-y: auto;
-            margin: 1rem 0;
-        }
-
-        .user-list-item {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-            padding: 1rem;
-            border-bottom: 1px solid var(--border-color);
-            cursor: pointer;
-            transition: var(--transition);
-        }
-
-        .user-list-item:hover {
-            background: var(--light-color);
-        }
-
-        .user-list-item:last-child {
-            border-bottom: none;
-        }
-
-        @media (max-width: 768px) {
-            .home-hero {
-                flex-direction: column;
-                text-align: center;
-                padding: 2rem 1rem;
-            }
-
-            .hero-content h1 {
-                font-size: 2rem;
-            }
-
-            .hero-image {
-                font-size: 4rem;
-                margin-top: 2rem;
-            }
-
-            .hero-actions {
-                flex-direction: column;
-            }
-
-            .settings-grid {
-                grid-template-columns: 1fr;
-            }
-
-            .stories-header,
-            .media-header {
-                flex-direction: column;
-                gap: 1rem;
-                align-items: stretch;
-            }
-
-            .media-actions {
-                justify-content: space-between;
-            }
-        }
-    </style>
 </body>
 </html>
