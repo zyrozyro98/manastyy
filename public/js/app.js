@@ -1,17 +1,18 @@
-// public/js/app.js - التطبيق الرئيسي الكامل للمنصة التعليمية (محدث ومحسن)
+// public/js/app.js - الملف الرئيسي للتطبيق الكامل (محدث ومصلح)
 class EducationalPlatform {
     constructor() {
         this.currentUser = null;
         this.socket = null;
         this.currentChat = null;
-        this.conversations = [];
-        this.allUsers = [];
+        this.conversations = new Map();
+        this.emojiPicker = null;
         this.stories = [];
+        this.currentStoryIndex = 0;
+        this.storyInterval = null;
+        this.isInitialized = false;
+        this.allUsers = [];
         this.groups = [];
         this.channels = [];
-        this.typingUsers = new Map();
-        this.typingTimeouts = new Map();
-        this.baseURL = window.location.origin;
         
         this.init();
     }
@@ -20,15 +21,20 @@ class EducationalPlatform {
         console.log('🚀 بدء تهيئة المنصة التعليمية...');
         
         try {
+            // إعداد مستمعي الأحداث أولاً
             this.setupEventListeners();
+            
+            // ثم التحقق من المصادقة
             await this.checkAuthentication();
+            
+            // تهيئة المكونات الأخرى
+            this.initializeSocket();
             await this.loadInitialData();
             
             this.isInitialized = true;
             console.log('✅ تم تهيئة المنصة التعليمية بنجاح');
         } catch (error) {
             console.error('❌ خطأ في تهيئة التطبيق:', error);
-            this.showNotification('خطأ في تهيئة التطبيق', 'error');
         }
     }
 
@@ -46,13 +52,11 @@ class EducationalPlatform {
                 // التحقق من صحة التوكن
                 const isValid = await this.validateToken(token);
                 if (!isValid) {
-                    await this.handleLogout();
-                } else {
-                    this.initializeSocket();
+                    this.handleLogout();
                 }
             } catch (error) {
                 console.error('خطأ في تحميل بيانات المستخدم:', error);
-                await this.handleLogout();
+                this.handleLogout();
             }
         } else {
             this.showUnauthenticatedUI();
@@ -62,8 +66,11 @@ class EducationalPlatform {
 
     async validateToken(token) {
         try {
-            const response = await this.apiRequest('/api/users/me', {
-                method: 'GET'
+            const response = await fetch('/api/users/me', {
+                headers: { 
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
             });
             return response.ok;
         } catch (error) {
@@ -74,60 +81,38 @@ class EducationalPlatform {
 
     // ============ إدارة الواجهة ============
     showAuthenticatedUI() {
-        this.showElement('userInfo');
-        this.showElement('logoutBtn');
-        this.hideElement('loginBtn');
-        this.hideElement('registerBtn');
+        const userInfo = document.getElementById('userInfo');
+        const logoutBtn = document.getElementById('logoutBtn');
+        const loginBtn = document.getElementById('loginBtn');
+        const registerBtn = document.getElementById('registerBtn');
+
+        if (userInfo) userInfo.classList.remove('hidden');
+        if (logoutBtn) logoutBtn.classList.remove('hidden');
+        if (loginBtn) loginBtn.classList.add('hidden');
+        if (registerBtn) registerBtn.classList.add('hidden');
         
-        // تحديث واجهة الجوال
-        this.showElement('logoutBtnMobile');
-        this.hideElement('loginBtnMobile');
-        this.hideElement('registerBtnMobile');
-        
-        this.updateUserInfo();
-    }
-
-    showUnauthenticatedUI() {
-        this.hideElement('userInfo');
-        this.hideElement('logoutBtn');
-        this.showElement('loginBtn');
-        this.showElement('registerBtn');
-        
-        // تحديث واجهة الجوال
-        this.hideElement('logoutBtnMobile');
-        this.showElement('loginBtnMobile');
-        this.showElement('registerBtnMobile');
-    }
-
-    showElement(id) {
-        const element = document.getElementById(id);
-        if (element) element.classList.remove('hidden');
-    }
-
-    hideElement(id) {
-        const element = document.getElementById(id);
-        if (element) element.classList.add('hidden');
-    }
-
-    updateUserInfo() {
+        // تحديث بيانات المستخدم
         if (this.currentUser) {
             const userNameDisplay = document.getElementById('userNameDisplay');
             const userRoleDisplay = document.getElementById('userRoleDisplay');
             const userAvatarText = document.getElementById('userAvatarText');
             
             if (userNameDisplay) userNameDisplay.textContent = this.currentUser.fullName || 'مستخدم';
-            if (userRoleDisplay) userRoleDisplay.textContent = this.getRoleText(this.currentUser.role);
+            if (userRoleDisplay) userRoleDisplay.textContent = this.currentUser.role || 'طالب';
             if (userAvatarText) userAvatarText.textContent = (this.currentUser.fullName || 'م').charAt(0);
         }
     }
 
-    getRoleText(role) {
-        const roles = {
-            'admin': 'مدير',
-            'teacher': 'معلم', 
-            'student': 'طالب'
-        };
-        return roles[role] || 'مستخدم';
+    showUnauthenticatedUI() {
+        const userInfo = document.getElementById('userInfo');
+        const logoutBtn = document.getElementById('logoutBtn');
+        const loginBtn = document.getElementById('loginBtn');
+        const registerBtn = document.getElementById('registerBtn');
+
+        if (userInfo) userInfo.classList.add('hidden');
+        if (logoutBtn) logoutBtn.classList.add('hidden');
+        if (loginBtn) loginBtn.classList.remove('hidden');
+        if (registerBtn) registerBtn.classList.remove('hidden');
     }
 
     navigateToPage(pageName) {
@@ -142,12 +127,17 @@ class EducationalPlatform {
         const targetPage = document.getElementById(`${pageName}-page`);
         if (targetPage) {
             targetPage.classList.add('active');
+            
+            // تحميل محتوى الصفحة الديناميكي
             this.loadPageContent(pageName);
         } else {
-            console.error(`❌ الصفحة غير موجودة: ${pageName}`);
+            console.error(`❌ الصفحة غير موجودة: ${pageName}-page`);
         }
 
+        // تحديث حالة التنقل
         this.updateNavigationState(pageName);
+        
+        // إخفاء القائمة المتنقلة
         this.closeMobileMenu();
     }
 
@@ -161,31 +151,26 @@ class EducationalPlatform {
     }
 
     async loadPageContent(pageName) {
-        try {
-            switch (pageName) {
-                case 'chat':
-                    await this.loadConversations();
-                    this.setupNewChatButton();
-                    break;
-                case 'stories':
-                    await this.loadStories();
-                    break;
-                case 'groups':
-                    await this.loadGroups();
-                    break;
-                case 'channels':
-                    await this.loadChannels();
-                    break;
-                case 'dashboard':
-                    await this.loadDashboard();
-                    break;
-                case 'media':
-                    await this.loadMedia();
-                    break;
-            }
-        } catch (error) {
-            console.error(`❌ خطأ في تحميل محتوى الصفحة ${pageName}:`, error);
-            this.showNotification(`خطأ في تحميل ${pageName}`, 'error');
+        switch (pageName) {
+            case 'chat':
+                await this.loadConversations();
+                this.setupNewChatButton();
+                break;
+            case 'stories':
+                await this.loadStories();
+                break;
+            case 'groups':
+                await this.loadGroups();
+                break;
+            case 'channels':
+                await this.loadChannels();
+                break;
+            case 'media':
+                await this.loadMedia();
+                break;
+            case 'dashboard':
+                await this.loadDashboard();
+                break;
         }
     }
 
@@ -198,6 +183,7 @@ class EducationalPlatform {
             element.addEventListener('click', (e) => {
                 e.preventDefault();
                 const pageName = element.getAttribute('data-page');
+                console.log(`📱 نقر على: ${pageName}`);
                 this.navigateToPage(pageName);
             });
         });
@@ -206,8 +192,11 @@ class EducationalPlatform {
         const startAppBtn = document.getElementById('startAppBtn');
         if (startAppBtn) {
             startAppBtn.addEventListener('click', () => {
+                console.log('🎯 نقر على زر ابدأ الآن');
                 this.startApp();
             });
+        } else {
+            console.error('❌ زر ابدأ الآن غير موجود');
         }
 
         // المصادقة
@@ -222,9 +211,6 @@ class EducationalPlatform {
         // المجموعات والقنوات
         this.setupGroupsChannelsEventListeners();
 
-        // الوسائط
-        this.setupMediaEventListeners();
-
         // الأزرار الإضافية
         this.setupUtilityEventListeners();
 
@@ -232,28 +218,12 @@ class EducationalPlatform {
     }
 
     setupAuthEventListeners() {
-        const loginForm = document.getElementById('loginForm');
-        const registerForm = document.getElementById('registerForm');
+        document.getElementById('loginForm')?.addEventListener('submit', (e) => this.handleLogin(e));
+        document.getElementById('registerForm')?.addEventListener('submit', (e) => this.handleRegister(e));
+        
         const logoutBtn = document.getElementById('logoutBtn');
-        const logoutBtnMobile = document.getElementById('logoutBtnMobile');
-
-        if (loginForm) {
-            loginForm.addEventListener('submit', (e) => this.handleLogin(e));
-        }
-
-        if (registerForm) {
-            registerForm.addEventListener('submit', (e) => this.handleRegister(e));
-        }
-
         if (logoutBtn) {
             logoutBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                this.handleLogout();
-            });
-        }
-
-        if (logoutBtnMobile) {
-            logoutBtnMobile.addEventListener('click', (e) => {
                 e.preventDefault();
                 this.handleLogout();
             });
@@ -261,164 +231,51 @@ class EducationalPlatform {
     }
 
     setupChatEventListeners() {
-        const sendMessageBtn = document.getElementById('sendMessageBtn');
+        document.getElementById('sendMessageBtn')?.addEventListener('click', () => this.sendMessage());
+        document.getElementById('chatInput')?.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') this.sendMessage();
+        });
+        document.getElementById('emojiToggle')?.addEventListener('click', () => this.toggleEmojiPicker());
+        document.getElementById('attachFileBtn')?.addEventListener('click', () => this.triggerFileInput());
+        document.getElementById('fileInput')?.addEventListener('change', (e) => this.handleFileUpload(e));
+        document.getElementById('chatToggle')?.addEventListener('click', () => this.toggleChatSidebar());
+        document.getElementById('chatToggleMain')?.addEventListener('click', () => this.toggleChatSidebar());
+
+        // إدخال الدردشة
         const chatInput = document.getElementById('chatInput');
-        const attachFileBtn = document.getElementById('attachFileBtn');
-        const emojiToggle = document.getElementById('emojiToggle');
-        const fileInput = document.getElementById('fileInput');
-
-        if (sendMessageBtn) {
-            sendMessageBtn.addEventListener('click', () => this.sendMessage());
-        }
-
         if (chatInput) {
-            chatInput.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    this.sendMessage();
-                }
-            });
-
             chatInput.addEventListener('input', () => this.handleTyping());
             chatInput.addEventListener('blur', () => this.stopTyping());
-        }
-
-        if (attachFileBtn) {
-            attachFileBtn.addEventListener('click', () => this.triggerFileInput());
-        }
-
-        if (emojiToggle) {
-            emojiToggle.addEventListener('click', () => this.toggleEmojiPicker());
-        }
-
-        if (fileInput) {
-            fileInput.addEventListener('change', (e) => this.handleFileUpload(e));
         }
     }
 
     setupStoriesEventListeners() {
-        const createStoryBtn = document.getElementById('createStoryBtn');
-        const storyClose = document.getElementById('storyClose');
-        const storyPrev = document.getElementById('storyPrev');
-        const storyNext = document.getElementById('storyNext');
-
-        if (createStoryBtn) {
-            createStoryBtn.addEventListener('click', () => this.showCreateStoryModal());
-        }
-
-        if (storyClose) {
-            storyClose.addEventListener('click', () => this.closeStoryViewer());
-        }
-
-        if (storyPrev) {
-            storyPrev.addEventListener('click', () => this.showPreviousStory());
-        }
-
-        if (storyNext) {
-            storyNext.addEventListener('click', () => this.showNextStory());
-        }
+        document.getElementById('storyClose')?.addEventListener('click', () => this.closeStoryViewer());
+        document.getElementById('storyPrev')?.addEventListener('click', () => this.showPreviousStory());
+        document.getElementById('storyNext')?.addEventListener('click', () => this.showNextStory());
+        document.getElementById('createStoryBtn')?.addEventListener('click', () => this.showCreateStoryModal());
     }
 
     setupGroupsChannelsEventListeners() {
         // المجموعات
-        const createGroupBtn = document.getElementById('createGroupBtn');
-        const createGroupForm = document.getElementById('createGroupForm');
-        const closeGroupModal = document.getElementById('closeGroupModal');
-        const cancelGroupBtn = document.getElementById('cancelGroupBtn');
-
-        if (createGroupBtn) {
-            createGroupBtn.addEventListener('click', () => this.showCreateGroupModal());
-        }
-
-        if (createGroupForm) {
-            createGroupForm.addEventListener('submit', (e) => this.createGroup(e));
-        }
-
-        if (closeGroupModal) {
-            closeGroupModal.addEventListener('click', () => this.hideCreateGroupModal());
-        }
-
-        if (cancelGroupBtn) {
-            cancelGroupBtn.addEventListener('click', () => this.hideCreateGroupModal());
-        }
+        document.getElementById('createGroupBtn')?.addEventListener('click', () => this.showCreateGroupModal());
+        document.getElementById('createGroupForm')?.addEventListener('submit', (e) => this.createGroup(e));
+        document.getElementById('closeGroupModal')?.addEventListener('click', () => this.hideCreateGroupModal());
+        document.getElementById('cancelGroupBtn')?.addEventListener('click', () => this.hideCreateGroupModal());
 
         // القنوات
-        const createChannelBtn = document.getElementById('createChannelBtn');
-        const createChannelForm = document.getElementById('createChannelForm');
-        const closeChannelModal = document.getElementById('closeChannelModal');
-        const cancelChannelBtn = document.getElementById('cancelChannelBtn');
-
-        if (createChannelBtn) {
-            createChannelBtn.addEventListener('click', () => this.showCreateChannelModal());
-        }
-
-        if (createChannelForm) {
-            createChannelForm.addEventListener('submit', (e) => this.createChannel(e));
-        }
-
-        if (closeChannelModal) {
-            closeChannelModal.addEventListener('click', () => this.hideCreateChannelModal());
-        }
-
-        if (cancelChannelBtn) {
-            cancelChannelBtn.addEventListener('click', () => this.hideCreateChannelModal());
-        }
-    }
-
-    setupMediaEventListeners() {
-        const uploadMediaBtn = document.getElementById('uploadMediaBtn');
-        const uploadMediaForm = document.getElementById('uploadMediaForm');
-        const closeUploadModal = document.getElementById('closeUploadModal');
-        const cancelUploadBtn = document.getElementById('cancelUploadBtn');
-
-        if (uploadMediaBtn) {
-            uploadMediaBtn.addEventListener('click', () => this.showUploadMediaModal());
-        }
-
-        if (uploadMediaForm) {
-            uploadMediaForm.addEventListener('submit', (e) => this.uploadMedia(e));
-        }
-
-        if (closeUploadModal) {
-            closeUploadModal.addEventListener('click', () => this.hideUploadMediaModal());
-        }
-
-        if (cancelUploadBtn) {
-            cancelUploadBtn.addEventListener('click', () => this.hideUploadMediaModal());
-        }
+        document.getElementById('createChannelBtn')?.addEventListener('click', () => this.showCreateChannelModal());
+        document.getElementById('createChannelForm')?.addEventListener('submit', (e) => this.createChannel(e));
+        document.getElementById('closeChannelModal')?.addEventListener('click', () => this.hideCreateChannelModal());
+        document.getElementById('cancelChannelBtn')?.addEventListener('click', () => this.hideCreateChannelModal());
     }
 
     setupUtilityEventListeners() {
-        const mobileMenuBtn = document.getElementById('mobileMenuBtn');
-        const overlay = document.getElementById('overlay');
-        const floatingActionBtn = document.getElementById('floatingActionBtn');
-        const reloadBtn = document.getElementById('reloadBtn');
-        const chatToggle = document.getElementById('chatToggle');
-        const chatToggleMain = document.getElementById('chatToggleMain');
-
-        if (mobileMenuBtn) {
-            mobileMenuBtn.addEventListener('click', () => this.toggleMobileMenu());
-        }
-
-        if (overlay) {
-            overlay.addEventListener('click', () => this.closeMobileMenu());
-        }
-
-        if (floatingActionBtn) {
-            floatingActionBtn.addEventListener('click', () => this.toggleQuickActions());
-        }
-
-        if (reloadBtn) {
-            reloadBtn.addEventListener('click', () => location.reload());
-        }
-
-        if (chatToggle) {
-            chatToggle.addEventListener('click', () => this.toggleChatSidebar());
-        }
-
-        if (chatToggleMain) {
-            chatToggleMain.addEventListener('click', () => this.toggleChatSidebar());
-        }
+        // الأزرار الإضافية
+        document.getElementById('mobileMenuBtn')?.addEventListener('click', () => this.toggleMobileMenu());
+        document.getElementById('overlay')?.addEventListener('click', () => this.closeMobileMenu());
+        document.getElementById('floatingActionBtn')?.addEventListener('click', () => this.toggleQuickActions());
+        document.getElementById('reloadBtn')?.addEventListener('click', () => location.reload());
 
         // إغلاق منتقي الإيموجي عند النقر خارجها
         document.addEventListener('click', (e) => {
@@ -436,17 +293,6 @@ class EducationalPlatform {
                 e.target.style.display = 'none';
             }
         });
-
-        // تحديث حالة الاتصال
-        window.addEventListener('online', () => {
-            this.showNotification('تم استعادة الاتصال بالإنترنت', 'success');
-            this.updateConnectionStatus(true);
-        });
-
-        window.addEventListener('offline', () => {
-            this.showNotification('فقد الاتصال بالإنترنت', 'error');
-            this.updateConnectionStatus(false);
-        });
     }
 
     // ============ دوال التطبيق الرئيسية ============
@@ -456,6 +302,8 @@ class EducationalPlatform {
         if (welcomeScreen) {
             welcomeScreen.style.display = 'none';
             console.log('✅ تم إخفاء شاشة الترحيب');
+        } else {
+            console.error('❌ شاشة الترحيب غير موجودة');
         }
         
         this.navigateToPage('home');
@@ -496,39 +344,6 @@ class EducationalPlatform {
         }
     }
 
-    toggleEmojiPicker() {
-        const pickerContainer = document.getElementById('emojiPickerContainer');
-        if (pickerContainer) {
-            pickerContainer.classList.toggle('active');
-            
-            // تهيئة منتقي الإيموجي إذا لم يكن معيناً
-            if (!this.emojiPicker && window.EmojiPickerElement) {
-                this.initializeEmojiPicker();
-            }
-        }
-    }
-
-    initializeEmojiPicker() {
-        const emojiPicker = document.querySelector('emoji-picker');
-        if (emojiPicker) {
-            emojiPicker.addEventListener('emoji-click', (event) => {
-                const input = document.getElementById('chatInput');
-                if (input) {
-                    input.value += event.detail.unicode;
-                    input.focus();
-                }
-            });
-            this.emojiPicker = emojiPicker;
-        }
-    }
-
-    triggerFileInput() {
-        const fileInput = document.getElementById('fileInput');
-        if (fileInput) {
-            fileInput.click();
-        }
-    }
-
     // ============ إدارة الدردشة ============
     initializeSocket() {
         const token = localStorage.getItem('authToken');
@@ -541,61 +356,45 @@ class EducationalPlatform {
             this.socket = io({
                 auth: {
                     token: token
-                },
-                transports: ['websocket', 'polling']
+                }
             });
 
-            this.setupSocketEvents();
-            
+            this.socket.on('connect', () => {
+                console.log('✅ متصل بالسيرفر');
+                this.updateConnectionStatus(true);
+                this.showNotification('متصل بالخادم', 'success');
+            });
+
+            this.socket.on('disconnect', () => {
+                console.log('❌ تم قطع الاتصال');
+                this.updateConnectionStatus(false);
+                this.showNotification('تم قطع الاتصال بالخادم', 'error');
+            });
+
+            this.socket.on('new_message', (data) => {
+                this.receiveMessage(data);
+            });
+
+            this.socket.on('user_typing', (data) => {
+                this.showTypingIndicator(data);
+            });
+
+            this.socket.on('user_status_changed', (data) => {
+                this.updateUserStatus(data);
+            });
+
+            this.socket.on('authenticated', (data) => {
+                console.log('🔓 تمت المصادقة عبر السوكت');
+            });
+
+            this.socket.on('error', (data) => {
+                console.error('❌ خطأ في السوكت:', data);
+                this.showNotification(data.message || 'خطأ في الاتصال', 'error');
+            });
+
         } catch (error) {
             console.error('❌ خطأ في تهيئة السوكت:', error);
-            this.showNotification('خطأ في الاتصال بالخادم', 'error');
         }
-    }
-
-    setupSocketEvents() {
-        this.socket.on('connect', () => {
-            console.log('✅ متصل بالسيرفر');
-            this.updateConnectionStatus(true);
-            this.showNotification('متصل بالخادم', 'success');
-        });
-
-        this.socket.on('disconnect', (reason) => {
-            console.log('❌ تم قطع الاتصال:', reason);
-            this.updateConnectionStatus(false);
-            this.showNotification('تم قطع الاتصال بالخادم', 'error');
-        });
-
-        this.socket.on('authenticated', (data) => {
-            console.log('🔓 تمت المصادقة عبر السوكت');
-            if (data.user) {
-                this.currentUser = data.user;
-                localStorage.setItem('currentUser', JSON.stringify(data.user));
-                this.updateUserInfo();
-            }
-        });
-
-        this.socket.on('new_message', (data) => {
-            this.handleNewMessage(data);
-        });
-
-        this.socket.on('user_typing', (data) => {
-            this.handleUserTyping(data);
-        });
-
-        this.socket.on('user_status_changed', (data) => {
-            this.handleUserStatusChanged(data);
-        });
-
-        this.socket.on('error', (data) => {
-            console.error('❌ خطأ في السوكت:', data);
-            this.showNotification(data.message || 'خطأ في الاتصال', 'error');
-        });
-
-        this.socket.on('connect_error', (error) => {
-            console.error('❌ خطأ في اتصال السوكت:', error);
-            this.updateConnectionStatus(false);
-        });
     }
 
     updateConnectionStatus(isConnected) {
@@ -613,22 +412,32 @@ class EducationalPlatform {
 
     async loadInitialData() {
         if (this.currentUser) {
-            await Promise.allSettled([
-                this.loadUsers(),
-                this.loadConversations(),
-                this.loadStories(),
-                this.loadGroups(),
-                this.loadChannels()
-            ]);
+            await this.loadUsers();
+            await this.loadConversations();
+            await this.loadStories();
+            await this.loadGroups();
+            await this.loadChannels();
+            await this.loadMedia();
         }
     }
 
     async loadUsers() {
         try {
-            const response = await this.apiRequest('/api/users');
+            const token = localStorage.getItem('authToken');
+            if (!token) return;
+
+            const response = await fetch('/api/users', {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            
             if (response.ok) {
                 const data = await response.json();
-                this.allUsers = data.users || [];
+                this.allUsers = data.data?.users || [];
+            } else {
+                console.error('فشل في تحميل المستخدمين:', response.status);
             }
         } catch (error) {
             console.error('خطأ في تحميل المستخدمين:', error);
@@ -637,11 +446,21 @@ class EducationalPlatform {
 
     async loadConversations() {
         try {
-            const response = await this.apiRequest('/api/chat/conversations');
+            const token = localStorage.getItem('authToken');
+            if (!token) return;
+
+            const response = await fetch('/api/chat/conversations', {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            
             if (response.ok) {
                 const data = await response.json();
-                this.conversations = data.conversations || [];
-                this.renderConversations(this.conversations);
+                this.renderConversations(data.data?.conversations || []);
+            } else {
+                console.error('فشل في تحميل المحادثات:', response.status);
             }
         } catch (error) {
             console.error('خطأ في تحميل المحادثات:', error);
@@ -655,21 +474,14 @@ class EducationalPlatform {
         container.innerHTML = '';
 
         if (!conversations || conversations.length === 0) {
-            container.innerHTML = `
-                <div class="empty-state">
-                    <i class="fas fa-comments"></i>
-                    <p>لا توجد محادثات</p>
-                    <button class="btn btn-primary" onclick="educationalPlatform.showNewChatModal()">
-                        ابدأ محادثة جديدة
-                    </button>
-                </div>
-            `;
+            container.innerHTML = '<div class="text-center" style="padding: 2rem; color: #666;">لا توجد محادثات</div>';
             return;
         }
 
         conversations.forEach(conversation => {
             const conversationElement = this.createConversationElement(conversation);
             container.appendChild(conversationElement);
+            this.conversations.set(conversation._id, conversation);
         });
     }
 
@@ -680,17 +492,22 @@ class EducationalPlatform {
         
         const lastMessage = conversation.lastMessage ? 
             (conversation.lastMessage.content || 'ملف مرفق') : 'لا توجد رسائل';
+        const unreadCount = conversation.unreadCount && conversation.unreadCount[this.currentUser._id] 
+            ? conversation.unreadCount[this.currentUser._id] 
+            : 0;
 
         div.innerHTML = `
             <div class="conversation-avatar">
                 <span>${conversation.name.charAt(0)}</span>
             </div>
             <div class="conversation-info">
-                <div class="conversation-name">${this.escapeHtml(conversation.name)}</div>
+                <div class="conversation-name">${conversation.name}</div>
                 <div class="conversation-last-message">${this.truncateText(lastMessage, 30)}</div>
             </div>
             <div class="conversation-meta">
                 <div class="conversation-time">${this.formatTime(conversation.updatedAt)}</div>
+                ${unreadCount > 0 ? 
+                    `<div class="conversation-unread">${unreadCount}</div>` : ''}
             </div>
         `;
 
@@ -702,7 +519,7 @@ class EducationalPlatform {
         const chatHeader = document.querySelector('.chat-sidebar .chat-header');
         if (!chatHeader) return;
 
-        // إزالة الزر إذا كان موجوداً
+        // إزالة زر إنشاء محادثة إذا كان موجوداً
         const existingButton = document.getElementById('newChatBtn');
         if (existingButton) {
             existingButton.remove();
@@ -721,12 +538,6 @@ class EducationalPlatform {
     }
 
     showNewChatModal() {
-        if (this.allUsers.length === 0) {
-            this.showNotification('جاري تحميل المستخدمين...', 'info');
-            this.loadUsers();
-            return;
-        }
-
         const modal = document.createElement('div');
         modal.className = 'modal';
         modal.style.display = 'flex';
@@ -740,19 +551,17 @@ class EducationalPlatform {
                     <div class="form-group">
                         <label>اختر مستخدم للدردشة:</label>
                         <div class="users-list" style="max-height: 300px; overflow-y: auto; margin-top: 1rem;">
-                            ${this.allUsers
-                                .filter(user => user._id !== this.currentUser._id)
-                                .map(user => `
-                                    <div class="user-item" data-user-id="${user._id}" style="display: flex; align-items: center; padding: 10px; border-bottom: 1px solid #eee; cursor: pointer;">
-                                        <div class="user-avatar" style="width: 40px; height: 40px; background: #4361ee; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; margin-left: 10px;">
-                                            ${user.fullName.charAt(0)}
-                                        </div>
-                                        <div>
-                                            <div style="font-weight: bold;">${user.fullName}</div>
-                                            <div style="font-size: 0.8rem; color: #666;">${this.getRoleText(user.role)}</div>
-                                        </div>
+                            ${this.allUsers.filter(user => user._id !== this.currentUser._id).map(user => `
+                                <div class="user-item" data-user-id="${user._id}" style="display: flex; align-items: center; padding: 10px; border-bottom: 1px solid #eee; cursor: pointer;">
+                                    <div class="user-avatar" style="width: 40px; height: 40px; background: #4361ee; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; margin-left: 10px;">
+                                        ${user.fullName.charAt(0)}
                                     </div>
-                                `).join('')}
+                                    <div>
+                                        <div style="font-weight: bold;">${user.fullName}</div>
+                                        <div style="font-size: 0.8rem; color: #666;">${user.role}</div>
+                                    </div>
+                                </div>
+                            `).join('')}
                         </div>
                     </div>
                     <div class="modal-actions" style="margin-top: 1rem;">
@@ -787,25 +596,29 @@ class EducationalPlatform {
 
     async startNewChat(userId) {
         try {
-            const response = await this.apiRequest('/api/chat/conversations', {
+            const token = localStorage.getItem('authToken');
+            const response = await fetch('/api/chat/conversations', {
                 method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
                 body: JSON.stringify({
                     participantId: userId
                 })
             });
 
-            const data = await response.json();
-
-            if (response.ok && data.success) {
+            if (response.ok) {
+                const data = await response.json();
                 this.showNotification('تم بدء المحادثة بنجاح', 'success');
                 await this.loadConversations();
                 
                 // تحديد المحادثة الجديدة
-                if (data.conversation) {
-                    this.selectConversation(data.conversation._id);
+                if (data.data.conversation) {
+                    this.selectConversation(data.data.conversation._id);
                 }
             } else {
-                this.showNotification(data.message || 'فشل في بدء المحادثة', 'error');
+                this.showNotification('فشل في بدء المحادثة', 'error');
             }
         } catch (error) {
             console.error('خطأ في بدء المحادثة:', error);
@@ -814,13 +627,13 @@ class EducationalPlatform {
     }
 
     selectConversation(conversationId) {
-        const conversation = this.conversations.find(c => c._id === conversationId);
-        if (!conversation) return;
+        this.currentChat = this.conversations.get(conversationId);
+        if (!this.currentChat) return;
 
-        this.currentChat = conversation;
-        
-        document.getElementById('activeChatName').textContent = conversation.name;
-        document.getElementById('activeChatAvatar').textContent = conversation.name.charAt(0);
+        // تحديث الواجهة
+        document.getElementById('activeChatName').textContent = this.currentChat.name;
+        document.getElementById('activeChatAvatar').textContent = this.currentChat.name.charAt(0);
+        document.getElementById('activeChatStatus').textContent = 'متصل';
         
         const chatInputContainer = document.getElementById('chatInputContainer');
         const emptyChat = document.getElementById('emptyChat');
@@ -828,6 +641,7 @@ class EducationalPlatform {
         if (chatInputContainer) chatInputContainer.style.display = 'flex';
         if (emptyChat) emptyChat.style.display = 'none';
 
+        // تحميل الرسائل
         this.loadMessages(conversationId);
         
         // تحديث حالة المحادثة النشطة
@@ -839,18 +653,27 @@ class EducationalPlatform {
             activeConversation.classList.add('active');
         }
 
-        // الانضمام إلى غرفة المحادثة
-        if (this.socket) {
-            this.socket.emit('join_conversation', conversationId);
-        }
+        // إعلام السيرفر بأن الرسائل قُرأت
+        this.markMessagesAsRead(conversationId);
     }
 
     async loadMessages(conversationId) {
         try {
-            const response = await this.apiRequest(`/api/chat/conversations/${conversationId}/messages?limit=50`);
+            const token = localStorage.getItem('authToken');
+            if (!token) return;
+
+            const response = await fetch(`/api/chat/conversations/${conversationId}/messages?limit=50`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            
             if (response.ok) {
                 const data = await response.json();
-                this.renderMessages(data.messages);
+                this.renderMessages(data.data?.messages || []);
+            } else {
+                console.error('فشل في تحميل الرسائل:', response.status);
             }
         } catch (error) {
             console.error('خطأ في تحميل الرسائل:', error);
@@ -894,7 +717,7 @@ class EducationalPlatform {
             </div>
             ${isSent ? `
                 <div class="message-status">
-                    <i class="fas fa-check${message.readBy && message.readBy.length > 1 ? '-double' : ''}"></i>
+                    <i class="fas fa-${message.readBy && message.readBy.length > 1 ? 'check-double' : 'check'}"></i>
                 </div>
             ` : ''}
         `;
@@ -925,7 +748,6 @@ class EducationalPlatform {
             }, true);
 
             input.value = '';
-            this.stopTyping();
 
             // إرسال الرسالة عبر السوكيت
             if (this.socket) {
@@ -942,6 +764,7 @@ class EducationalPlatform {
         const container = document.getElementById('chatMessages');
         if (!container) return;
 
+        // إخفاء empty chat إذا كان ظاهر
         const emptyChat = document.getElementById('emptyChat');
         if (emptyChat) emptyChat.style.display = 'none';
 
@@ -955,8 +778,15 @@ class EducationalPlatform {
             this.addMessageToUI(data.message, false);
         }
         
-        // تحديث قائمة المحادثات
-        this.loadConversations();
+        // تحديث عدد الرسائل غير المقروءة
+        this.updateUnreadCount();
+    }
+
+    scrollToBottom() {
+        const container = document.getElementById('chatMessages');
+        if (container) {
+            container.scrollTop = container.scrollHeight;
+        }
     }
 
     handleTyping() {
@@ -964,12 +794,6 @@ class EducationalPlatform {
             this.socket.emit('typing_start', {
                 conversationId: this.currentChat._id
             });
-            
-            // إعادة تعيين مؤقت إيقاف الكتابة
-            clearTimeout(this.typingTimeouts.get(this.currentChat._id));
-            this.typingTimeouts.set(this.currentChat._id, setTimeout(() => {
-                this.stopTyping();
-            }, 1000));
         }
     }
 
@@ -981,72 +805,54 @@ class EducationalPlatform {
         }
     }
 
-    handleUserTyping(data) {
-        if (data.conversationId !== this.currentChat?._id) return;
-
-        const typingIndicator = document.getElementById('typingIndicator');
-        if (!typingIndicator) return;
-
-        if (data.isTyping) {
-            this.typingUsers.set(data.userId, true);
-        } else {
-            this.typingUsers.delete(data.userId);
-        }
-
-        if (this.typingUsers.size > 0) {
-            typingIndicator.style.display = 'block';
-            typingIndicator.textContent = `${this.typingUsers.size} مستخدم يكتب...`;
-        } else {
-            typingIndicator.style.display = 'none';
-        }
+    showTypingIndicator(data) {
+        // تنفيذ مؤشر الكتابة
+        console.log('المستخدم يكتب:', data);
     }
 
-    handleUserStatusChanged(data) {
-        console.log('تحديث حالة المستخدم:', data);
-        // يمكن تحديث حالة المستخدمين في القوائم
-    }
-
-    scrollToBottom() {
-        const container = document.getElementById('chatMessages');
-        if (container) {
-            container.scrollTop = container.scrollHeight;
+    async markMessagesAsRead(conversationId) {
+        if (this.socket) {
+            this.socket.emit('mark_messages_read', { conversationId });
         }
     }
 
     // ============ إدارة القصص ============
     async loadStories() {
         try {
-            const response = await this.apiRequest('/api/stories');
+            const token = localStorage.getItem('authToken');
+            if (!token) return;
+
+            const response = await fetch('/api/stories', {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            
             if (response.ok) {
                 const data = await response.json();
-                this.stories = data.stories || [];
-                this.renderStories(this.stories);
+                this.stories = data.data?.stories || [];
+                this.renderStories();
+            } else {
+                console.error('فشل في تحميل القصص:', response.status);
             }
         } catch (error) {
             console.error('خطأ في تحميل القصص:', error);
         }
     }
 
-    renderStories(stories) {
+    renderStories() {
         const container = document.getElementById('storiesContainer');
         if (!container) return;
 
         container.innerHTML = '';
 
-        if (stories.length === 0) {
-            container.innerHTML = `
-                <div class="empty-state">
-                    <i class="fas fa-camera"></i>
-                    <p>لا توجد قصص حالية</p>
-                    <button class="btn btn-primary" onclick="educationalPlatform.showCreateStoryModal()">
-                        أضف قصة جديدة
-                    </button>
-                </div>
-            `;
+        if (this.stories.length === 0) {
+            container.innerHTML = '<div class="text-center" style="padding: 2rem; color: #666;">لا توجد قصص حالية</div>';
             return;
         }
 
-        stories.forEach((story, index) => {
+        this.stories.forEach((story, index) => {
             const storyElement = this.createStoryElement(story, index);
             container.appendChild(storyElement);
         });
@@ -1073,21 +879,16 @@ class EducationalPlatform {
         
         if (!story) return;
 
-        const storyViewer = document.getElementById('storyViewer');
-        const storyImage = document.getElementById('currentStoryImage');
+        document.getElementById('currentStoryImage').src = story.mediaUrl;
+        document.getElementById('storyAuthorName').textContent = 'مستخدم';
+        document.getElementById('storyAuthorAvatar').textContent = story.userId.charAt(0);
+        document.getElementById('storyTime').textContent = this.formatTime(story.createdAt);
         
-        if (storyViewer && storyImage) {
-            storyImage.src = story.mediaUrl;
-            document.getElementById('storyAuthorName').textContent = 'مستخدم';
-            document.getElementById('storyAuthorAvatar').textContent = story.userId.charAt(0);
-            document.getElementById('storyTime').textContent = this.formatTime(story.createdAt);
-            
-            storyViewer.classList.add('active');
-            this.startStoryProgress();
+        document.getElementById('storyViewer').classList.add('active');
+        this.startStoryProgress();
 
-            // تسجيل المشاهدة
-            this.recordStoryView(story._id);
-        }
+        // تسجيل المشاهدة
+        this.recordStoryView(story._id);
     }
 
     startStoryProgress() {
@@ -1154,8 +955,15 @@ class EducationalPlatform {
 
     async recordStoryView(storyId) {
         try {
-            await this.apiRequest(`/api/stories/${storyId}/view`, {
-                method: 'POST'
+            const token = localStorage.getItem('authToken');
+            if (!token) return;
+
+            await fetch(`/api/stories/${storyId}/view`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
             });
         } catch (error) {
             console.error('خطأ في تسجيل مشاهدة القصة:', error);
@@ -1169,11 +977,22 @@ class EducationalPlatform {
     // ============ إدارة المجموعات ============
     async loadGroups() {
         try {
-            const response = await this.apiRequest('/api/groups');
+            const token = localStorage.getItem('authToken');
+            if (!token) return;
+
+            const response = await fetch('/api/groups', {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            
             if (response.ok) {
                 const data = await response.json();
-                this.groups = data.groups || [];
+                this.groups = data.data?.groups || [];
                 this.renderGroups(this.groups);
+            } else {
+                console.error('فشل في تحميل المجموعات:', response.status);
             }
         } catch (error) {
             console.error('خطأ في تحميل المجموعات:', error);
@@ -1187,15 +1006,7 @@ class EducationalPlatform {
         container.innerHTML = '';
 
         if (!groups || groups.length === 0) {
-            container.innerHTML = `
-                <div class="empty-state">
-                    <i class="fas fa-users"></i>
-                    <p>لا توجد مجموعات</p>
-                    <button class="btn btn-primary" onclick="educationalPlatform.showCreateGroupModal()">
-                        أنشئ مجموعة جديدة
-                    </button>
-                </div>
-            `;
+            container.innerHTML = '<div class="text-center" style="padding: 2rem; color: #666;">لا توجد مجموعات</div>';
             return;
         }
 
@@ -1232,100 +1043,114 @@ class EducationalPlatform {
                     </div>
                 </div>
                 <button class="btn btn-primary btn-block mt-3 join-group-btn" data-group-id="${group._id}">
-                    <i class="fas fa-sign-in-alt"></i>
-                    ${isMember ? 'الدخول' : 'الانضمام'}
+                    <i class="fas ${isMember ? 'fa-sign-out-alt' : 'fa-sign-in-alt'}"></i>
+                    ${isMember ? 'مغادرة' : 'انضمام'}
                 </button>
             </div>
         `;
 
-        div.querySelector('.join-group-btn').addEventListener('click', () => {
-            if (isMember) {
-                this.enterGroup(group._id);
-            } else {
-                this.joinGroup(group._id);
-            }
+        const joinBtn = div.querySelector('.join-group-btn');
+        joinBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.handleGroupJoin(group._id, isMember);
         });
+
+        div.addEventListener('click', () => this.openGroup(group._id));
         return div;
     }
 
-    async joinGroup(groupId) {
+    async handleGroupJoin(groupId, isMember) {
         try {
-            const response = await this.apiRequest(`/api/groups/${groupId}/join`, {
-                method: 'POST'
+            const token = localStorage.getItem('authToken');
+            const method = isMember ? 'DELETE' : 'POST';
+            
+            const response = await fetch(`/api/groups/${groupId}/members`, {
+                method: method,
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
             });
 
             if (response.ok) {
-                this.showNotification('تم الانضمام للمجموعة بنجاح', 'success');
-                this.loadGroups();
+                this.showNotification(isMember ? 'تم مغادرة المجموعة' : 'تم الانضمام للمجموعة', 'success');
+                await this.loadGroups();
             } else {
-                const data = await response.json();
-                this.showNotification(data.message || 'فشل في الانضمام للمجموعة', 'error');
+                this.showNotification('فشل في العملية', 'error');
             }
         } catch (error) {
-            console.error('خطأ في الانضمام للمجموعة:', error);
-            this.showNotification('فشل في الانضمام للمجموعة', 'error');
+            console.error('خطأ في إدارة المجموعة:', error);
+            this.showNotification('خطأ في العملية', 'error');
         }
     }
 
-    enterGroup(groupId) {
-        this.showNotification('تم الدخول إلى المجموعة', 'success');
-        // هنا يمكن إضافة منطق للدخول إلى دردشة المجموعة
-    }
-
-    async createGroup(event) {
-        event.preventDefault();
-        
-        const formData = new FormData(event.target);
-        const groupData = {
-            name: formData.get('groupName'),
-            description: formData.get('groupDescription'),
-            isPublic: formData.get('groupPrivacy') === 'public'
-        };
-
-        try {
-            const response = await this.apiRequest('/api/groups', {
-                method: 'POST',
-                body: JSON.stringify(groupData)
-            });
-
-            const data = await response.json();
-
-            if (response.ok && data.success) {
-                this.showNotification('تم إنشاء المجموعة بنجاح', 'success');
-                this.hideCreateGroupModal();
-                this.loadGroups();
-            } else {
-                this.showNotification(data.message || 'فشل في إنشاء المجموعة', 'error');
-            }
-        } catch (error) {
-            console.error('خطأ في إنشاء المجموعة:', error);
-            this.showNotification('فشل في إنشاء المجموعة', 'error');
-        }
+    openGroup(groupId) {
+        this.showNotification('فتح المجموعة: ' + groupId, 'info');
+        // يمكن تنفيذ فتح المجموعة هنا
     }
 
     showCreateGroupModal() {
-        const modal = document.getElementById('createGroupModal');
-        if (modal) {
-            modal.style.display = 'flex';
-        }
+        document.getElementById('createGroupModal').style.display = 'flex';
     }
 
     hideCreateGroupModal() {
-        const modal = document.getElementById('createGroupModal');
-        if (modal) {
-            modal.style.display = 'none';
-            document.getElementById('createGroupForm').reset();
+        document.getElementById('createGroupModal').style.display = 'none';
+    }
+
+    async createGroup(e) {
+        e.preventDefault();
+        
+        const formData = new FormData(e.target);
+        const groupData = {
+            name: formData.get('groupName'),
+            description: formData.get('groupDescription'),
+            privacy: formData.get('groupPrivacy')
+        };
+
+        try {
+            const token = localStorage.getItem('authToken');
+            const response = await fetch('/api/groups', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(groupData)
+            });
+
+            if (response.ok) {
+                this.showNotification('تم إنشاء المجموعة بنجاح', 'success');
+                this.hideCreateGroupModal();
+                e.target.reset();
+                await this.loadGroups();
+            } else {
+                this.showNotification('فشل في إنشاء المجموعة', 'error');
+            }
+        } catch (error) {
+            console.error('خطأ في إنشاء المجموعة:', error);
+            this.showNotification('خطأ في إنشاء المجموعة', 'error');
         }
     }
 
     // ============ إدارة القنوات ============
     async loadChannels() {
         try {
-            const response = await this.apiRequest('/api/channels');
+            const token = localStorage.getItem('authToken');
+            if (!token) return;
+
+            const response = await fetch('/api/channels', {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            
             if (response.ok) {
                 const data = await response.json();
-                this.channels = data.channels || [];
+                this.channels = data.data?.channels || [];
                 this.renderChannels(this.channels);
+            } else {
+                console.error('فشل في تحميل القنوات:', response.status);
             }
         } catch (error) {
             console.error('خطأ في تحميل القنوات:', error);
@@ -1339,15 +1164,7 @@ class EducationalPlatform {
         container.innerHTML = '';
 
         if (!channels || channels.length === 0) {
-            container.innerHTML = `
-                <div class="empty-state">
-                    <i class="fas fa-broadcast-tower"></i>
-                    <p>لا توجد قنوات</p>
-                    <button class="btn btn-primary" onclick="educationalPlatform.showCreateChannelModal()">
-                        أنشئ قناة جديدة
-                    </button>
-                </div>
-            `;
+            container.innerHTML = '<div class="text-center" style="padding: 2rem; color: #666;">لا توجد قنوات</div>';
             return;
         }
 
@@ -1361,7 +1178,7 @@ class EducationalPlatform {
         const div = document.createElement('div');
         div.className = 'channel-card';
         
-        const isMember = channel.members?.includes(this.currentUser._id);
+        const isSubscribed = channel.subscribers?.includes(this.currentUser._id);
         
         div.innerHTML = `
             <div class="channel-header">
@@ -1369,65 +1186,79 @@ class EducationalPlatform {
                     <i class="fas fa-broadcast-tower"></i>
                 </div>
                 <h3>${this.escapeHtml(channel.name)}</h3>
-                <p>${channel.stats?.memberCount || channel.members?.length || 0} مشترك</p>
+                <p>${channel.stats?.subscriberCount || channel.subscribers?.length || 0} مشترك</p>
             </div>
             <div class="channel-info">
                 <p>${this.escapeHtml(channel.description || 'لا يوجد وصف')}</p>
                 <div class="channel-stats">
                     <div class="channel-stat">
-                        <div class="channel-stat-number">${channel.stats?.messageCount || 0}</div>
-                        <div class="channel-stat-label">رسالة</div>
+                        <div class="channel-stat-number">${channel.stats?.postCount || 0}</div>
+                        <div class="channel-stat-label">منشور</div>
                     </div>
                     <div class="channel-stat">
-                        <div class="channel-stat-number">${channel.members?.length || 0}</div>
+                        <div class="channel-stat-number">${channel.subscribers?.length || 0}</div>
                         <div class="channel-stat-label">مشترك</div>
                     </div>
                 </div>
                 <button class="btn btn-primary btn-block mt-3 subscribe-channel-btn" data-channel-id="${channel._id}">
-                    <i class="fas fa-bell"></i>
-                    ${isMember ? 'مشترك' : 'اشترك'}
+                    <i class="fas ${isSubscribed ? 'fa-bell-slash' : 'fa-bell'}"></i>
+                    ${isSubscribed ? 'إلغاء الاشتراك' : 'اشتراك'}
                 </button>
             </div>
         `;
 
-        div.querySelector('.subscribe-channel-btn').addEventListener('click', () => {
-            if (isMember) {
-                this.enterChannel(channel._id);
-            } else {
-                this.subscribeChannel(channel._id);
-            }
+        const subscribeBtn = div.querySelector('.subscribe-channel-btn');
+        subscribeBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.handleChannelSubscription(channel._id, isSubscribed);
         });
+
+        div.addEventListener('click', () => this.openChannel(channel._id));
         return div;
     }
 
-    async subscribeChannel(channelId) {
+    async handleChannelSubscription(channelId, isSubscribed) {
         try {
-            const response = await this.apiRequest(`/api/channels/${channelId}/join`, {
-                method: 'POST'
+            const token = localStorage.getItem('authToken');
+            const method = isSubscribed ? 'DELETE' : 'POST';
+            
+            const response = await fetch(`/api/channels/${channelId}/subscriptions`, {
+                method: method,
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
             });
 
             if (response.ok) {
-                this.showNotification('تم الاشتراك في القناة بنجاح', 'success');
-                this.loadChannels();
+                this.showNotification(isSubscribed ? 'تم إلغاء الاشتراك' : 'تم الاشتراك في القناة', 'success');
+                await this.loadChannels();
             } else {
-                const data = await response.json();
-                this.showNotification(data.message || 'فشل في الاشتراك بالقناة', 'error');
+                this.showNotification('فشل في العملية', 'error');
             }
         } catch (error) {
-            console.error('خطأ في الاشتراك بالقناة:', error);
-            this.showNotification('فشل في الاشتراك بالقناة', 'error');
+            console.error('خطأ في إدارة القناة:', error);
+            this.showNotification('خطأ في العملية', 'error');
         }
     }
 
-    enterChannel(channelId) {
-        this.showNotification('تم الدخول إلى القناة', 'success');
-        // هنا يمكن إضافة منطق للدخول إلى قناة البث
+    openChannel(channelId) {
+        this.showNotification('فتح القناة: ' + channelId, 'info');
+        // يمكن تنفيذ فتح القناة هنا
     }
 
-    async createChannel(event) {
-        event.preventDefault();
+    showCreateChannelModal() {
+        document.getElementById('createChannelModal').style.display = 'flex';
+    }
+
+    hideCreateChannelModal() {
+        document.getElementById('createChannelModal').style.display = 'none';
+    }
+
+    async createChannel(e) {
+        e.preventDefault();
         
-        const formData = new FormData(event.target);
+        const formData = new FormData(e.target);
         const channelData = {
             name: formData.get('channelName'),
             description: formData.get('channelDescription'),
@@ -1435,476 +1266,521 @@ class EducationalPlatform {
         };
 
         try {
-            const response = await this.apiRequest('/api/channels', {
+            const token = localStorage.getItem('authToken');
+            const response = await fetch('/api/channels', {
                 method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
                 body: JSON.stringify(channelData)
             });
 
-            const data = await response.json();
-
-            if (response.ok && data.success) {
+            if (response.ok) {
                 this.showNotification('تم إنشاء القناة بنجاح', 'success');
                 this.hideCreateChannelModal();
-                this.loadChannels();
+                e.target.reset();
+                await this.loadChannels();
             } else {
-                this.showNotification(data.message || 'فشل في إنشاء القناة', 'error');
+                this.showNotification('فشل في إنشاء القناة', 'error');
             }
         } catch (error) {
             console.error('خطأ في إنشاء القناة:', error);
-            this.showNotification('فشل في إنشاء القناة', 'error');
-        }
-    }
-
-    showCreateChannelModal() {
-        const modal = document.getElementById('createChannelModal');
-        if (modal) {
-            modal.style.display = 'flex';
-        }
-    }
-
-    hideCreateChannelModal() {
-        const modal = document.getElementById('createChannelModal');
-        if (modal) {
-            modal.style.display = 'none';
-            document.getElementById('createChannelForm').reset();
+            this.showNotification('خطأ في إنشاء القناة', 'error');
         }
     }
 
     // ============ إدارة الوسائط ============
     async loadMedia() {
         try {
-            const mediaGrid = document.getElementById('mediaGrid');
-            if (mediaGrid) {
-                mediaGrid.innerHTML = `
-                    <div class="empty-state">
-                        <i class="fas fa-photo-video"></i>
-                        <p>لا توجد وسائط بعد</p>
-                        <button class="btn btn-primary" onclick="educationalPlatform.showUploadMediaModal()">
-                            رفع وسائط جديدة
-                        </button>
-                    </div>
-                `;
+            const token = localStorage.getItem('authToken');
+            if (!token) return;
+
+            const response = await fetch('/api/media', {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                this.renderMedia(data.data?.media || []);
+            } else {
+                console.error('فشل في تحميل الوسائط:', response.status);
             }
         } catch (error) {
             console.error('خطأ في تحميل الوسائط:', error);
         }
     }
 
-    async handleFileUpload(event) {
-        const file = event.target.files[0];
-        if (!file || !this.currentChat) return;
+    renderMedia(mediaItems) {
+        const container = document.getElementById('mediaGrid');
+        if (!container) return;
 
-        this.showNotification('جاري رفع الملف...', 'info');
+        container.innerHTML = '';
 
-        const formData = new FormData();
-        formData.append('file', file);
+        if (!mediaItems || mediaItems.length === 0) {
+            container.innerHTML = '<div class="text-center" style="padding: 2rem; color: #666;">لا توجد وسائط</div>';
+            return;
+        }
 
+        mediaItems.forEach(media => {
+            const mediaElement = this.createMediaElement(media);
+            container.appendChild(mediaElement);
+        });
+    }
+
+    createMediaElement(media) {
+        const div = document.createElement('div');
+        div.className = 'media-item';
+        
+        div.innerHTML = `
+            <div class="media-thumbnail">
+                <img src="${media.thumbnailUrl || media.url}" alt="${media.name}" onerror="this.src='https://via.placeholder.com/150'">
+                <div class="media-overlay">
+                    <div class="media-info">
+                        <h4>${this.escapeHtml(media.name)}</h4>
+                        <p>${this.formatFileSize(media.size)} • ${this.formatTime(media.createdAt)}</p>
+                    </div>
+                    <div class="media-actions">
+                        <button class="btn btn-sm btn-outline" onclick="app.downloadMedia('${media._id}')">
+                            <i class="fas fa-download"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        return div;
+    }
+
+    async downloadMedia(mediaId) {
         try {
-            const response = await this.apiRequest('/api/upload', {
-                method: 'POST',
-                body: formData
+            const token = localStorage.getItem('authToken');
+            const response = await fetch(`/api/media/${mediaId}/download`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
             });
 
             if (response.ok) {
-                const fileData = await response.json();
-                this.sendFileMessage(fileData.data);
-                this.showNotification('تم رفع الملف بنجاح', 'success');
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'media-file';
+                a.click();
+                window.URL.revokeObjectURL(url);
             } else {
-                this.showNotification('فشل في رفع الملف', 'error');
+                this.showNotification('فشل في تحميل الملف', 'error');
             }
         } catch (error) {
-            console.error('خطأ في رفع الملف:', error);
-            this.showNotification('فشل في رفع الملف', 'error');
+            console.error('خطأ في تحميل الوسائط:', error);
+            this.showNotification('خطأ في تحميل الملف', 'error');
         }
-
-        event.target.value = '';
-    }
-
-    sendFileMessage(fileData) {
-        const message = {
-            content: `📎 ${fileData.originalName}`,
-            file: fileData,
-            conversationId: this.currentChat._id,
-            type: 'file'
-        };
-
-        this.addMessageToUI({
-            ...message,
-            _id: 'temp-file-' + Date.now(),
-            senderId: this.currentUser._id,
-            createdAt: new Date().toISOString(),
-            readBy: [this.currentUser._id]
-        }, true);
-        
-        if (this.socket) {
-            this.socket.emit('send_message', message);
-        }
-    }
-
-    showUploadMediaModal() {
-        const modal = document.getElementById('uploadMediaModal');
-        if (modal) {
-            modal.style.display = 'flex';
-        }
-    }
-
-    hideUploadMediaModal() {
-        const modal = document.getElementById('uploadMediaModal');
-        if (modal) {
-            modal.style.display = 'none';
-            document.getElementById('uploadMediaForm').reset();
-        }
-    }
-
-    async uploadMedia(event) {
-        event.preventDefault();
-        this.showNotification('ميزة رفع الوسائط قريباً', 'info');
     }
 
     // ============ لوحة التحكم ============
     async loadDashboard() {
         try {
-            const dashboardPage = document.getElementById('dashboard-page');
-            if (dashboardPage) {
-                dashboardPage.innerHTML = `
-                    <div class="dashboard-header">
-                        <h1 class="section-title">
-                            <i class="fas fa-tachometer-alt"></i>
-                            لوحة التحكم
-                        </h1>
-                        <p>مرحباً بك ${this.currentUser?.fullName || 'مستخدم'} في المنصة التعليمية</p>
-                    </div>
-                    
-                    <div class="dashboard-stats">
-                        <div class="stat-card">
-                            <div class="stat-icon">
-                                <i class="fas fa-users"></i>
-                            </div>
-                            <div class="stat-info">
-                                <div class="stat-number">${this.allUsers.length}</div>
-                                <div class="stat-label">إجمالي المستخدمين</div>
-                            </div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-icon">
-                                <i class="fas fa-comments"></i>
-                            </div>
-                            <div class="stat-info">
-                                <div class="stat-number">${this.conversations.length}</div>
-                                <div class="stat-label">المحادثات</div>
-                            </div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-icon">
-                                <i class="fas fa-history"></i>
-                            </div>
-                            <div class="stat-info">
-                                <div class="stat-number">${this.stories.length}</div>
-                                <div class="stat-label">القصص النشطة</div>
-                            </div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-icon">
-                                <i class="fas fa-broadcast-tower"></i>
-                            </div>
-                            <div class="stat-info">
-                                <div class="stat-number">${this.channels.length}</div>
-                                <div class="stat-label">القنوات</div>
-                            </div>
-                        </div>
-                    </div>
+            const token = localStorage.getItem('authToken');
+            if (!token) return;
 
-                    <div class="recent-activities">
-                        <h3>النشاطات الأخيرة</h3>
-                        <div class="activities-list">
-                            <div class="activity-item">
-                                <i class="fas fa-user-plus"></i>
-                                <div class="activity-content">
-                                    <p>انضم مستخدم جديد إلى المنصة</p>
-                                    <span class="activity-time">منذ قليل</span>
-                                </div>
-                            </div>
-                            <div class="activity-item">
-                                <i class="fas fa-comment"></i>
-                                <div class="activity-content">
-                                    <p>تم إرسال رسالة جديدة</p>
-                                    <span class="activity-time">منذ 5 دقائق</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                `;
+            const response = await fetch('/api/dashboard', {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                this.renderDashboard(data.data);
+            } else {
+                console.error('فشل في تحميل لوحة التحكم:', response.status);
             }
         } catch (error) {
             console.error('خطأ في تحميل لوحة التحكم:', error);
         }
     }
 
-    // ============ إدارة المصادقة ============
-    async handleLogin(event) {
-        if (event) event.preventDefault();
+    renderDashboard(data) {
+        // تحديث الإحصائيات
+        const stats = data?.stats || {};
         
-        const email = document.getElementById('loginEmail')?.value;
-        const password = document.getElementById('loginPassword')?.value;
+        const statsElements = {
+            totalMessages: document.getElementById('totalMessages'),
+            totalGroups: document.getElementById('totalGroups'),
+            totalChannels: document.getElementById('totalChannels'),
+            totalMedia: document.getElementById('totalMedia')
+        };
 
-        if (!email || !password) {
-            this.showNotification('يرجى ملء جميع الحقول', 'error');
+        Object.keys(statsElements).forEach(key => {
+            if (statsElements[key]) {
+                statsElements[key].textContent = stats[key] || 0;
+            }
+        });
+
+        // تحديث النشاط الأخير
+        const recentActivity = data?.recentActivity || [];
+        this.renderRecentActivity(recentActivity);
+    }
+
+    renderRecentActivity(activities) {
+        const container = document.getElementById('recentActivity');
+        if (!container) return;
+
+        container.innerHTML = '';
+
+        if (!activities || activities.length === 0) {
+            container.innerHTML = '<div class="text-center" style="padding: 1rem; color: #666;">لا توجد نشاطات حديثة</div>';
             return;
         }
 
-        this.showLoading('جاري تسجيل الدخول...');
+        activities.forEach(activity => {
+            const activityElement = this.createActivityElement(activity);
+            container.appendChild(activityElement);
+        });
+    }
+
+    createActivityElement(activity) {
+        const div = document.createElement('div');
+        div.className = 'activity-item';
+        
+        div.innerHTML = `
+            <div class="activity-icon">
+                <i class="fas ${this.getActivityIcon(activity.type)}"></i>
+            </div>
+            <div class="activity-content">
+                <p>${this.escapeHtml(activity.description)}</p>
+                <span class="activity-time">${this.formatTime(activity.createdAt)}</span>
+            </div>
+        `;
+
+        return div;
+    }
+
+    getActivityIcon(type) {
+        const icons = {
+            message: 'fa-comment',
+            group: 'fa-users',
+            channel: 'fa-broadcast-tower',
+            media: 'fa-file',
+            story: 'fa-history'
+        };
+        return icons[type] || 'fa-circle';
+    }
+
+    // ============ إدارة المصادقة ============
+    async handleLogin(e) {
+        e.preventDefault();
+        
+        const formData = new FormData(e.target);
+        const loginData = {
+            email: formData.get('email'),
+            password: formData.get('password')
+        };
 
         try {
-            const response = await fetch('/api/auth/login', {
+            const response = await fetch('/api/users/login', {
                 method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json' 
+                headers: {
+                    'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({
-                    email: email,
-                    password: password
-                })
+                body: JSON.stringify(loginData)
             });
 
             const data = await response.json();
 
-            if (response.ok && data.success) {
-                this.handleAuthSuccess(data);
+            if (response.ok) {
+                localStorage.setItem('authToken', data.data.token);
+                localStorage.setItem('currentUser', JSON.stringify(data.data.user));
+                
+                this.currentUser = data.data.user;
+                this.showAuthenticatedUI();
+                this.navigateToPage('dashboard');
+                
+                this.showNotification('تم تسجيل الدخول بنجاح!', 'success');
+                
+                // إعادة تهيئة السوكت
+                this.initializeSocket();
+                await this.loadInitialData();
+                
             } else {
-                this.showNotification(data.message || 'فشل تسجيل الدخول', 'error');
+                this.showNotification(data.message || 'فشل في تسجيل الدخول', 'error');
             }
         } catch (error) {
             console.error('خطأ في تسجيل الدخول:', error);
             this.showNotification('خطأ في الاتصال بالخادم', 'error');
-        } finally {
-            this.hideLoading();
         }
     }
 
-    async handleRegister(event) {
-        if (event) event.preventDefault();
+    async handleRegister(e) {
+        e.preventDefault();
         
-        const form = event.target;
-        const formData = new FormData(form);
-        const userData = {
-            fullName: formData.get('name'),
+        const formData = new FormData(e.target);
+        const registerData = {
+            fullName: formData.get('fullName'),
             email: formData.get('email'),
             password: formData.get('password'),
-            role: formData.get('role') || 'student'
+            role: formData.get('role')
         };
 
-        if (!userData.fullName || !userData.email || !userData.password) {
-            this.showNotification('يرجى ملء جميع الحقول', 'error');
-            return;
-        }
-
-        this.showLoading('جاري إنشاء الحساب...');
-
         try {
-            const response = await fetch('/api/auth/register', {
+            const response = await fetch('/api/users/register', {
                 method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json' 
+                headers: {
+                    'Content-Type': 'application/json'
                 },
-                body: JSON.stringify(userData)
+                body: JSON.stringify(registerData)
             });
 
             const data = await response.json();
 
-            if (response.ok && data.success) {
-                this.handleAuthSuccess(data);
+            if (response.ok) {
+                this.showNotification('تم إنشاء الحساب بنجاح!', 'success');
+                e.target.reset();
+                
+                // الانتقال إلى صفحة تسجيل الدخول
+                document.getElementById('loginTab').click();
+                
             } else {
-                this.showNotification(data.message || 'فشل إنشاء الحساب', 'error');
+                this.showNotification(data.message || 'فشل في إنشاء الحساب', 'error');
             }
         } catch (error) {
             console.error('خطأ في إنشاء الحساب:', error);
             this.showNotification('خطأ في الاتصال بالخادم', 'error');
-        } finally {
-            this.hideLoading();
         }
     }
 
-    handleAuthSuccess(data) {
-        localStorage.setItem('authToken', data.token);
-        localStorage.setItem('currentUser', JSON.stringify(data.user));
-        
-        this.currentUser = data.user;
-        this.showAuthenticatedUI();
-        this.navigateToPage('dashboard');
-        this.showNotification(`مرحباً ${data.user.fullName}!`, 'success');
-        
-        this.initializeSocket();
-        this.loadInitialData();
-    }
-
-    async handleLogout() {
-        try {
-            await this.apiRequest('/api/auth/logout', {
-                method: 'POST'
-            });
-        } catch (error) {
-            console.error('خطأ في تسجيل الخروج:', error);
-        } finally {
-            localStorage.removeItem('authToken');
-            localStorage.removeItem('currentUser');
-            
-            if (this.socket) {
-                this.socket.disconnect();
-            }
-            
-            this.currentUser = null;
-            this.showUnauthenticatedUI();
-            this.navigateToPage('home');
-            this.showNotification('تم تسجيل الخروج', 'info');
-        }
-    }
-
-    // ============ دوال مساعدة ============
-    async apiRequest(endpoint, options = {}) {
-        const token = localStorage.getItem('authToken');
-        const config = {
-            headers: {
-                'Content-Type': 'application/json',
-                ...options.headers
-            },
-            ...options
-        };
-
-        if (token) {
-            config.headers['Authorization'] = `Bearer ${token}`;
+    handleLogout() {
+        // إغلاق السوكت
+        if (this.socket) {
+            this.socket.disconnect();
         }
 
-        if (options.body && typeof options.body === 'object' && !(options.body instanceof FormData)) {
-            config.body = JSON.stringify(options.body);
-        }
-
-        return await fetch(endpoint, config);
-    }
-
-    formatTime(timestamp) {
-        if (!timestamp) return 'الآن';
+        // مسح بيانات التخزين المحلي
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('currentUser');
         
-        const date = new Date(timestamp);
-        const now = new Date();
-        const diff = now - date;
+        this.currentUser = null;
+        this.currentChat = null;
+        this.conversations.clear();
         
-        if (diff < 60000) return 'الآن';
-        if (diff < 3600000) return `${Math.floor(diff / 60000)} د`;
-        if (diff < 86400000) return `${Math.floor(diff / 3600000)} س`;
+        this.showUnauthenticatedUI();
+        this.navigateToPage('home');
         
-        return date.toLocaleDateString('ar-EG');
+        this.showNotification('تم تسجيل الخروج بنجاح', 'success');
     }
 
-    truncateText(text, maxLength) {
-        if (!text) return '';
-        if (text.length <= maxLength) return text;
-        return text.substring(0, maxLength) + '...';
-    }
-
-    escapeHtml(unsafe) {
-        if (!unsafe) return '';
-        return unsafe
-            .replace(/&/g, "&amp;")
-            .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;")
-            .replace(/"/g, "&quot;")
-            .replace(/'/g, "&#039;");
-    }
-
+    // ============ أدوات مساعدة ============
     showNotification(message, type = 'info') {
-        // إنشاء عنصر الإشعار
         const notification = document.createElement('div');
         notification.className = `notification notification-${type}`;
-        notification.style.cssText = `
-            position: fixed;
-            top: 100px;
-            left: 20px;
-            background: ${type === 'success' ? '#4cc9f0' : type === 'error' ? '#f72585' : '#4895ef'};
-            color: white;
-            padding: 1rem 1.5rem;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-            z-index: 1000;
-            max-width: 400px;
-            animation: slideIn 0.3s ease;
-        `;
-
         notification.innerHTML = `
-            <div style="display: flex; align-items: center; gap: 0.5rem;">
-                <i class="fas fa-${type === 'success' ? 'check' : type === 'error' ? 'exclamation-triangle' : 'info'}"></i>
+            <div class="notification-content">
+                <i class="fas ${this.getNotificationIcon(type)}"></i>
                 <span>${message}</span>
             </div>
+            <button class="notification-close">&times;</button>
         `;
 
         document.body.appendChild(notification);
 
-        // إزالة الإشعار بعد 5 ثواني
+        // إضافة مستمعي الأحداث
+        notification.querySelector('.notification-close').addEventListener('click', () => {
+            notification.remove();
+        });
+
+        // إزالة الإشعار تلقائياً بعد 5 ثواني
         setTimeout(() => {
-            if (notification.parentElement) {
+            if (notification.parentNode) {
                 notification.remove();
             }
         }, 5000);
-
-        // إضافة أنيميشن
-        const style = document.createElement('style');
-        style.textContent = `
-            @keyframes slideIn {
-                from { transform: translateX(-100%); opacity: 0; }
-                to { transform: translateX(0); opacity: 1; }
-            }
-        `;
-        document.head.appendChild(style);
     }
 
-    showLoading(message = 'جاري التحميل...') {
-        this.hideLoading();
-
-        const loadingEl = document.createElement('div');
-        loadingEl.id = 'loading-overlay';
-        loadingEl.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.5);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 9999;
-        `;
-
-        loadingEl.innerHTML = `
-            <div style="background: white; padding: 2rem; border-radius: 12px; text-align: center;">
-                <div class="spinner" style="width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid #4361ee; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 1rem;"></div>
-                <p>${message}</p>
-            </div>
-            <style>
-                @keyframes spin {
-                    0% { transform: rotate(0deg); }
-                    100% { transform: rotate(360deg); }
-                }
-            </style>
-        `;
-
-        document.body.appendChild(loadingEl);
+    getNotificationIcon(type) {
+        const icons = {
+            success: 'fa-check-circle',
+            error: 'fa-exclamation-circle',
+            warning: 'fa-exclamation-triangle',
+            info: 'fa-info-circle'
+        };
+        return icons[type] || 'fa-info-circle';
     }
 
-    hideLoading() {
-        const loadingEl = document.getElementById('loading-overlay');
-        if (loadingEl) {
-            loadingEl.remove();
+    updateUnreadCount() {
+        // تحديث عدد الرسائل غير المقروءة
+        console.log('تحديث عدد الرسائل غير المقروءة');
+    }
+
+    updateUserStatus(data) {
+        // تحديث حالة المستخدم
+        console.log('تحديث حالة المستخدم:', data);
+    }
+
+    toggleEmojiPicker() {
+        const container = document.getElementById('emojiPickerContainer');
+        if (container) {
+            container.classList.toggle('active');
         }
+    }
+
+    triggerFileInput() {
+        document.getElementById('fileInput').click();
+    }
+
+    handleFileUpload(e) {
+        const file = e.target.files[0];
+        if (file) {
+            this.showNotification(`تم اختيار الملف: ${file.name}`, 'info');
+            // يمكن إضافة رفع الملف هنا
+        }
+    }
+
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    truncateText(text, maxLength) {
+        if (text.length <= maxLength) return text;
+        return text.substr(0, maxLength) + '...';
+    }
+
+    formatTime(dateString) {
+        const date = new Date(dateString);
+        const now = new Date();
+        const diffMs = now - date;
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMs / 3600000);
+        const diffDays = Math.floor(diffMs / 86400000);
+
+        if (diffMins < 1) return 'الآن';
+        if (diffMins < 60) return `منذ ${diffMins} دقيقة`;
+        if (diffHours < 24) return `منذ ${diffHours} ساعة`;
+        if (diffDays < 7) return `منذ ${diffDays} يوم`;
+        
+        return date.toLocaleDateString('ar-SA');
+    }
+
+    formatFileSize(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
     }
 }
 
-// تهيئة التطبيق عند تحميل الصفحة
-document.addEventListener('DOMContentLoaded', () => {
-    console.log('📄 تم تحميل DOM بنجاح، بدء التطبيق...');
-    window.educationalPlatform = new EducationalPlatform();
+// ============ تهيئة التطبيق ============
+let app;
+
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('📄 تم تحميل DOM بالكامل');
+    
+    // تهيئة التطبيق
+    app = new EducationalPlatform();
+    
+    // جعل التطبيق متاحاً عالمياً
+    window.app = app;
+    
+    // إضافة الأنماط للإشعارات
+    const style = document.createElement('style');
+    style.textContent = `
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: white;
+            border-radius: 8px;
+            padding: 15px 20px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            border-left: 4px solid #4361ee;
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            min-width: 300px;
+            max-width: 500px;
+            animation: slideInRight 0.3s ease;
+        }
+        
+        .notification-success {
+            border-left-color: #4caf50;
+        }
+        
+        .notification-error {
+            border-left-color: #f44336;
+        }
+        
+        .notification-warning {
+            border-left-color: #ff9800;
+        }
+        
+        .notification-info {
+            border-left-color: #2196f3;
+        }
+        
+        .notification-content {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .notification-close {
+            background: none;
+            border: none;
+            font-size: 18px;
+            cursor: pointer;
+            color: #666;
+        }
+        
+        @keyframes slideInRight {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+        
+        .connection-status {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            background: rgba(76, 201, 240, 0.9);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            z-index: 9999;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        }
+    `;
+    document.head.appendChild(style);
+    
+    // إضافة شريط حالة الاتصال
+    const connectionStatus = document.createElement('div');
+    connectionStatus.id = 'connectionStatus';
+    connectionStatus.className = 'connection-status';
+    connectionStatus.innerHTML = '<i class="fas fa-wifi"></i><span>جاري الاتصال...</span>';
+    document.body.appendChild(connectionStatus);
 });
 
-// التعامل مع أخطاء التحميل
-window.addEventListener('error', (event) => {
-    console.error('❌ خطأ في الصفحة:', event.error);
+// معالجة الأخطاء غير المتوقعة
+window.addEventListener('error', function(e) {
+    console.error('خطأ غير متوقع:', e.error);
+});
+
+window.addEventListener('unhandledrejection', function(e) {
+    console.error('Promise مرفوض:', e.reason);
 });
