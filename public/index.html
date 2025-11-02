@@ -3,664 +3,1640 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>المنصة التعليمية المتطورة - نظام الإدارة المتكامل</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/emoji-picker-element@1.14.0/index.min.css">
-    <link rel="stylesheet" href="css/css.css">
-    <script src="/socket.io/socket.io.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/emoji-picker-element@1.14.0/index.min.js"></script>
+    <title>المنصة التعليمية - نظام الدردشة المتكامل</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #4361ee;
+            --secondary: #3f37c9;
+            --accent: #f72585;
+            --success: #4caf50;
+            --warning: #ff9800;
+            --error: #f44336;
+            --dark: #1e1e2c;
+            --light: #f8f9fa;
+            --gray: #6c757d;
+            --border: #e0e0e0;
+            --shadow: 0 2px 10px rgba(0,0,0,0.1);
+            --gradient: linear-gradient(135deg, #4361ee, #3a0ca3);
+        }
+
+        body {
+            font-family: 'Tajawal', sans-serif;
+            background: var(--light);
+            color: var(--dark);
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 15px;
+        }
+
+        /* التنقل */
+        .navbar {
+            background: white;
+            box-shadow: var(--shadow);
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            height: 70px;
+        }
+
+        .nav-content {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 100%;
+            padding: 0 20px;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .nav-items {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .nav-item {
+            padding: 10px 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            color: var(--gray);
+            text-decoration: none;
+        }
+
+        .nav-item:hover, .nav-item.active {
+            background: var(--primary);
+            color: white;
+        }
+
+        .auth-buttons {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--secondary);
+            transform: translateY(-2px);
+        }
+
+        .btn-outline {
+            background: transparent;
+            border: 2px solid var(--primary);
+            color: var(--primary);
+        }
+
+        .btn-outline:hover {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-sm {
+            padding: 8px 16px;
+            font-size: 0.8rem;
+        }
+
+        /* المحتوى الرئيسي */
+        .main-content {
+            margin-top: 70px;
+            min-height: calc(100vh - 70px);
+        }
+
+        .page {
+            display: none;
+            padding: 20px;
+        }
+
+        .page.active {
+            display: block;
+        }
+
+        /* شاشة الترحيب */
+        .welcome-screen {
+            background: var(--gradient);
+            color: white;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .welcome-content {
+            max-width: 600px;
+        }
+
+        .welcome-content h1 {
+            font-size: 3rem;
+            margin-bottom: 20px;
+            font-weight: 700;
+        }
+
+        .welcome-content p {
+            font-size: 1.2rem;
+            margin-bottom: 30px;
+            opacity: 0.9;
+        }
+
+        /* الصفحات */
+        .page-header {
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .page-header h1 {
+            font-size: 2.5rem;
+            color: var(--primary);
+            margin-bottom: 10px;
+        }
+
+        .page-header p {
+            color: var(--gray);
+            font-size: 1.1rem;
+        }
+
+        /* نظام الدردشة */
+        .chat-container {
+            display: flex;
+            gap: 20px;
+            height: calc(100vh - 150px);
+            background: white;
+            border-radius: 15px;
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+
+        .chat-sidebar {
+            width: 350px;
+            background: white;
+            border-left: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chat-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border);
+            background: var(--light);
+        }
+
+        .chat-main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chat-messages {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            background: var(--light);
+        }
+
+        .chat-input-container {
+            padding: 20px;
+            border-top: 1px solid var(--border);
+            background: white;
+        }
+
+        .chat-input-wrapper {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .chat-input {
+            flex: 1;
+            padding: 12px 15px;
+            border: 1px solid var(--border);
+            border-radius: 25px;
+            font-family: inherit;
+            font-size: 0.9rem;
+        }
+
+        .chat-actions {
+            display: flex;
+            gap: 5px;
+        }
+
+        .action-btn {
+            width: 40px;
+            height: 40px;
+            border: none;
+            border-radius: 50%;
+            background: var(--light);
+            color: var(--gray);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+        }
+
+        .action-btn:hover {
+            background: var(--primary);
+            color: white;
+        }
+
+        /* الرسائل */
+        .message {
+            display: flex;
+            margin-bottom: 15px;
+            gap: 10px;
+        }
+
+        .message.sent {
+            justify-content: flex-end;
+        }
+
+        .message.received {
+            justify-content: flex-start;
+        }
+
+        .message-content {
+            max-width: 70%;
+            padding: 12px 16px;
+            border-radius: 18px;
+            position: relative;
+        }
+
+        .message.sent .message-content {
+            background: var(--primary);
+            color: white;
+            border-bottom-right-radius: 4px;
+        }
+
+        .message.received .message-content {
+            background: white;
+            color: var(--dark);
+            border: 1px solid var(--border);
+            border-bottom-left-radius: 4px;
+        }
+
+        .message-time {
+            font-size: 0.7rem;
+            opacity: 0.7;
+            margin-top: 5px;
+        }
+
+        .message-status {
+            align-self: flex-end;
+            font-size: 0.8rem;
+            color: var(--success);
+        }
+
+        /* القصص */
+        .stories-container {
+            display: flex;
+            gap: 15px;
+            padding: 20px 0;
+            overflow-x: auto;
+        }
+
+        .story-item {
+            flex: 0 0 auto;
+            width: 80px;
+            text-align: center;
+            cursor: pointer;
+        }
+
+        .story-avatar {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            background: var(--gradient);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 1.2rem;
+            margin: 0 auto 8px;
+            border: 3px solid var(--primary);
+        }
+
+        .story-author {
+            font-size: 0.8rem;
+            color: var(--gray);
+        }
+
+        /* المشاهدة */
+        .story-viewer {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.9);
+            z-index: 2000;
+            display: none;
+            flex-direction: column;
+        }
+
+        .story-viewer.active {
+            display: flex;
+        }
+
+        .story-progress {
+            display: flex;
+            gap: 5px;
+            padding: 20px;
+        }
+
+        .story-progress-bar {
+            flex: 1;
+            height: 3px;
+            background: rgba(255,255,255,0.3);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .story-progress-fill {
+            height: 100%;
+            background: white;
+            width: 0%;
+        }
+
+        .story-content {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        .story-image {
+            max-width: 100%;
+            max-height: 80vh;
+            border-radius: 10px;
+        }
+
+        .story-controls {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 20px;
+        }
+
+        .story-control-btn {
+            width: 50px;
+            height: 50px;
+            background: rgba(255,255,255,0.2);
+            border: none;
+            border-radius: 50%;
+            color: white;
+            font-size: 1.2rem;
+            cursor: pointer;
+            backdrop-filter: blur(10px);
+        }
+
+        .story-info {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            left: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: white;
+        }
+
+        .story-user-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: var(--primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+        }
+
+        /* البطاقات */
+        .cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 30px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: var(--shadow);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .card-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 12px;
+            background: var(--gradient);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.2rem;
+        }
+
+        .card-title {
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: var(--dark);
+        }
+
+        .card-description {
+            color: var(--gray);
+            line-height: 1.6;
+        }
+
+        /* الإحصائيات */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin: 30px 0;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: var(--shadow);
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .stat-icon {
+            width: 60px;
+            height: 60px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+        }
+
+        .stat-info h3 {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--dark);
+            margin-bottom: 5px;
+        }
+
+        .stat-info p {
+            color: var(--gray);
+            font-size: 0.9rem;
+        }
+
+        /* النماذج */
+        .auth-container {
+            max-width: 400px;
+            margin: 50px auto;
+            background: white;
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: var(--shadow);
+        }
+
+        .auth-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .auth-header h2 {
+            color: var(--primary);
+            margin-bottom: 10px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: var(--dark);
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 12px 15px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 0.9rem;
+            transition: border-color 0.3s ease;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .form-select {
+            width: 100%;
+            padding: 12px 15px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 0.9rem;
+            background: white;
+        }
+
+        /* الأزرار العائمة */
+        .floating-action-btn {
+            position: fixed;
+            bottom: 30px;
+            left: 30px;
+            width: 60px;
+            height: 60px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            font-size: 1.5rem;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(67, 97, 238, 0.3);
+            z-index: 100;
+            transition: all 0.3s ease;
+        }
+
+        .floating-action-btn:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 20px rgba(67, 97, 238, 0.4);
+        }
+
+        .quick-actions {
+            position: fixed;
+            bottom: 100px;
+            left: 30px;
+            background: white;
+            border-radius: 15px;
+            box-shadow: var(--shadow);
+            padding: 15px;
+            display: none;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 99;
+        }
+
+        .quick-actions.active {
+            display: flex;
+        }
+
+        .quick-action-btn {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 15px;
+            border: none;
+            background: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.3s ease;
+            font-family: inherit;
+            color: var(--dark);
+        }
+
+        .quick-action-btn:hover {
+            background: var(--light);
+        }
+
+        /* حالة الاتصال */
+        .connection-status {
+            position: fixed;
+            top: 80px;
+            right: 20px;
+            background: var(--success);
+            color: white;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            z-index: 999;
+        }
+
+        /* الوسائط */
+        .media-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 20px;
+            margin-top: 30px;
+        }
+
+        .media-item {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: var(--shadow);
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            transition: transform 0.3s ease;
+        }
+
+        .media-item:hover {
+            transform: translateY(-3px);
+        }
+
+        .media-icon {
+            width: 50px;
+            height: 50px;
+            background: var(--light);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            color: var(--primary);
+        }
+
+        .media-info {
+            flex: 1;
+        }
+
+        .media-name {
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .media-meta {
+            font-size: 0.8rem;
+            color: var(--gray);
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        /* الأدوات */
+        .hidden {
+            display: none !important;
+        }
+
+        .text-center {
+            text-align: center;
+        }
+
+        .mt-4 {
+            margin-top: 2rem;
+        }
+
+        .mb-4 {
+            margin-bottom: 2rem;
+        }
+
+        /* التجاوب */
+        @media (max-width: 768px) {
+            .nav-items {
+                display: none;
+            }
+
+            .mobile-menu-btn {
+                display: block;
+            }
+
+            .chat-container {
+                flex-direction: column;
+                height: auto;
+            }
+
+            .chat-sidebar {
+                width: 100%;
+                height: 300px;
+            }
+
+            .cards-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .welcome-content h1 {
+                font-size: 2rem;
+            }
+        }
+
+        /* القائمة المتنقلة */
+        .mobile-menu {
+            position: fixed;
+            top: 70px;
+            right: -300px;
+            width: 300px;
+            height: calc(100vh - 70px);
+            background: white;
+            box-shadow: -2px 0 10px rgba(0,0,0,0.1);
+            transition: right 0.3s ease;
+            z-index: 999;
+            padding: 20px;
+        }
+
+        .mobile-menu.active {
+            right: 0;
+        }
+
+        .mobile-menu-items {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .mobile-menu-item {
+            padding: 15px;
+            border-radius: 8px;
+            background: var(--light);
+            text-decoration: none;
+            color: var(--dark);
+            transition: background 0.3s ease;
+        }
+
+        .mobile-menu-item:hover {
+            background: var(--primary);
+            color: white;
+        }
+
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 998;
+            display: none;
+        }
+
+        .overlay.active {
+            display: block;
+        }
+
+        .mobile-menu-btn {
+            display: none;
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            color: var(--dark);
+            cursor: pointer;
+        }
+
+        @media (max-width: 768px) {
+            .mobile-menu-btn {
+                display: block;
+            }
+        }
+
+        /* منتقي الإيموجي */
+        .emoji-picker {
+            position: absolute;
+            bottom: 70px;
+            left: 20px;
+            background: white;
+            border-radius: 15px;
+            box-shadow: var(--shadow);
+            padding: 15px;
+            display: none;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 8px;
+            z-index: 1000;
+            max-width: 300px;
+        }
+
+        .emoji-picker.active {
+            display: grid;
+        }
+
+        .emoji {
+            font-size: 1.2rem;
+            cursor: pointer;
+            padding: 5px;
+            border-radius: 5px;
+            text-align: center;
+            transition: background 0.3s ease;
+        }
+
+        .emoji:hover {
+            background: var(--light);
+        }
+
+        /* المحادثات */
+        .conversations-list {
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .conversation-item {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 15px;
+            border-bottom: 1px solid var(--border);
+            cursor: pointer;
+            transition: background 0.3s ease;
+        }
+
+        .conversation-item:hover, .conversation-item.active {
+            background: var(--light);
+        }
+
+        .conversation-avatar {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: var(--gradient);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+
+        .conversation-info {
+            flex: 1;
+        }
+
+        .conversation-name {
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .conversation-last-message {
+            font-size: 0.8rem;
+            color: var(--gray);
+        }
+
+        .conversation-meta {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 5px;
+        }
+
+        .conversation-time {
+            font-size: 0.7rem;
+            color: var(--gray);
+        }
+
+        .conversation-unread {
+            background: var(--primary);
+            color: white;
+            font-size: 0.7rem;
+            padding: 2px 6px;
+            border-radius: 10px;
+            min-width: 18px;
+            text-align: center;
+        }
+
+        /* المجموعات والقنوات */
+        .group-item, .channel-item {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: var(--shadow);
+            margin-bottom: 20px;
+        }
+
+        .group-header, .channel-header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .group-avatar, .channel-avatar {
+            width: 60px;
+            height: 60px;
+            border-radius: 12px;
+            background: var(--gradient);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 1.2rem;
+            position: relative;
+        }
+
+        .channel-avatar.live::after {
+            content: '';
+            position: absolute;
+            top: -3px;
+            right: -3px;
+            width: 12px;
+            height: 12px;
+            background: var(--error);
+            border-radius: 50%;
+            border: 2px solid white;
+        }
+
+        .live-indicator {
+            position: absolute;
+            top: -8px;
+            left: -8px;
+            background: var(--error);
+            color: white;
+            font-size: 0.6rem;
+            padding: 2px 6px;
+            border-radius: 10px;
+        }
+
+        .group-info, .channel-info {
+            flex: 1;
+        }
+
+        .group-name, .channel-name {
+            font-weight: 600;
+            margin-bottom: 5px;
+            font-size: 1.1rem;
+        }
+
+        .group-description, .channel-description {
+            color: var(--gray);
+            font-size: 0.9rem;
+            margin-bottom: 10px;
+        }
+
+        .group-meta, .channel-meta {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.8rem;
+            color: var(--gray);
+        }
+
+        .group-admin-badge, .channel-creator-badge {
+            background: var(--primary);
+            color: white;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 0.7rem;
+        }
+
+        .group-actions, .channel-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        /* النماذج المنبثقة */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            padding: 20px;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 15px;
+            max-width: 500px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .modal-header h3 {
+            color: var(--dark);
+            font-size: 1.3rem;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--gray);
+        }
+
+        .modal-body {
+            padding: 20px;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            margin-top: 20px;
+        }
+
+        /* النشاطات */
+        .activities-list {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .activity-item {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 15px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: var(--shadow);
+        }
+
+        .activity-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            background: var(--light);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--primary);
+        }
+
+        .activity-content {
+            flex: 1;
+        }
+
+        .activity-content p {
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+
+        .activity-time {
+            font-size: 0.8rem;
+            color: var(--gray);
+        }
+
+        /* حالة المستخدم */
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 5px 10px;
+            border-radius: 20px;
+            background: var(--light);
+        }
+
+        .user-avatar {
+            width: 35px;
+            height: 35px;
+            border-radius: 50%;
+            background: var(--primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+        }
+
+        .user-details {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .user-name {
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .user-role {
+            font-size: 0.7rem;
+            color: var(--gray);
+        }
+
+        /* الدردشة الفارغة */
+        .empty-chat {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: var(--gray);
+            text-align: center;
+        }
+
+        .empty-chat i {
+            font-size: 4rem;
+            margin-bottom: 20px;
+            opacity: 0.5;
+        }
+
+        .empty-chat h3 {
+            margin-bottom: 10px;
+            color: var(--dark);
+        }
+    </style>
 </head>
 <body>
     <!-- شاشة الترحيب -->
-    <div class="welcome-screen" id="welcomeScreen">
+    <div id="welcomeScreen" class="welcome-screen">
         <div class="welcome-content">
-            <div class="welcome-logo">
-                <div class="logo-icon large">
-                    <i class="fas fa-graduation-cap"></i>
-                </div>
-                <h1>المنصة التعليمية</h1>
-                <p>نظام إدارة تعليمي متكامل ومتطور</p>
-            </div>
-            
-            <div class="welcome-features">
-                <div class="feature">
-                    <i class="fas fa-comments"></i>
-                    <span>دردشة مباشرة</span>
-                </div>
-                <div class="feature">
-                    <i class="fas fa-users"></i>
-                    <span>مجموعات تعليمية</span>
-                </div>
-                <div class="feature">
-                    <i class="fas fa-play-circle"></i>
-                    <span>فصول افتراضية</span>
-                </div>
-                <div class="feature">
-                    <i class="fas fa-chart-line"></i>
-                    <span>تتبع التقدم</span>
-                </div>
-            </div>
-            
-            <button class="btn btn-primary btn-lg" id="startAppBtn">
-                <i class="fas fa-rocket"></i>
-                ابدأ الآن
+            <h1>مرحباً بك في المنصة التعليمية</h1>
+            <p>منصة متكاملة للتعلم والتفاعل مع الزملاء والمعلمين من خلال نظام دردشة متطور</p>
+            <button id="startAppBtn" class="btn btn-primary" style="font-size: 1.1rem; padding: 15px 30px;">
+                ابدأ الآن <i class="fas fa-arrow-left"></i>
             </button>
         </div>
     </div>
 
-    <!-- حالة الاتصال -->
-    <div class="connection-status" id="connectionStatus">
-        <i class="fas fa-wifi"></i>
-        <span>متصل بالإنترنت</span>
-    </div>
-
-    <!-- إشعار التحديث -->
-    <div class="update-notification" id="updateNotification" style="display: none;">
-        <div class="update-content">
-            <i class="fas fa-sync-alt fa-spin"></i>
-            <div class="update-info">
-                <strong>تحديث جديد متاح</strong>
-                <span>يتم تحميل التحديثات تلقائياً</span>
+    <!-- شريط التنقل -->
+    <nav class="navbar">
+        <div class="nav-content">
+            <div class="logo">
+                <i class="fas fa-graduation-cap"></i>
+                <span>المنصة التعليمية</span>
             </div>
-        </div>
-        <button class="btn btn-sm btn-outline" id="reloadBtn">
-            <i class="fas fa-redo"></i>
-            تحديث الآن
-        </button>
-    </div>
-
-    <!-- الهيدر -->
-    <header class="header" id="header">
-        <div class="header-content">
-            <a href="#" class="logo" data-page="home">
-                <div class="logo-icon">
-                    <i class="fas fa-graduation-cap"></i>
-                </div>
-                <div>
-                    <div class="logo-text">المنصة التعليمية</div>
-                    <div class="logo-subtitle">نظام الإدارة المتكامل</div>
-                </div>
-            </a>
-
-            <nav class="nav">
-                <a href="#" class="nav-item" data-page="home">
-                    <i class="fas fa-home"></i>
-                    الرئيسية
-                </a>
-                <a href="#" class="nav-item" data-page="dashboard">
-                    <i class="fas fa-tachometer-alt"></i>
-                    لوحة التحكم
-                </a>
-                <a href="#" class="nav-item" data-page="chat">
-                    <i class="fas fa-comments"></i>
-                    الدردشة
-                    <span class="nav-item-badge" id="unreadMessagesCount">0</span>
-                </a>
-                <a href="#" class="nav-item" data-page="stories">
-                    <i class="fas fa-history"></i>
-                    القصص
-                </a>
-                <a href="#" class="nav-item" data-page="groups">
-                    <i class="fas fa-users"></i>
-                    المجموعات
-                </a>
-                <a href="#" class="nav-item" data-page="channels">
-                    <i class="fas fa-broadcast-tower"></i>
-                    القنوات
-                </a>
-                <a href="#" class="nav-item" data-page="media">
-                    <i class="fas fa-photo-video"></i>
-                    الوسائط
-                </a>
-                <a href="#" class="nav-item hidden" id="loginBtn" data-page="login">
-                    <i class="fas fa-sign-in-alt"></i>
-                    تسجيل الدخول
-                </a>
-                <a href="#" class="nav-item hidden" id="registerBtn" data-page="register">
-                    <i class="fas fa-user-plus"></i>
-                    إنشاء حساب
-                </a>
-                <a href="#" class="nav-item hidden" id="logoutBtn">
-                    <i class="fas fa-sign-out-alt"></i>
-                    تسجيل الخروج
-                </a>
-            </nav>
-
-            <div class="user-info hidden" id="userInfo">
-                <div class="user-avatar">
-                    <span id="userAvatarText">م</span>
-                </div>
-                <div class="user-details">
-                    <div class="user-name" id="userNameDisplay">محمد أحمد</div>
-                    <div class="user-role" id="userRoleDisplay">طالب</div>
-                </div>
+            
+            <div class="nav-items">
+                <a href="#" class="nav-item" data-page="home">الرئيسية</a>
+                <a href="#" class="nav-item" data-page="dashboard">لوحة التحكم</a>
+                <a href="#" class="nav-item" data-page="chat">الدردشة</a>
+                <a href="#" class="nav-item" data-page="stories">القصص</a>
+                <a href="#" class="nav-item" data-page="groups">المجموعات</a>
+                <a href="#" class="nav-item" data-page="channels">القنوات</a>
+                <a href="#" class="nav-item" data-page="media">الوسائط</a>
             </div>
 
-            <button class="mobile-menu-btn" id="mobileMenuBtn">
-                <i class="fas fa-bars"></i>
-            </button>
+            <div class="auth-buttons">
+                <div id="userInfo" class="user-info hidden">
+                    <div class="user-avatar">
+                        <span id="userAvatarText">م</span>
+                    </div>
+                    <div class="user-details">
+                        <div class="user-name" id="userNameDisplay">مستخدم</div>
+                        <div class="user-role" id="userRoleDisplay">طالب</div>
+                    </div>
+                </div>
+                
+                <button id="loginBtn" class="btn btn-outline">تسجيل الدخول</button>
+                <button id="registerBtn" class="btn btn-primary">إنشاء حساب</button>
+                <button id="logoutBtn" class="btn btn-outline hidden">تسجيل الخروج</button>
+                
+                <button id="mobileMenuBtn" class="mobile-menu-btn">
+                    <i class="fas fa-bars"></i>
+                </button>
+            </div>
         </div>
-    </header>
+    </nav>
 
     <!-- القائمة المتنقلة -->
-    <div class="mobile-menu" id="mobileMenu">
-        <div class="mobile-menu-header">
-            <div class="user-info">
-                <div class="user-avatar">
-                    <span id="mobileUserAvatarText">م</span>
-                </div>
-                <div class="user-details">
-                    <div class="user-name" id="mobileUserNameDisplay">محمد أحمد</div>
-                    <div class="user-role" id="mobileUserRoleDisplay">طالب</div>
-                </div>
-            </div>
-            <button class="mobile-menu-close" id="mobileMenuClose">
-                <i class="fas fa-times"></i>
-            </button>
+    <div id="mobileMenu" class="mobile-menu">
+        <div class="mobile-menu-items">
+            <a href="#" class="mobile-menu-item" data-page="home">الرئيسية</a>
+            <a href="#" class="mobile-menu-item" data-page="dashboard">لوحة التحكم</a>
+            <a href="#" class="mobile-menu-item" data-page="chat">الدردشة</a>
+            <a href="#" class="mobile-menu-item" data-page="stories">القصص</a>
+            <a href="#" class="mobile-menu-item" data-page="groups">المجموعات</a>
+            <a href="#" class="mobile-menu-item" data-page="channels">القنوات</a>
+            <a href="#" class="mobile-menu-item" data-page="media">الوسائط</a>
         </div>
-        <nav class="mobile-nav">
-            <a href="#" class="nav-item" data-page="home">
-                <i class="fas fa-home"></i>
-                الرئيسية
-            </a>
-            <a href="#" class="nav-item" data-page="dashboard">
-                <i class="fas fa-tachometer-alt"></i>
-                لوحة التحكم
-            </a>
-            <a href="#" class="nav-item" data-page="chat">
-                <i class="fas fa-comments"></i>
-                الدردشة
-                <span class="nav-item-badge" id="unreadMessagesCountMobile">0</span>
-            </a>
-            <a href="#" class="nav-item" data-page="stories">
-                <i class="fas fa-history"></i>
-                القصص
-            </a>
-            <a href="#" class="nav-item" data-page="groups">
-                <i class="fas fa-users"></i>
-                المجموعات
-            </a>
-            <a href="#" class="nav-item" data-page="channels">
-                <i class="fas fa-broadcast-tower"></i>
-                القنوات
-            </a>
-            <a href="#" class="nav-item" data-page="media">
-                <i class="fas fa-photo-video"></i>
-                الوسائط
-            </a>
-            <a href="#" class="nav-item hidden" id="loginBtnMobile" data-page="login">
-                <i class="fas fa-sign-in-alt"></i>
-                تسجيل الدخول
-            </a>
-            <a href="#" class="nav-item hidden" id="registerBtnMobile" data-page="register">
-                <i class="fas fa-user-plus"></i>
-                إنشاء حساب
-            </a>
-            <a href="#" class="nav-item hidden" id="logoutBtnMobile">
-                <i class="fas fa-sign-out-alt"></i>
-                تسجيل الخروج
-            </a>
-        </nav>
     </div>
 
-    <!-- طبقة التعتيم -->
-    <div class="overlay" id="overlay"></div>
+    <div id="overlay" class="overlay"></div>
 
     <!-- المحتوى الرئيسي -->
-    <main class="main-content">
-        <!-- الصفحة الرئيسية -->
-        <div class="page active" id="home-page">
-            <div class="home-hero">
-                <div class="hero-content">
-                    <h1>مرحباً بك في المنصة التعليمية</h1>
-                    <p>منصة متكاملة للتعلم والتعاون والتواصل بين الطلاب والمعلمين</p>
-                    <div class="hero-actions">
-                        <button class="btn btn-primary btn-lg" data-page="register">
-                            <i class="fas fa-user-plus"></i>
-                            انضم إلينا
-                        </button>
-                        <button class="btn btn-outline btn-lg" data-page="login">
-                            <i class="fas fa-sign-in-alt"></i>
-                            تسجيل الدخول
-                        </button>
-                    </div>
+    <div class="main-content">
+        <!-- صفحة الرئيسية -->
+        <div id="home-page" class="page active">
+            <div class="container">
+                <div class="page-header">
+                    <h1>المنصة التعليمية الشاملة</h1>
+                    <p>بيئة تعليمية تفاعلية تجمع الطلاب والمعلمين في مكان واحد</p>
                 </div>
-                <div class="hero-image">
-                    <i class="fas fa-graduation-cap"></i>
-                </div>
-            </div>
 
-            <div class="features-section">
-                <h2 class="section-title">مميزات المنصة</h2>
-                <div class="features-grid">
-                    <div class="feature-card">
-                        <div class="feature-icon">
-                            <i class="fas fa-comments"></i>
+                <div class="cards-grid">
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-icon">
+                                <i class="fas fa-comments"></i>
+                            </div>
+                            <h3 class="card-title">نظام الدردشة</h3>
                         </div>
-                        <h3>دردشة مباشرة</h3>
-                        <p>تواصل فوري مع الزملاء والمعلمين عبر نظام دردشة متكامل</p>
+                        <p class="card-description">
+                            تواصل فوري مع الزملاء والمعلمين من خلال نظام دردشة متطور يدعم المحادثات الفردية والجماعية.
+                        </p>
                     </div>
-                    <div class="feature-card">
-                        <div class="feature-icon">
-                            <i class="fas fa-users"></i>
-                        </div>
-                        <h3>مجموعات تعليمية</h3>
-                        <p>أنشئ مجموعات دراسية وناقش مواضيعك مع زملائك</p>
-                    </div>
-                    <div class="feature-card">
-                        <div class="feature-icon">
-                            <i class="fas fa-broadcast-tower"></i>
-                        </div>
-                        <h3>قنوات البث</h3>
-                        <p>انضم إلى قنوات تعليمية متخصصة واحصل على آخر المستجدات</p>
-                    </div>
-                    <div class="feature-card">
-                        <div class="feature-icon">
-                            <i class="fas fa-history"></i>
-                        </div>
-                        <h3>القصص التعليمية</h3>
-                        <p>شارك تجاربك التعليمية عبر القصص التفاعلية</p>
-                    </div>
-                    <div class="feature-card">
-                        <div class="feature-icon">
-                            <i class="fas fa-photo-video"></i>
-                        </div>
-                        <h3>وسائط متعددة</h3>
-                        <p>شارك ومشاهدة الوسائط التعليمية بجودة عالية</p>
-                    </div>
-                    <div class="feature-card">
-                        <div class="feature-icon">
-                            <i class="fas fa-chart-line"></i>
-                        </div>
-                        <h3>تتبع التقدم</h3>
-                        <p>تابع تقدمك التعليمي واحصل على تقارير أداء مفصلة</p>
-                    </div>
-                </div>
-            </div>
-        </div>
 
-        <!-- صفحة تسجيل الدخول -->
-        <div class="page" id="login-page">
-            <div class="auth-container">
-                <div class="auth-card">
-                    <div class="auth-header">
-                        <h2>تسجيل الدخول</h2>
-                        <p>ادخل إلى حسابك للمتابعة</p>
-                    </div>
-                    <form class="auth-form" id="loginForm">
-                        <div class="form-group">
-                            <label for="loginEmail">البريد الإلكتروني</label>
-                            <input type="email" id="loginEmail" name="email" required placeholder="ادخل بريدك الإلكتروني">
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-icon">
+                                <i class="fas fa-users"></i>
+                            </div>
+                            <h3 class="card-title">المجموعات الدراسية</h3>
                         </div>
-                        <div class="form-group">
-                            <label for="loginPassword">كلمة المرور</label>
-                            <input type="password" id="loginPassword" name="password" required placeholder="ادخل كلمة المرور">
-                        </div>
-                        <button type="submit" class="btn btn-primary btn-block">
-                            <i class="fas fa-sign-in-alt"></i>
-                            تسجيل الدخول
-                        </button>
-                    </form>
-                    <div class="auth-footer">
-                        <p>ليس لديك حساب؟ <a href="#" data-page="register">أنشئ حساب جديد</a></p>
+                        <p class="card-description">
+                            أنشئ مجموعات دربية وناقش المواضيع التعليمية مع زملائك في بيئة تعاونية آمنة.
+                        </p>
                     </div>
-                </div>
-            </div>
-        </div>
 
-        <!-- صفحة إنشاء حساب -->
-        <div class="page" id="register-page">
-            <div class="auth-container">
-                <div class="auth-card">
-                    <div class="auth-header">
-                        <h2>إنشاء حساب جديد</h2>
-                        <p>انضم إلى منصتنا التعليمية</p>
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-icon">
+                                <i class="fas fa-satellite-dish"></i>
+                            </div>
+                            <h3 class="card-title">القنوات التعليمية</h3>
+                        </div>
+                        <p class="card-description">
+                            اشترك في القنوات التعليمية وتابع آخر المستجدات والدروس من معلميك المفضلين.
+                        </p>
                     </div>
-                    <form class="auth-form" id="registerForm">
-                        <div class="form-group">
-                            <label for="registerName">الاسم الكامل</label>
-                            <input type="text" id="registerName" name="name" required placeholder="ادخل اسمك الكامل">
+
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-icon">
+                                <i class="fas fa-images"></i>
+                            </div>
+                            <h3 class="card-title">القصص التعليمية</h3>
                         </div>
-                        <div class="form-group">
-                            <label for="registerEmail">البريد الإلكتروني</label>
-                            <input type="email" id="registerEmail" name="email" required placeholder="ادخل بريدك الإلكتروني">
+                        <p class="card-description">
+                            شارك تجاربك التعليمية من خلال القصص المصورة التي تختفي بعد 24 ساعة.
+                        </p>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-icon">
+                                <i class="fas fa-file"></i>
+                            </div>
+                            <h3 class="card-title">مكتبة الوسائط</h3>
                         </div>
-                        <div class="form-group">
-                            <label for="registerPassword">كلمة المرور</label>
-                            <input type="password" id="registerPassword" name="password" required placeholder="اختر كلمة مرور قوية">
+                        <p class="card-description">
+                            الوصول إلى مكتبة شاملة من الوسائط التعليمية من فيديوهات وملفات وموارد تعليمية.
+                        </p>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-icon">
+                                <i class="fas fa-chart-line"></i>
+                            </div>
+                            <h3 class="card-title">التقارير والإحصائيات</h3>
                         </div>
-                        <div class="form-group">
-                            <label for="registerRole">الدور</label>
-                            <select id="registerRole" name="role" required>
-                                <option value="">اختر دورك</option>
-                                <option value="student">طالب</option>
-                                <option value="teacher">معلم</option>
-                            </select>
-                        </div>
-                        <button type="submit" class="btn btn-primary btn-block">
-                            <i class="fas fa-user-plus"></i>
-                            إنشاء حساب
-                        </button>
-                    </form>
-                    <div class="auth-footer">
-                        <p>لديك حساب بالفعل؟ <a href="#" data-page="login">سجل الدخول</a></p>
+                        <p class="card-description">
+                            تتبع تقدمك التعليمي من خلال تقارير مفصلة وإحصائيات عن نشاطك في المنصة.
+                        </p>
                     </div>
                 </div>
             </div>
         </div>
 
         <!-- صفحة لوحة التحكم -->
-        <div class="page" id="dashboard-page">
-            <!-- سيتم تحميل المحتوى ديناميكياً -->
+        <div id="dashboard-page" class="page">
+            <div class="container">
+                <div class="page-header">
+                    <h1>لوحة التحكم</h1>
+                    <p>نظرة عامة على نشاطك في المنصة التعليمية</p>
+                </div>
+
+                <div class="stats-grid" id="dashboardStats">
+                    <!-- سيتم تعبئتها ديناميكياً -->
+                </div>
+
+                <div class="row" style="display: grid; grid-template-columns: 2fr 1fr; gap: 20px;">
+                    <div class="card">
+                        <h3 style="margin-bottom: 20px;">النشاطات الحديثة</h3>
+                        <div class="activities-list" id="recentActivities">
+                            <!-- سيتم تعبئتها ديناميكياً -->
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <h3 style="margin-bottom: 20px;">إحصائيات سريعة</h3>
+                        <div style="display: flex; flex-direction: column; gap: 15px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <span>المحادثات النشطة</span>
+                                <span class="badge">5</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <span>المجموعات</span>
+                                <span class="badge">3</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <span>القنوات</span>
+                                <span class="badge">2</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <span>الوسائط</span>
+                                <span class="badge">8</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- صفحة الدردشة -->
-        <div class="page" id="chat-page">
-            <div class="chat-container">
-                <div class="chat-sidebar active" id="chatSidebar">
-                    <div class="chat-header">
-                        <h3>المحادثات</h3>
-                        <div class="chat-header-actions">
-                            <button class="chat-tool-btn" id="newChatBtn" title="محادثة جديدة">
-                                <i class="fas fa-plus"></i>
-                            </button>
-                            <button class="chat-toggle" id="chatToggle">
-                                <i class="fas fa-times"></i>
-                            </button>
+        <div id="chat-page" class="page">
+            <div class="container">
+                <div class="page-header">
+                    <h1>نظام الدردشة</h1>
+                    <p>تواصل مع زملائك ومعلميك في الوقت الحقيقي</p>
+                </div>
+
+                <div class="chat-container">
+                    <!-- الشريط الجانبي للمحادثات -->
+                    <div id="chatSidebar" class="chat-sidebar">
+                        <div class="chat-header">
+                            <h3 style="margin: 0;">المحادثات</h3>
+                        </div>
+                        <div class="conversations-list" id="conversationsList">
+                            <!-- سيتم تعبئتها ديناميكياً -->
                         </div>
                     </div>
-                    
-                    <div class="chat-search">
-                        <input type="text" id="chatSearchInput" placeholder="بحث في المحادثات...">
-                    </div>
-                    
-                    <div class="conversations-list" id="conversationsList">
-                        <!-- سيتم ملء المحادثات ديناميكياً -->
-                    </div>
-                </div>
-                
-                <div class="chat-main">
-                    <div class="chat-header" id="activeChatHeader">
-                        <div class="chat-user-info">
-                            <div class="conversation-avatar small">
+
+                    <!-- منطقة الدردشة الرئيسية -->
+                    <div class="chat-main">
+                        <div class="chat-header" style="display: flex; align-items: center; gap: 15px; padding: 15px 20px;">
+                            <div class="user-avatar">
                                 <span id="activeChatAvatar">?</span>
                             </div>
-                            <div>
-                                <div class="conversation-name" id="activeChatName">اختر محادثة</div>
-                                <div class="user-status-text" id="activeChatStatus">غير متصل</div>
+                            <div style="flex: 1;">
+                                <h4 style="margin: 0;" id="activeChatName">اختر محادثة</h4>
+                                <small style="color: var(--success);" id="activeChatStatus">غير متصل</small>
                             </div>
-                        </div>
-                        <div class="chat-actions">
-                            <button class="chat-tool-btn" id="voiceCallBtn" title="مكالمة صوتية">
-                                <i class="fas fa-phone"></i>
-                            </button>
-                            <button class="chat-tool-btn" id="videoCallBtn" title="مكالمة فيديو">
-                                <i class="fas fa-video"></i>
-                            </button>
-                            <button class="chat-toggle" id="chatToggleMain">
+                            <button id="chatToggle" class="action-btn">
                                 <i class="fas fa-bars"></i>
                             </button>
                         </div>
-                    </div>
-                    
-                    <div class="chat-messages" id="chatMessages">
-                        <div class="empty-chat" id="emptyChat">
-                            <i class="fas fa-comments"></i>
-                            <h3>مرحباً في الدردشة</h3>
-                            <p>اختر محادثة لبدء التحدث</p>
+
+                        <div class="chat-messages" id="chatMessages">
+                            <div id="emptyChat" class="empty-chat">
+                                <i class="fas fa-comments"></i>
+                                <h3>لا توجد محادثة نشطة</h3>
+                                <p>اختر محادثة من القائمة لبدء المحادثة</p>
+                            </div>
                         </div>
-                    </div>
-                    
-                    <div class="chat-input-container" id="chatInputContainer" style="display: none;">
-                        <div class="chat-input-tools">
-                            <button class="chat-tool-btn" id="attachFileBtn" title="إرفاق ملف">
-                                <i class="fas fa-paperclip"></i>
-                            </button>
-                            <button class="chat-tool-btn" id="emojiToggle" title="إدراج إيموجي">
-                                <i class="fas fa-smile"></i>
-                            </button>
-                            <input type="file" id="fileInput" style="display: none;" accept="image/*,video/*,audio/*,.pdf,.doc,.docx">
+
+                        <div id="chatInputContainer" class="chat-input-container" style="display: none;">
+                            <div class="chat-input-wrapper">
+                                <button class="action-btn" id="attachFileBtn">
+                                    <i class="fas fa-paperclip"></i>
+                                </button>
+                                <input type="file" id="fileInput" style="display: none;">
+                                
+                                <button class="action-btn" id="emojiToggle">
+                                    <i class="fas fa-smile"></i>
+                                </button>
+                                
+                                <input type="text" id="chatInput" class="chat-input" placeholder="اكتب رسالتك هنا...">
+                                
+                                <button class="action-btn" id="sendMessageBtn">
+                                    <i class="fas fa-paper-plane"></i>
+                                </button>
+                            </div>
+                            
+                            <div id="emojiPickerContainer" class="emoji-picker">
+                                <!-- سيتم تعبئتها ديناميكياً -->
+                            </div>
                         </div>
-                        
-                        <div class="chat-input-wrapper">
-                            <input type="text" placeholder="اكتب رسالة..." id="chatInput">
-                        </div>
-                        
-                        <button class="send-btn" id="sendMessageBtn">
-                            <i class="fas fa-paper-plane"></i>
-                        </button>
-                    </div>
-                    
-                    <div class="emoji-picker-container" id="emojiPickerContainer">
-                        <emoji-picker></emoji-picker>
                     </div>
                 </div>
             </div>
         </div>
 
         <!-- صفحة القصص -->
-        <div class="page" id="stories-page">
-            <div class="stories-header">
-                <h1 class="section-title">
-                    <i class="fas fa-history"></i>
-                    القصص
-                </h1>
-                <button class="btn btn-primary" id="createStoryBtn">
-                    <i class="fas fa-plus"></i>
-                    إضافة قصة
-                </button>
-            </div>
-            
-            <div class="stories-container" id="storiesContainer">
-                <!-- سيتم ملء القصص ديناميكياً -->
-            </div>
+        <div id="stories-page" class="page">
+            <div class="container">
+                <div class="page-header">
+                    <h1>القصص التعليمية</h1>
+                    <p>شارك تجاربك التعليمية مع الزملاء</p>
+                </div>
 
-            <div class="story-viewer" id="storyViewer">
-                <button class="story-close" id="storyClose">
-                    <i class="fas fa-times"></i>
-                </button>
-                <div class="story-content">
-                    <div class="story-progress" id="storyProgress">
-                        <!-- سيتم ملء شريط التقدم ديناميكياً -->
-                    </div>
-                    <img id="currentStoryImage" src="" alt="قصة">
-                    <div class="story-info">
-                        <div class="story-author-avatar">
-                            <span id="storyAuthorAvatar">?</span>
-                        </div>
-                        <div class="story-author-info">
-                            <div class="story-author-name" id="storyAuthorName"></div>
-                            <div class="story-time" id="storyTime"></div>
-                        </div>
-                    </div>
-                    <div class="story-nav prev" id="storyPrev">
-                        <i class="fas fa-chevron-right"></i>
-                    </div>
-                    <div class="story-nav next" id="storyNext">
-                        <i class="fas fa-chevron-left"></i>
-                    </div>
+                <div class="stories-container" id="storiesContainer">
+                    <!-- سيتم تعبئتها ديناميكياً -->
+                </div>
+
+                <div class="text-center mt-4">
+                    <button id="createStoryBtn" class="btn btn-primary">
+                        <i class="fas fa-plus"></i> إنشاء قصة جديدة
+                    </button>
                 </div>
             </div>
         </div>
 
         <!-- صفحة المجموعات -->
-        <div class="page" id="groups-page">
-            <div class="groups-header">
-                <h1 class="section-title">
-                    <i class="fas fa-users"></i>
-                    المجموعات التعليمية
-                </h1>
-                <button class="btn btn-primary" id="createGroupBtn">
-                    <i class="fas fa-plus"></i>
-                    إنشاء مجموعة
-                </button>
-            </div>
-            
-            <div class="groups-grid" id="groupsGrid">
-                <!-- سيتم ملء المجموعات ديناميكياً -->
+        <div id="groups-page" class="page">
+            <div class="container">
+                <div class="page-header">
+                    <h1>المجموعات الدراسية</h1>
+                    <p>انضم إلى المجموعات أو أنشئ مجموعة جديدة</p>
+                </div>
+
+                <div class="text-center mb-4">
+                    <button id="createGroupBtn" class="btn btn-primary">
+                        <i class="fas fa-plus"></i> إنشاء مجموعة جديدة
+                    </button>
+                </div>
+
+                <div id="groupsContainer">
+                    <!-- سيتم تعبئتها ديناميكياً -->
+                </div>
             </div>
         </div>
 
         <!-- صفحة القنوات -->
-        <div class="page" id="channels-page">
-            <div class="channels-header">
-                <h1 class="section-title">
-                    <i class="fas fa-broadcast-tower"></i>
-                    القنوات التعليمية
-                </h1>
-                <button class="btn btn-primary" id="createChannelBtn">
-                    <i class="fas fa-plus"></i>
-                    إنشاء قناة
-                </button>
-            </div>
-            
-            <div class="channels-grid" id="channelsGrid">
-                <!-- سيتم ملء القنوات ديناميكياً -->
+        <div id="channels-page" class="page">
+            <div class="container">
+                <div class="page-header">
+                    <h1>القنوات التعليمية</h1>
+                    <p>اشترك في القنوات لمتابعة آخر المستجدات والدروس</p>
+                </div>
+
+                <div class="text-center mb-4">
+                    <button id="createChannelBtn" class="btn btn-primary">
+                        <i class="fas fa-plus"></i> إنشاء قناة جديدة
+                    </button>
+                </div>
+
+                <div id="channelsContainer">
+                    <!-- سيتم تعبئتها ديناميكياً -->
+                </div>
             </div>
         </div>
 
         <!-- صفحة الوسائط -->
-        <div class="page" id="media-page">
-            <div class="media-header">
-                <h1 class="section-title">
-                    <i class="fas fa-photo-video"></i>
-                    الوسائط التعليمية
-                </h1>
-                <div class="media-actions">
-                    <button class="btn btn-primary" id="uploadMediaBtn">
-                        <i class="fas fa-upload"></i>
-                        رفع وسائط
-                    </button>
-                    <div class="media-filter">
-                        <select id="mediaFilter">
-                            <option value="all">جميع الوسائط</option>
-                            <option value="image">الصور</option>
-                            <option value="video">الفيديوهات</option>
-                            <option value="document">المستندات</option>
-                        </select>
-                    </div>
+        <div id="media-page" class="page">
+            <div class="container">
+                <div class="page-header">
+                    <h1>مكتبة الوسائط</h1>
+                    <p>الوصول إلى جميع الوسائط والموارد التعليمية</p>
                 </div>
-            </div>
-            
-            <div class="media-grid" id="mediaGrid">
-                <!-- سيتم ملء الوسائط ديناميكياً -->
+
+                <div class="media-grid" id="mediaContainer">
+                    <!-- سيتم تعبئتها ديناميكياً -->
+                </div>
             </div>
         </div>
 
-        <!-- صفحة الإعدادات -->
-        <div class="page" id="settings-page">
-            <div class="settings-container">
-                <h1 class="section-title">
-                    <i class="fas fa-cog"></i>
-                    الإعدادات
-                </h1>
-                
-                <div class="settings-grid">
-                    <div class="settings-sidebar">
-                        <div class="settings-nav">
-                            <button class="settings-nav-item active" data-tab="profile">
-                                <i class="fas fa-user"></i>
-                                الملف الشخصي
-                            </button>
-                            <button class="settings-nav-item" data-tab="privacy">
-                                <i class="fas fa-shield-alt"></i>
-                                الخصوصية
-                            </button>
-                            <button class="settings-nav-item" data-tab="notifications">
-                                <i class="fas fa-bell"></i>
-                                الإشعارات
-                            </button>
-                            <button class="settings-nav-item" data-tab="appearance">
-                                <i class="fas fa-palette"></i>
-                                المظهر
-                            </button>
-                        </div>
+        <!-- صفحة تسجيل الدخول -->
+        <div id="login-page" class="page">
+            <div class="container">
+                <div class="auth-container">
+                    <div class="auth-header">
+                        <h2>تسجيل الدخول</h2>
+                        <p>أدخل بياناتك للوصول إلى حسابك</p>
                     </div>
-                    
-                    <div class="settings-content">
-                        <div class="settings-tab active" id="profile-tab">
-                            <h3>الملف الشخصي</h3>
-                            <form class="settings-form">
-                                <div class="form-group">
-                                    <label for="profileName">الاسم الكامل</label>
-                                    <input type="text" id="profileName" value="محمد أحمد">
-                                </div>
-                                <div class="form-group">
-                                    <label for="profileEmail">البريد الإلكتروني</label>
-                                    <input type="email" id="profileEmail" value="mohamed@example.com">
-                                </div>
-                                <div class="form-group">
-                                    <label for="profileBio">نبذة شخصية</label>
-                                    <textarea id="profileBio" rows="4" placeholder="اكتب نبذة عن نفسك..."></textarea>
-                                </div>
-                                <button type="submit" class="btn btn-primary">حفظ التغييرات</button>
-                            </form>
+                    <form id="loginForm">
+                        <div class="form-group">
+                            <label class="form-label">البريد الإلكتروني</label>
+                            <input type="email" class="form-control" name="email" required>
                         </div>
-                        
-                        <div class="settings-tab" id="privacy-tab">
-                            <h3>إعدادات الخصوصية</h3>
-                            <div class="privacy-settings">
-                                <div class="privacy-item">
-                                    <div class="privacy-info">
-                                        <h4>إظهار حالة الاتصال</h4>
-                                        <p>السماح للآخرين برؤية ما إذا كنت متصلاً أم لا</p>
-                                    </div>
-                                    <label class="switch">
-                                        <input type="checkbox" checked>
-                                        <span class="slider"></span>
-                                    </label>
-                                </div>
-                                <div class="privacy-item">
-                                    <div class="privacy-info">
-                                        <h4>إظهار آخر ظهور</h4>
-                                        <p>السماح للآخرين برؤية وقت آخر ظهور لك</p>
-                                    </div>
-                                    <label class="switch">
-                                        <input type="checkbox" checked>
-                                        <span class="slider"></span>
-                                    </label>
-                                </div>
-                                <div class="privacy-item">
-                                    <div class="privacy-info">
-                                        <h4>الملف الشخصي العام</h4>
-                                        <p>جعل ملفك الشخصي مرئياً للجميع</p>
-                                    </div>
-                                    <label class="switch">
-                                        <input type="checkbox">
-                                        <span class="slider"></span>
-                                    </label>
-                                </div>
-                            </div>
+                        <div class="form-group">
+                            <label class="form-label">كلمة المرور</label>
+                            <input type="password" class="form-control" name="password" required>
                         </div>
+                        <button type="submit" class="btn btn-primary" style="width: 100%;">تسجيل الدخول</button>
+                    </form>
+                    <div class="text-center mt-3">
+                        <p>ليس لديك حساب؟ <a href="#" data-page="register" style="color: var(--primary);">إنشاء حساب</a></p>
                     </div>
                 </div>
             </div>
         </div>
-    </main>
 
-    <!-- شريط الأدوات السريع -->
-    <div class="quick-actions-bar" id="quickActionsBar">
-        <button class="quick-action" data-page="chat" title="الدردشة">
-            <i class="fas fa-comments"></i>
-        </button>
-        <button class="quick-action" data-page="stories" title="القصص">
-            <i class="fas fa-history"></i>
-        </button>
-        <button class="quick-action" data-page="groups" title="المجموعات">
-            <i class="fas fa-users"></i>
-        </button>
-        <button class="quick-action" data-page="channels" title="القنوات">
-            <i class="fas fa-broadcast-tower"></i>
+        <!-- صفحة إنشاء الحساب -->
+        <div id="register-page" class="page">
+            <div class="container">
+                <div class="auth-container">
+                    <div class="auth-header">
+                        <h2>إنشاء حساب جديد</h2>
+                        <p>املأ البيانات لإنشاء حساب جديد</p>
+                    </div>
+                    <form id="registerForm">
+                        <div class="form-group">
+                            <label class="form-label">الاسم الكامل</label>
+                            <input type="text" class="form-control" name="fullName" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">البريد الإلكتروني</label>
+                            <input type="email" class="form-control" name="email" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">كلمة المرور</label>
+                            <input type="password" class="form-control" name="password" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">الدور</label>
+                            <select class="form-select" name="role" required>
+                                <option value="student">طالب</option>
+                                <option value="teacher">معلم</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-primary" style="width: 100%;">إنشاء الحساب</button>
+                    </form>
+                    <div class="text-center mt-3">
+                        <p>لديك حساب بالفعل؟ <a href="#" data-page="login" style="color: var(--primary);">تسجيل الدخول</a></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- مشاهد القصص -->
+    <div id="storyViewer" class="story-viewer">
+        <div class="story-progress" id="storyProgress">
+            <!-- سيتم تعبئتها ديناميكياً -->
+        </div>
+        <div class="story-content">
+            <img id="currentStoryImage" class="story-image" src="" alt="قصة">
+            <div class="story-info">
+                <div class="story-user-avatar" id="storyAuthorAvatar">م</div>
+                <div>
+                    <div id="storyAuthorName">مستخدم</div>
+                    <div id="storyTime" style="font-size: 0.8rem; opacity: 0.8;"></div>
+                </div>
+            </div>
+            <div class="story-controls">
+                <button class="story-control-btn" id="storyPrev">
+                    <i class="fas fa-chevron-right"></i>
+                </button>
+                <button class="story-control-btn" id="storyNext">
+                    <i class="fas fa-chevron-left"></i>
+                </button>
+            </div>
+        </div>
+        <button class="story-control-btn" id="storyClose" style="position: absolute; top: 20px; left: 20px;">
+            <i class="fas fa-times"></i>
         </button>
     </div>
 
-    <!-- الزر العائم -->
-    <button class="floating-action-btn" id="floatingActionBtn">
-        <i class="fas fa-plus"></i>
-    </button>
-
-    <!-- نافذة إنشاء مجموعة -->
-    <div class="modal" id="createGroupModal">
+    <!-- نموذج إنشاء مجموعة -->
+    <div id="createGroupModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
                 <h3>إنشاء مجموعة جديدة</h3>
@@ -669,19 +1645,25 @@
             <div class="modal-body">
                 <form id="createGroupForm">
                     <div class="form-group">
-                        <label for="groupName">اسم المجموعة</label>
-                        <input type="text" id="groupName" name="groupName" required placeholder="ادخل اسم المجموعة">
+                        <label class="form-label">اسم المجموعة</label>
+                        <input type="text" class="form-control" name="name" required>
                     </div>
                     <div class="form-group">
-                        <label for="groupDescription">وصف المجموعة</label>
-                        <textarea id="groupDescription" name="groupDescription" rows="3" placeholder="ادخل وصف المجموعة"></textarea>
+                        <label class="form-label">وصف المجموعة</label>
+                        <textarea class="form-control" name="description" rows="3"></textarea>
                     </div>
                     <div class="form-group">
-                        <label for="groupPrivacy">خصوصية المجموعة</label>
-                        <select id="groupPrivacy" name="groupPrivacy">
-                            <option value="public">عامة</option>
-                            <option value="private">خاصة</option>
-                        </select>
+                        <label class="form-label">نوع المجموعة</label>
+                        <div>
+                            <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                                <input type="radio" name="privacy" value="public" checked>
+                                <span>عامة (يمكن للجميع الانضمام)</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 8px;">
+                                <input type="radio" name="privacy" value="private">
+                                <span>خاصة (بالدعوة فقط)</span>
+                            </label>
+                        </div>
                     </div>
                     <div class="modal-actions">
                         <button type="button" class="btn btn-outline" id="cancelGroupBtn">إلغاء</button>
@@ -692,8 +1674,8 @@
         </div>
     </div>
 
-    <!-- نافذة إنشاء قناة -->
-    <div class="modal" id="createChannelModal">
+    <!-- نموذج إنشاء قناة -->
+    <div id="createChannelModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
                 <h3>إنشاء قناة جديدة</h3>
@@ -702,21 +1684,12 @@
             <div class="modal-body">
                 <form id="createChannelForm">
                     <div class="form-group">
-                        <label for="channelName">اسم القناة</label>
-                        <input type="text" id="channelName" name="channelName" required placeholder="ادخل اسم القناة">
+                        <label class="form-label">اسم القناة</label>
+                        <input type="text" class="form-control" name="name" required>
                     </div>
                     <div class="form-group">
-                        <label for="channelDescription">وصف القناة</label>
-                        <textarea id="channelDescription" name="channelDescription" rows="3" placeholder="ادخل وصف القناة"></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label for="channelCategory">تصنيف القناة</label>
-                        <select id="channelCategory" name="channelCategory">
-                            <option value="education">تعليمي</option>
-                            <option value="entertainment">ترفيهي</option>
-                            <option value="news">أخباري</option>
-                            <option value="technology">تكنولوجيا</option>
-                        </select>
+                        <label class="form-label">وصف القناة</label>
+                        <textarea class="form-control" name="description" rows="3"></textarea>
                     </div>
                     <div class="modal-actions">
                         <button type="button" class="btn btn-outline" id="cancelChannelBtn">إلغاء</button>
@@ -727,471 +1700,36 @@
         </div>
     </div>
 
-    <!-- نافذة محادثة جديدة -->
-    <div class="modal" id="newChatModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>بدء محادثة جديدة</h3>
-                <button class="modal-close" id="closeNewChatModal">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="form-group">
-                    <label for="userSearch">ابحث عن مستخدم</label>
-                    <input type="text" id="userSearch" placeholder="اكتب اسم المستخدم...">
-                </div>
-                <div class="users-list" id="usersList">
-                    <!-- سيتم ملء قائمة المستخدمين ديناميكياً -->
-                </div>
-                <div class="modal-actions">
-                    <button type="button" class="btn btn-outline" id="cancelNewChatBtn">إلغاء</button>
-                </div>
-            </div>
-        </div>
+    <!-- الأزرار العائمة -->
+    <button id="floatingActionBtn" class="floating-action-btn">
+        <i class="fas fa-plus"></i>
+    </button>
+
+    <div id="quickActionsBar" class="quick-actions">
+        <button class="quick-action-btn" data-page="chat">
+            <i class="fas fa-comment"></i>
+            <span>دردشة جديدة</span>
+        </button>
+        <button class="quick-action-btn" data-page="groups">
+            <i class="fas fa-users"></i>
+            <span>إنشاء مجموعة</span>
+        </button>
+        <button class="quick-action-btn" data-page="channels">
+            <i class="fas fa-satellite-dish"></i>
+            <span>إنشاء قناة</span>
+        </button>
+        <button class="quick-action-btn" id="reloadBtn">
+            <i class="fas fa-sync"></i>
+            <span>تحديث</span>
+        </button>
     </div>
 
-    <!-- نافذة رفع الوسائط -->
-    <div class="modal" id="uploadMediaModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>رفع وسائط جديدة</h3>
-                <button class="modal-close" id="closeUploadModal">&times;</button>
-            </div>
-            <div class="modal-body">
-                <form id="uploadMediaForm">
-                    <div class="upload-area" id="uploadArea">
-                        <i class="fas fa-cloud-upload-alt"></i>
-                        <p>اسحب وأفلت الملفات هنا أو انقر للاختيار</p>
-                        <input type="file" id="mediaFileInput" multiple style="display: none;" accept="image/*,video/*,.pdf,.doc,.docx">
-                    </div>
-                    <div class="form-group">
-                        <label for="mediaTitle">عنوان الوسائط</label>
-                        <input type="text" id="mediaTitle" placeholder="ادخل عنوان الوسائط">
-                    </div>
-                    <div class="form-group">
-                        <label for="mediaDescription">وصف الوسائط</label>
-                        <textarea id="mediaDescription" rows="3" placeholder="ادخل وصف الوسائط"></textarea>
-                    </div>
-                    <div class="modal-actions">
-                        <button type="button" class="btn btn-outline" id="cancelUploadBtn">إلغاء</button>
-                        <button type="submit" class="btn btn-primary">رفع الوسائط</button>
-                    </div>
-                </form>
-            </div>
-        </div>
+    <!-- حالة الاتصال -->
+    <div id="connectionStatus" class="connection-status">
+        <i class="fas fa-wifi"></i>
+        <span>متصل بالإنترنت</span>
     </div>
 
-    <!-- نافذة إنشاء قصة -->
-    <div class="modal" id="createStoryModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>إنشاء قصة جديدة</h3>
-                <button class="modal-close" id="closeStoryModal">&times;</button>
-            </div>
-            <div class="modal-body">
-                <form id="createStoryForm">
-                    <div class="upload-area" id="storyUploadArea">
-                        <i class="fas fa-camera"></i>
-                        <p>انقر لاختيار صورة أو فيديو للقصة</p>
-                        <input type="file" id="storyFileInput" style="display: none;" accept="image/*,video/*">
-                    </div>
-                    <div class="form-group">
-                        <label for="storyCaption">تعليق القصة</label>
-                        <textarea id="storyCaption" rows="3" placeholder="اكتب تعليقاً للقصة..."></textarea>
-                    </div>
-                    <div class="modal-actions">
-                        <button type="button" class="btn btn-outline" id="cancelStoryBtn">إلغاء</button>
-                        <button type="submit" class="btn btn-primary">نشر القصة</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-
-    <!-- السكريبتات -->
-    <script src="js/config.js"></script>
-    <script src="js/app.js"></script>
-
-    <style>
-        /* أنماط إضافية للصفحة الرئيسية */
-        .home-hero {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 4rem 2rem;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border-radius: var(--border-radius);
-            margin-bottom: 3rem;
-        }
-
-        .hero-content h1 {
-            font-size: 3rem;
-            margin-bottom: 1rem;
-        }
-
-        .hero-content p {
-            font-size: 1.2rem;
-            margin-bottom: 2rem;
-            opacity: 0.9;
-        }
-
-        .hero-actions {
-            display: flex;
-            gap: 1rem;
-        }
-
-        .hero-image {
-            font-size: 8rem;
-            opacity: 0.8;
-        }
-
-        .features-section {
-            padding: 2rem 0;
-        }
-
-        .features-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 2rem;
-            margin-top: 2rem;
-        }
-
-        .feature-card {
-            background: white;
-            padding: 2rem;
-            border-radius: var(--border-radius);
-            box-shadow: var(--shadow);
-            text-align: center;
-            transition: var(--transition);
-        }
-
-        .feature-card:hover {
-            transform: translateY(-5px);
-        }
-
-        .feature-icon {
-            font-size: 3rem;
-            color: var(--primary-color);
-            margin-bottom: 1rem;
-        }
-
-        .feature-card h3 {
-            margin-bottom: 1rem;
-            color: var(--dark-color);
-        }
-
-        .feature-card p {
-            color: var(--gray-color);
-            line-height: 1.6;
-        }
-
-        /* أنماط لوحة التحكم */
-        .dashboard-stats {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 1.5rem;
-            margin: 2rem 0;
-        }
-
-        .stat-card {
-            background: white;
-            padding: 1.5rem;
-            border-radius: var(--border-radius);
-            box-shadow: var(--shadow);
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-        }
-
-        .stat-icon {
-            width: 60px;
-            height: 60px;
-            background: var(--primary-color);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 1.5rem;
-        }
-
-        .stat-number {
-            font-size: 2rem;
-            font-weight: bold;
-            color: var(--dark-color);
-        }
-
-        .stat-label {
-            color: var(--gray-color);
-            font-size: 0.9rem;
-        }
-
-        .recent-activities {
-            background: white;
-            padding: 1.5rem;
-            border-radius: var(--border-radius);
-            box-shadow: var(--shadow);
-            margin-top: 2rem;
-        }
-
-        .activity-item {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-            padding: 1rem 0;
-            border-bottom: 1px solid var(--border-color);
-        }
-
-        .activity-item:last-child {
-            border-bottom: none;
-        }
-
-        .activity-item i {
-            color: var(--primary-color);
-            font-size: 1.2rem;
-        }
-
-        .activity-content p {
-            margin: 0;
-            color: var(--dark-color);
-        }
-
-        .activity-time {
-            font-size: 0.8rem;
-            color: var(--gray-color);
-        }
-
-        /* أنماط الإعدادات */
-        .settings-grid {
-            display: grid;
-            grid-template-columns: 250px 1fr;
-            gap: 2rem;
-            margin-top: 2rem;
-        }
-
-        .settings-sidebar {
-            background: white;
-            border-radius: var(--border-radius);
-            box-shadow: var(--shadow);
-            padding: 1rem;
-        }
-
-        .settings-nav {
-            display: flex;
-            flex-direction: column;
-            gap: 0.5rem;
-        }
-
-        .settings-nav-item {
-            padding: 1rem;
-            border: none;
-            background: none;
-            text-align: right;
-            border-radius: var(--border-radius);
-            cursor: pointer;
-            transition: var(--transition);
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            color: var(--dark-color);
-        }
-
-        .settings-nav-item:hover,
-        .settings-nav-item.active {
-            background: var(--primary-color);
-            color: white;
-        }
-
-        .settings-content {
-            background: white;
-            border-radius: var(--border-radius);
-            box-shadow: var(--shadow);
-            padding: 2rem;
-        }
-
-        .settings-tab {
-            display: none;
-        }
-
-        .settings-tab.active {
-            display: block;
-        }
-
-        .privacy-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 1rem 0;
-            border-bottom: 1px solid var(--border-color);
-        }
-
-        .privacy-item:last-child {
-            border-bottom: none;
-        }
-
-        .switch {
-            position: relative;
-            display: inline-block;
-            width: 60px;
-            height: 34px;
-        }
-
-        .switch input {
-            opacity: 0;
-            width: 0;
-            height: 0;
-        }
-
-        .slider {
-            position: absolute;
-            cursor: pointer;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background-color: #ccc;
-            transition: .4s;
-            border-radius: 34px;
-        }
-
-        .slider:before {
-            position: absolute;
-            content: "";
-            height: 26px;
-            width: 26px;
-            left: 4px;
-            bottom: 4px;
-            background-color: white;
-            transition: .4s;
-            border-radius: 50%;
-        }
-
-        input:checked + .slider {
-            background-color: var(--primary-color);
-        }
-
-        input:checked + .slider:before {
-            transform: translateX(26px);
-        }
-
-        /* أنماط الرفع */
-        .upload-area {
-            border: 2px dashed var(--border-color);
-            border-radius: var(--border-radius);
-            padding: 3rem;
-            text-align: center;
-            cursor: pointer;
-            transition: var(--transition);
-            margin-bottom: 1.5rem;
-        }
-
-        .upload-area:hover {
-            border-color: var(--primary-color);
-            background: rgba(67, 97, 238, 0.05);
-        }
-
-        .upload-area i {
-            font-size: 3rem;
-            color: var(--gray-color);
-            margin-bottom: 1rem;
-        }
-
-        .stories-header,
-        .media-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 2rem;
-        }
-
-        .media-actions {
-            display: flex;
-            gap: 1rem;
-            align-items: center;
-        }
-
-        /* أنماط جديدة للدردشة */
-        .chat-header-actions {
-            display: flex;
-            gap: 0.5rem;
-        }
-
-        .mobile-menu-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 1rem;
-            border-bottom: 1px solid var(--border-color);
-            background: var(--light-color);
-        }
-
-        .mobile-menu-close {
-            background: none;
-            border: none;
-            font-size: 1.2rem;
-            color: var(--gray-color);
-            cursor: pointer;
-        }
-
-        .users-list {
-            max-height: 300px;
-            overflow-y: auto;
-            margin: 1rem 0;
-        }
-
-        .user-list-item {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-            padding: 1rem;
-            border-bottom: 1px solid var(--border-color);
-            cursor: pointer;
-            transition: var(--transition);
-        }
-
-        .user-list-item:hover {
-            background: var(--light-color);
-        }
-
-        .user-list-item:last-child {
-            border-bottom: none;
-        }
-
-        @media (max-width: 768px) {
-            .home-hero {
-                flex-direction: column;
-                text-align: center;
-                padding: 2rem 1rem;
-            }
-
-            .hero-content h1 {
-                font-size: 2rem;
-            }
-
-            .hero-image {
-                font-size: 4rem;
-                margin-top: 2rem;
-            }
-
-            .hero-actions {
-                flex-direction: column;
-            }
-
-            .settings-grid {
-                grid-template-columns: 1fr;
-            }
-
-            .stories-header,
-            .media-header {
-                flex-direction: column;
-                gap: 1rem;
-                align-items: stretch;
-            }
-
-            .media-actions {
-                justify-content: space-between;
-            }
-        }
-    </style>
+    <script src="app.js"></script>
 </body>
 </html>
