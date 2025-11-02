@@ -1,4 +1,4 @@
-// public/js/app.js - الملف الرئيسي للتطبيق الكامل (محدث ومصحح)
+// app.js - المنصة التعليمية المتكاملة - الإصدار النهائي
 class EducationalPlatform {
     constructor() {
         this.currentUser = null;
@@ -11,6 +11,9 @@ class EducationalPlatform {
         this.storyInterval = null;
         this.isInitialized = false;
         this.allUsers = [];
+        this.groups = [];
+        this.channels = [];
+        this.media = [];
         
         this.init();
     }
@@ -19,13 +22,8 @@ class EducationalPlatform {
         console.log('🚀 بدء تهيئة المنصة التعليمية...');
         
         try {
-            // إعداد مستمعي الأحداث أولاً
             this.setupEventListeners();
-            
-            // ثم التحقق من المصادقة
             await this.checkAuthentication();
-            
-            // تهيئة المكونات الأخرى
             this.initializeSocket();
             await this.loadInitialData();
             
@@ -33,50 +31,6 @@ class EducationalPlatform {
             console.log('✅ تم تهيئة المنصة التعليمية بنجاح');
         } catch (error) {
             console.error('❌ خطأ في تهيئة التطبيق:', error);
-        }
-    }
-
-    // ============ إدارة المصادقة ============
-    async checkAuthentication() {
-        const token = this.getLocalStorage('authToken');
-        const userData = this.getLocalStorage('currentUser');
-
-        if (token && userData) {
-            try {
-                this.currentUser = JSON.parse(userData);
-                this.showAuthenticatedUI();
-                this.navigateToPage('dashboard');
-                
-                // التحقق من صحة التوكن
-                const isValid = await this.validateToken(token);
-                if (!isValid) {
-                    this.handleLogout();
-                }
-            } catch (error) {
-                console.error('خطأ في تحميل بيانات المستخدم:', error);
-                this.handleLogout();
-            }
-        } else {
-            this.showUnauthenticatedUI();
-            this.navigateToPage('home');
-        }
-    }
-
-    async validateToken(token) {
-        try {
-            // في النظام المحلي، نتحقق من وجود المستخدم في التخزين المحلي
-            const users = this.getLocalStorage('users') || [];
-            const currentUser = this.getLocalStorage('currentUser');
-            
-            if (!currentUser) return false;
-            
-            const user = JSON.parse(currentUser);
-            const userExists = users.find(u => u._id === user._id && u.email === user.email);
-            
-            return !!userExists;
-        } catch (error) {
-            console.error('خطأ في التحقق من التوكن:', error);
-            return false;
         }
     }
 
@@ -110,65 +64,83 @@ class EducationalPlatform {
         }
     }
 
+    // ============ إدارة المصادقة ============
+    async checkAuthentication() {
+        const token = this.getLocalStorage('authToken');
+        const userData = this.getLocalStorage('currentUser');
+
+        if (token && userData) {
+            try {
+                this.currentUser = JSON.parse(userData);
+                this.showAuthenticatedUI();
+                this.navigateToPage('dashboard');
+                
+                const isValid = await this.validateToken(token);
+                if (!isValid) {
+                    this.handleLogout();
+                }
+            } catch (error) {
+                console.error('خطأ في تحميل بيانات المستخدم:', error);
+                this.handleLogout();
+            }
+        } else {
+            this.showUnauthenticatedUI();
+            this.navigateToPage('home');
+        }
+    }
+
+    async validateToken(token) {
+        try {
+            const users = this.getLocalStorage('users') || [];
+            const currentUser = this.getLocalStorage('currentUser');
+            
+            if (!currentUser) return false;
+            
+            const user = JSON.parse(currentUser);
+            const userExists = users.find(u => u._id === user._id && u.email === user.email);
+            
+            return !!userExists;
+        } catch (error) {
+            console.error('خطأ في التحقق من التوكن:', error);
+            return false;
+        }
+    }
+
     // ============ إدارة الواجهة ============
     showAuthenticatedUI() {
-        const userInfo = document.getElementById('userInfo');
-        const logoutBtn = document.getElementById('logoutBtn');
-        const loginBtn = document.getElementById('loginBtn');
-        const registerBtn = document.getElementById('registerBtn');
-
-        if (userInfo) userInfo.classList.remove('hidden');
-        if (logoutBtn) logoutBtn.classList.remove('hidden');
-        if (loginBtn) loginBtn.classList.add('hidden');
-        if (registerBtn) registerBtn.classList.add('hidden');
+        document.getElementById('userInfo').classList.remove('hidden');
+        document.getElementById('logoutBtn').classList.remove('hidden');
+        document.getElementById('loginBtn').classList.add('hidden');
+        document.getElementById('registerBtn').classList.add('hidden');
         
-        // تحديث بيانات المستخدم
         if (this.currentUser) {
-            const userNameDisplay = document.getElementById('userNameDisplay');
-            const userRoleDisplay = document.getElementById('userRoleDisplay');
-            const userAvatarText = document.getElementById('userAvatarText');
-            
-            if (userNameDisplay) userNameDisplay.textContent = this.currentUser.fullName || 'مستخدم';
-            if (userRoleDisplay) userRoleDisplay.textContent = this.currentUser.role || 'طالب';
-            if (userAvatarText) userAvatarText.textContent = (this.currentUser.fullName || 'م').charAt(0);
+            document.getElementById('userNameDisplay').textContent = this.currentUser.fullName || 'مستخدم';
+            document.getElementById('userRoleDisplay').textContent = this.currentUser.role || 'طالب';
+            document.getElementById('userAvatarText').textContent = (this.currentUser.fullName || 'م').charAt(0);
         }
     }
 
     showUnauthenticatedUI() {
-        const userInfo = document.getElementById('userInfo');
-        const logoutBtn = document.getElementById('logoutBtn');
-        const loginBtn = document.getElementById('loginBtn');
-        const registerBtn = document.getElementById('registerBtn');
-
-        if (userInfo) userInfo.classList.add('hidden');
-        if (logoutBtn) logoutBtn.classList.add('hidden');
-        if (loginBtn) loginBtn.classList.remove('hidden');
-        if (registerBtn) registerBtn.classList.remove('hidden');
+        document.getElementById('userInfo').classList.add('hidden');
+        document.getElementById('logoutBtn').classList.add('hidden');
+        document.getElementById('loginBtn').classList.remove('hidden');
+        document.getElementById('registerBtn').classList.remove('hidden');
     }
 
     navigateToPage(pageName) {
         console.log(`🔄 الانتقال إلى صفحة: ${pageName}`);
         
-        // إخفاء جميع الصفحات
         document.querySelectorAll('.page').forEach(page => {
             page.classList.remove('active');
         });
 
-        // إظهار الصفحة المطلوبة
         const targetPage = document.getElementById(`${pageName}-page`);
         if (targetPage) {
             targetPage.classList.add('active');
-            
-            // تحميل محتوى الصفحة الديناميكي
             this.loadPageContent(pageName);
-        } else {
-            console.error(`❌ الصفحة غير موجودة: ${pageName}-page`);
         }
 
-        // تحديث حالة التنقل
         this.updateNavigationState(pageName);
-        
-        // إخفاء القائمة المتنقلة
         this.closeMobileMenu();
     }
 
@@ -202,6 +174,12 @@ class EducationalPlatform {
             case 'dashboard':
                 await this.loadDashboard();
                 break;
+            case 'login':
+                this.setupLoginForm();
+                break;
+            case 'register':
+                this.setupRegisterForm();
+                break;
         }
     }
 
@@ -209,133 +187,42 @@ class EducationalPlatform {
     setupEventListeners() {
         console.log('🔧 إعداد مستمعي الأحداث...');
         
+        // زر ابدأ الآن
+        document.getElementById('startAppBtn').addEventListener('click', () => this.startApp());
+
         // التنقل بين الصفحات
         document.querySelectorAll('[data-page]').forEach(element => {
             element.addEventListener('click', (e) => {
                 e.preventDefault();
                 const pageName = element.getAttribute('data-page');
-                console.log(`📱 نقر على: ${pageName}`);
                 this.navigateToPage(pageName);
             });
         });
 
-        // زر ابدأ الآن
-        const startAppBtn = document.getElementById('startAppBtn');
-        if (startAppBtn) {
-            startAppBtn.addEventListener('click', () => {
-                console.log('🎯 نقر على زر ابدأ الآن');
-                this.startApp();
-            });
-        } else {
-            console.error('❌ زر ابدأ الآن غير موجود');
-        }
+        // القائمة المتنقلة
+        document.getElementById('mobileMenuBtn').addEventListener('click', () => this.toggleMobileMenu());
+        document.getElementById('overlay').addEventListener('click', () => this.closeMobileMenu());
 
-        // المصادقة
-        this.setupAuthEventListeners();
+        // الزر العائم
+        document.getElementById('floatingActionBtn').addEventListener('click', () => this.toggleQuickActions());
 
-        // الدردشة
-        this.setupChatEventListeners();
-
-        // القصص
-        this.setupStoriesEventListeners();
-
-        // المجموعات والقنوات
-        this.setupGroupsChannelsEventListeners();
-
-        // الأزرار الإضافية
-        this.setupUtilityEventListeners();
+        // تسجيل الخروج
+        document.getElementById('logoutBtn').addEventListener('click', (e) => {
+            e.preventDefault();
+            this.handleLogout();
+        });
 
         console.log('✅ تم إعداد مستمعي الأحداث بنجاح');
-    }
-
-    setupAuthEventListeners() {
-        document.getElementById('loginForm')?.addEventListener('submit', (e) => this.handleLogin(e));
-        document.getElementById('registerForm')?.addEventListener('submit', (e) => this.handleRegister(e));
-        
-        const logoutBtn = document.getElementById('logoutBtn');
-        if (logoutBtn) {
-            logoutBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                this.handleLogout();
-            });
-        }
-    }
-
-    setupChatEventListeners() {
-        document.getElementById('sendMessageBtn')?.addEventListener('click', () => this.sendMessage());
-        document.getElementById('chatInput')?.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') this.sendMessage();
-        });
-        document.getElementById('emojiToggle')?.addEventListener('click', () => this.toggleEmojiPicker());
-        document.getElementById('attachFileBtn')?.addEventListener('click', () => this.triggerFileInput());
-        document.getElementById('fileInput')?.addEventListener('change', (e) => this.handleFileUpload(e));
-        document.getElementById('chatToggle')?.addEventListener('click', () => this.toggleChatSidebar());
-        document.getElementById('chatToggleMain')?.addEventListener('click', () => this.toggleChatSidebar());
-
-        // إدخال الدردشة
-        const chatInput = document.getElementById('chatInput');
-        if (chatInput) {
-            chatInput.addEventListener('input', () => this.handleTyping());
-            chatInput.addEventListener('blur', () => this.stopTyping());
-        }
-    }
-
-    setupStoriesEventListeners() {
-        document.getElementById('storyClose')?.addEventListener('click', () => this.closeStoryViewer());
-        document.getElementById('storyPrev')?.addEventListener('click', () => this.showPreviousStory());
-        document.getElementById('storyNext')?.addEventListener('click', () => this.showNextStory());
-        document.getElementById('createStoryBtn')?.addEventListener('click', () => this.showCreateStoryModal());
-    }
-
-    setupGroupsChannelsEventListeners() {
-        // المجموعات
-        document.getElementById('createGroupBtn')?.addEventListener('click', () => this.showCreateGroupModal());
-        document.getElementById('createGroupForm')?.addEventListener('submit', (e) => this.createGroup(e));
-        document.getElementById('closeGroupModal')?.addEventListener('click', () => this.hideCreateGroupModal());
-        document.getElementById('cancelGroupBtn')?.addEventListener('click', () => this.hideCreateGroupModal());
-
-        // القنوات
-        document.getElementById('createChannelBtn')?.addEventListener('click', () => this.showCreateChannelModal());
-        document.getElementById('createChannelForm')?.addEventListener('submit', (e) => this.createChannel(e));
-        document.getElementById('closeChannelModal')?.addEventListener('click', () => this.hideCreateChannelModal());
-        document.getElementById('cancelChannelBtn')?.addEventListener('click', () => this.hideCreateChannelModal());
-    }
-
-    setupUtilityEventListeners() {
-        // الأزرار الإضافية
-        document.getElementById('mobileMenuBtn')?.addEventListener('click', () => this.toggleMobileMenu());
-        document.getElementById('overlay')?.addEventListener('click', () => this.closeMobileMenu());
-        document.getElementById('floatingActionBtn')?.addEventListener('click', () => this.toggleQuickActions());
-        document.getElementById('reloadBtn')?.addEventListener('click', () => location.reload());
-
-        // إغلاق منتقي الإيموجي عند النقر خارجها
-        document.addEventListener('click', (e) => {
-            const emojiContainer = document.getElementById('emojiPickerContainer');
-            const emojiToggle = document.getElementById('emojiToggle');
-            
-            if (emojiContainer && !e.target.closest('#emojiPickerContainer') && !e.target.closest('#emojiToggle')) {
-                emojiContainer.classList.remove('active');
-            }
-        });
-
-        // إغلاق النماذج عند النقر خارجها
-        document.addEventListener('click', (e) => {
-            if (e.target.classList.contains('modal')) {
-                e.target.style.display = 'none';
-            }
-        });
     }
 
     // ============ دوال التطبيق الرئيسية ============
     startApp() {
         console.log('🎬 بدء التطبيق...');
         const welcomeScreen = document.getElementById('welcomeScreen');
-        if (welcomeScreen) {
-            welcomeScreen.style.display = 'none';
-            console.log('✅ تم إخفاء شاشة الترحيب');
-        } else {
-            console.error('❌ شاشة الترحيب غير موجودة');
-        }
+        const appContainer = document.getElementById('appContainer');
+        
+        welcomeScreen.style.display = 'none';
+        appContainer.classList.add('active');
         
         this.navigateToPage('home');
         this.showNotification('مرحباً بك في المنصة التعليمية!', 'success');
@@ -345,39 +232,25 @@ class EducationalPlatform {
         const mobileMenu = document.getElementById('mobileMenu');
         const overlay = document.getElementById('overlay');
         
-        if (mobileMenu && overlay) {
-            mobileMenu.classList.toggle('active');
-            overlay.classList.toggle('active');
-        }
+        mobileMenu.classList.toggle('active');
+        overlay.classList.toggle('active');
     }
 
     closeMobileMenu() {
         const mobileMenu = document.getElementById('mobileMenu');
         const overlay = document.getElementById('overlay');
         
-        if (mobileMenu && overlay) {
-            mobileMenu.classList.remove('active');
-            overlay.classList.remove('active');
-        }
+        mobileMenu.classList.remove('active');
+        overlay.classList.remove('active');
     }
 
     toggleQuickActions() {
         const quickActions = document.getElementById('quickActionsBar');
-        if (quickActions) {
-            quickActions.classList.toggle('active');
-        }
+        quickActions.classList.toggle('active');
     }
 
-    toggleChatSidebar() {
-        const chatSidebar = document.getElementById('chatSidebar');
-        if (chatSidebar) {
-            chatSidebar.classList.toggle('active');
-        }
-    }
-
-    // ============ إدارة الدردشة ============
+    // ============ نظام الدردشة ============
     initializeSocket() {
-        // في النظام المحلي، نستخدم نظام events بديل عن WebSockets
         console.log('🔌 تهيئة نظام الاتصال المحلي...');
         this.updateConnectionStatus(true);
     }
@@ -412,7 +285,7 @@ class EducationalPlatform {
             if (usersData) {
                 this.allUsers = JSON.parse(usersData);
             } else {
-                // إنشاء بيانات تجريبية إذا لم توجد
+                // إنشاء بيانات تجريبية
                 this.allUsers = [
                     {
                         _id: '1',
@@ -456,7 +329,7 @@ class EducationalPlatform {
                 conversations = [
                     {
                         _id: 'conv1',
-                        participants: [this.currentUser._id, '1'],
+                        participants: [this.currentUser?._id || 'user_1', '1'],
                         name: 'أحمد محمد',
                         lastMessage: {
                             content: 'مرحباً، كيف يمكنني مساعدتك؟',
@@ -468,11 +341,11 @@ class EducationalPlatform {
                     },
                     {
                         _id: 'conv2',
-                        participants: [this.currentUser._id, '2'],
+                        participants: [this.currentUser?._id || 'user_1', '2'],
                         name: 'فاطمة علي',
                         lastMessage: {
                             content: 'شكراً على المساعدة',
-                            senderId: this.currentUser._id,
+                            senderId: this.currentUser?._id || 'user_1',
                             createdAt: new Date().toISOString()
                         },
                         unreadCount: {},
@@ -495,7 +368,7 @@ class EducationalPlatform {
         container.innerHTML = '';
 
         if (!conversations || conversations.length === 0) {
-            container.innerHTML = '<div class="text-center" style="padding: 2rem; color: #666;">لا توجد محادثات</div>';
+            container.innerHTML = '<div class="text-center" style="padding: 2rem; color: rgba(255,255,255,0.7);">لا توجد محادثات</div>';
             return;
         }
 
@@ -513,7 +386,7 @@ class EducationalPlatform {
         
         const lastMessage = conversation.lastMessage ? 
             (conversation.lastMessage.content || 'ملف مرفق') : 'لا توجد رسائل';
-        const unreadCount = conversation.unreadCount && conversation.unreadCount[this.currentUser._id] 
+        const unreadCount = conversation.unreadCount && conversation.unreadCount[this.currentUser?._id] 
             ? conversation.unreadCount[this.currentUser._id] 
             : 0;
 
@@ -540,13 +413,11 @@ class EducationalPlatform {
         const chatHeader = document.querySelector('.chat-sidebar .chat-header');
         if (!chatHeader) return;
 
-        // إزالة زر إنشاء محادثة إذا كان موجوداً
         const existingButton = document.getElementById('newChatBtn');
         if (existingButton) {
             existingButton.remove();
         }
 
-        // إنشاء زر جديد
         const newChatBtn = document.createElement('button');
         newChatBtn.id = 'newChatBtn';
         newChatBtn.className = 'btn btn-primary btn-sm';
@@ -573,15 +444,15 @@ class EducationalPlatform {
                         <label>اختر مستخدم للدردشة:</label>
                         <div class="users-list" style="max-height: 300px; overflow-y: auto; margin-top: 1rem;">
                             ${this.allUsers
-                                .filter(user => user._id !== this.currentUser._id)
+                                .filter(user => user._id !== this.currentUser?._id)
                                 .map(user => `
-                                <div class="user-item" data-user-id="${user._id}" style="display: flex; align-items: center; padding: 10px; border-bottom: 1px solid #eee; cursor: pointer;">
+                                <div class="user-item" data-user-id="${user._id}" style="display: flex; align-items: center; padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.2); cursor: pointer; color: white;">
                                     <div class="user-avatar" style="width: 40px; height: 40px; background: #4361ee; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; margin-left: 10px;">
                                         ${user.fullName.charAt(0)}
                                     </div>
                                     <div>
                                         <div style="font-weight: bold;">${user.fullName}</div>
-                                        <div style="font-size: 0.8rem; color: #666;">${user.role}</div>
+                                        <div style="font-size: 0.8rem; color: rgba(255,255,255,0.7);">${user.role}</div>
                                     </div>
                                 </div>
                             `).join('')}
@@ -596,11 +467,9 @@ class EducationalPlatform {
 
         document.body.appendChild(modal);
 
-        // إضافة مستمعي الأحداث
         modal.querySelector('.modal-close').addEventListener('click', () => modal.remove());
         modal.querySelector('#cancelNewChat').addEventListener('click', () => modal.remove());
         
-        // اختيار مستخدم
         modal.querySelectorAll('.user-item').forEach(item => {
             item.addEventListener('click', async () => {
                 const userId = item.dataset.userId;
@@ -609,7 +478,6 @@ class EducationalPlatform {
             });
         });
 
-        // إغلاق عند النقر خارج المحتوى
         modal.addEventListener('click', (e) => {
             if (e.target === modal) {
                 modal.remove();
@@ -625,7 +493,6 @@ class EducationalPlatform {
                 return;
             }
 
-            // إنشاء محادثة جديدة
             const conversationId = 'conv_' + Date.now();
             const conversation = {
                 _id: conversationId,
@@ -637,7 +504,6 @@ class EducationalPlatform {
                 createdAt: new Date().toISOString()
             };
 
-            // حفظ المحادثة
             const conversationsData = this.getLocalStorage('conversations');
             let conversations = conversationsData ? JSON.parse(conversationsData) : [];
             conversations.push(conversation);
@@ -645,8 +511,6 @@ class EducationalPlatform {
 
             this.showNotification('تم بدء المحادثة بنجاح', 'success');
             await this.loadConversations();
-            
-            // تحديد المحادثة الجديدة
             this.selectConversation(conversationId);
 
         } catch (error) {
@@ -661,7 +525,6 @@ class EducationalPlatform {
 
         this.currentChat = conversation;
 
-        // تحديث الواجهة
         document.getElementById('activeChatName').textContent = this.currentChat.name;
         document.getElementById('activeChatAvatar').textContent = this.currentChat.name.charAt(0);
         document.getElementById('activeChatStatus').textContent = 'متصل';
@@ -672,10 +535,8 @@ class EducationalPlatform {
         if (chatInputContainer) chatInputContainer.style.display = 'flex';
         if (emptyChat) emptyChat.style.display = 'none';
 
-        // تحميل الرسائل
         this.loadMessages(conversationId);
         
-        // تحديث حالة المحادثة النشطة
         document.querySelectorAll('.conversation-item').forEach(item => {
             item.classList.remove('active');
         });
@@ -684,7 +545,6 @@ class EducationalPlatform {
             activeConversation.classList.add('active');
         }
 
-        // إعلام السيرفر بأن الرسائل قُرأت
         this.markMessagesAsRead(conversationId);
     }
 
@@ -762,12 +622,9 @@ class EducationalPlatform {
         };
 
         try {
-            // إضافة الرسالة للواجهة مباشرة
             this.addMessageToUI(messageData, true);
-
             input.value = '';
 
-            // حفظ الرسالة في التخزين المحلي
             const messagesData = this.getLocalStorage('messages') || '{}';
             const messages = JSON.parse(messagesData);
             
@@ -778,7 +635,6 @@ class EducationalPlatform {
             messages[this.currentChat._id].push(messageData);
             this.setLocalStorage('messages', JSON.stringify(messages));
 
-            // تحديث آخر رسالة في المحادثة
             this.updateConversationLastMessage(this.currentChat._id, messageData);
 
         } catch (error) {
@@ -798,8 +654,6 @@ class EducationalPlatform {
             conversations[conversationIndex].lastMessage = message;
             conversations[conversationIndex].updatedAt = new Date().toISOString();
             this.setLocalStorage('conversations', JSON.stringify(conversations));
-            
-            // تحديث الواجهة
             this.loadConversations();
         }
     }
@@ -808,7 +662,6 @@ class EducationalPlatform {
         const container = document.getElementById('chatMessages');
         if (!container) return;
 
-        // إخفاء empty chat إذا كان ظاهر
         const emptyChat = document.getElementById('emptyChat');
         if (emptyChat) emptyChat.style.display = 'none';
 
@@ -824,17 +677,7 @@ class EducationalPlatform {
         }
     }
 
-    handleTyping() {
-        // تنفيذ بسيط لمؤشر الكتابة
-        console.log('المستخدم يكتب...');
-    }
-
-    stopTyping() {
-        console.log('توقف المستخدم عن الكتابة');
-    }
-
     async markMessagesAsRead(conversationId) {
-        // في النظام المحلي، يمكننا تحديث حالة القراءة
         console.log('تم تحديد الرسائل كمقروءة للمحادثة:', conversationId);
     }
 
@@ -845,7 +688,6 @@ class EducationalPlatform {
             if (storiesData) {
                 this.stories = JSON.parse(storiesData);
             } else {
-                // إنشاء قصص تجريبية
                 this.stories = [
                     {
                         _id: 'story1',
@@ -880,7 +722,7 @@ class EducationalPlatform {
         container.innerHTML = '';
 
         if (this.stories.length === 0) {
-            container.innerHTML = '<div class="text-center" style="padding: 2rem; color: #666;">لا توجد قصص حالية</div>';
+            container.innerHTML = '<div class="text-center" style="padding: 2rem; color: rgba(255,255,255,0.7);">لا توجد قصص حالية</div>';
             return;
         }
 
@@ -922,7 +764,6 @@ class EducationalPlatform {
         document.getElementById('storyViewer').classList.add('active');
         this.startStoryProgress();
 
-        // تسجيل المشاهدة
         this.recordStoryView(story._id);
     }
 
@@ -996,10 +837,6 @@ class EducationalPlatform {
         }
     }
 
-    showCreateStoryModal() {
-        this.showNotification('ميزة إنشاء القصص قريباً', 'info');
-    }
-
     // ============ إدارة المجموعات ============
     async loadGroups() {
         try {
@@ -1009,14 +846,13 @@ class EducationalPlatform {
             if (groupsData) {
                 groups = JSON.parse(groupsData);
             } else {
-                // إنشاء مجموعات تجريبية
                 groups = [
                     {
                         _id: 'group1',
                         name: 'مجموعة الرياضيات',
                         description: 'مجموعة مخصصة لدراسة الرياضيات وحل المسائل',
                         creatorId: '1',
-                        members: [this.currentUser._id, '1', '2', '3'],
+                        members: [this.currentUser?._id || 'user_1', '1', '2', '3'],
                         admins: ['1'],
                         createdAt: new Date().toISOString(),
                         isPublic: true
@@ -1025,9 +861,9 @@ class EducationalPlatform {
                         _id: 'group2',
                         name: 'مجموعة اللغة العربية',
                         description: 'مجموعة لدراسة الأدب والنحو العربي',
-                        creatorId: this.currentUser._id,
-                        members: [this.currentUser._id, '2'],
-                        admins: [this.currentUser._id],
+                        creatorId: this.currentUser?._id || 'user_1',
+                        members: [this.currentUser?._id || 'user_1', '2'],
+                        admins: [this.currentUser?._id || 'user_1'],
                         createdAt: new Date().toISOString(),
                         isPublic: false
                     }
@@ -1048,7 +884,7 @@ class EducationalPlatform {
         container.innerHTML = '';
 
         if (groups.length === 0) {
-            container.innerHTML = '<div class="text-center" style="padding: 2rem; color: #666;">لا توجد مجموعات</div>';
+            container.innerHTML = '<div class="text-center" style="padding: 2rem; color: rgba(255,255,255,0.7);">لا توجد مجموعات</div>';
             return;
         }
 
@@ -1060,91 +896,42 @@ class EducationalPlatform {
 
     createGroupElement(group) {
         const div = document.createElement('div');
-        div.className = 'group-item';
+        div.className = 'group-card';
         
-        const isAdmin = group.admins.includes(this.currentUser._id);
+        const isMember = group.members.includes(this.currentUser?._id);
         const memberCount = group.members.length;
 
         div.innerHTML = `
             <div class="group-header">
                 <div class="group-avatar">
-                    <span>${group.name.charAt(0)}</span>
+                    <i class="fas fa-users"></i>
                 </div>
-                <div class="group-info">
-                    <h3 class="group-name">${group.name}</h3>
-                    <p class="group-description">${group.description}</p>
-                    <div class="group-meta">
-                        <span class="group-members">
-                            <i class="fas fa-users"></i> ${memberCount} عضو
-                        </span>
-                        ${isAdmin ? '<span class="group-admin-badge">مدير</span>' : ''}
+                <h3>${this.escapeHtml(group.name)}</h3>
+                <p>${memberCount} عضو</p>
+            </div>
+            <div class="group-info">
+                <p>${this.escapeHtml(group.description || 'لا يوجد وصف')}</p>
+                <div class="group-stats">
+                    <div class="group-stat">
+                        <div class="group-stat-number">${group.members.length}</div>
+                        <div class="group-stat-label">عضو</div>
                     </div>
                 </div>
-            </div>
-            <div class="group-actions">
-                <button class="btn btn-primary btn-sm" onclick="app.joinGroup('${group._id}')">
-                    <i class="fas fa-door-open"></i> الانضمام
+                <button class="btn btn-primary btn-block mt-3 join-group-btn" data-group-id="${group._id}">
+                    <i class="fas fa-sign-in-alt"></i>
+                    ${isMember ? 'الدخول' : 'الانضمام'}
                 </button>
-                ${isAdmin ? `
-                    <button class="btn btn-outline btn-sm" onclick="app.manageGroup('${group._id}')">
-                        <i class="fas fa-cog"></i> إدارة
-                    </button>
-                ` : ''}
             </div>
         `;
 
+        div.querySelector('.join-group-btn').addEventListener('click', () => {
+            if (isMember) {
+                this.enterGroup(group._id);
+            } else {
+                this.joinGroup(group._id);
+            }
+        });
         return div;
-    }
-
-    showCreateGroupModal() {
-        document.getElementById('createGroupModal').style.display = 'flex';
-    }
-
-    hideCreateGroupModal() {
-        document.getElementById('createGroupModal').style.display = 'none';
-    }
-
-    async createGroup(e) {
-        e.preventDefault();
-        
-        const formData = new FormData(e.target);
-        const name = formData.get('name');
-        const description = formData.get('description');
-        const isPublic = formData.get('privacy') === 'public';
-
-        if (!name) {
-            this.showNotification('يرجى إدخال اسم المجموعة', 'error');
-            return;
-        }
-
-        try {
-            const group = {
-                _id: 'group_' + Date.now(),
-                name: name,
-                description: description || '',
-                creatorId: this.currentUser._id,
-                members: [this.currentUser._id],
-                admins: [this.currentUser._id],
-                createdAt: new Date().toISOString(),
-                isPublic: isPublic
-            };
-
-            // حفظ المجموعة
-            const groupsData = this.getLocalStorage('groups');
-            let groups = groupsData ? JSON.parse(groupsData) : [];
-            groups.push(group);
-            this.setLocalStorage('groups', JSON.stringify(groups));
-
-            this.showNotification('تم إنشاء المجموعة بنجاح', 'success');
-            this.hideCreateGroupModal();
-            e.target.reset();
-            
-            await this.loadGroups();
-
-        } catch (error) {
-            console.error('خطأ في إنشاء المجموعة:', error);
-            this.showNotification('خطأ في إنشاء المجموعة', 'error');
-        }
     }
 
     async joinGroup(groupId) {
@@ -1168,8 +955,8 @@ class EducationalPlatform {
         }
     }
 
-    manageGroup(groupId) {
-        this.showNotification('صفحة إدارة المجموعة قريباً', 'info');
+    enterGroup(groupId) {
+        this.showNotification('تم الدخول إلى المجموعة', 'success');
     }
 
     // ============ إدارة القنوات ============
@@ -1181,14 +968,13 @@ class EducationalPlatform {
             if (channelsData) {
                 channels = JSON.parse(channelsData);
             } else {
-                // إنشاء قنوات تجريبية
                 channels = [
                     {
                         _id: 'channel1',
                         name: 'قناة العلوم',
                         description: 'قناة لبث دروس العلوم والتجارب العملية',
                         creatorId: '1',
-                        subscribers: [this.currentUser._id, '1', '2'],
+                        subscribers: [this.currentUser?._id || 'user_1', '1', '2'],
                         isActive: true,
                         createdAt: new Date().toISOString()
                     },
@@ -1196,8 +982,8 @@ class EducationalPlatform {
                         _id: 'channel2',
                         name: 'قناة التاريخ',
                         description: 'قناة لبث محاضرات التاريخ والحضارات',
-                        creatorId: this.currentUser._id,
-                        subscribers: [this.currentUser._id, '3'],
+                        creatorId: this.currentUser?._id || 'user_1',
+                        subscribers: [this.currentUser?._id || 'user_1', '3'],
                         isActive: false,
                         createdAt: new Date().toISOString()
                     }
@@ -1218,7 +1004,7 @@ class EducationalPlatform {
         container.innerHTML = '';
 
         if (channels.length === 0) {
-            container.innerHTML = '<div class="text-center" style="padding: 2rem; color: #666;">لا توجد قنوات</div>';
+            container.innerHTML = '<div class="text-center" style="padding: 2rem; color: rgba(255,255,255,0.7);">لا توجد قنوات</div>';
             return;
         }
 
@@ -1230,97 +1016,42 @@ class EducationalPlatform {
 
     createChannelElement(channel) {
         const div = document.createElement('div');
-        div.className = 'channel-item';
+        div.className = 'channel-card';
         
-        const isSubscribed = channel.subscribers.includes(this.currentUser._id);
-        const isCreator = channel.creatorId === this.currentUser._id;
+        const isSubscribed = channel.subscribers.includes(this.currentUser?._id);
         const subscriberCount = channel.subscribers.length;
 
         div.innerHTML = `
             <div class="channel-header">
-                <div class="channel-avatar ${channel.isActive ? 'live' : ''}">
-                    <span>${channel.name.charAt(0)}</span>
-                    ${channel.isActive ? '<div class="live-indicator">مباشر</div>' : ''}
+                <div class="channel-avatar">
+                    <i class="fas fa-broadcast-tower"></i>
                 </div>
-                <div class="channel-info">
-                    <h3 class="channel-name">${channel.name}</h3>
-                    <p class="channel-description">${channel.description}</p>
-                    <div class="channel-meta">
-                        <span class="channel-subscribers">
-                            <i class="fas fa-users"></i> ${subscriberCount} مشترك
-                        </span>
-                        ${isCreator ? '<span class="channel-creator-badge">مالك القناة</span>' : ''}
+                <h3>${this.escapeHtml(channel.name)}</h3>
+                <p>${subscriberCount} مشترك</p>
+            </div>
+            <div class="channel-info">
+                <p>${this.escapeHtml(channel.description || 'لا يوجد وصف')}</p>
+                <div class="channel-stats">
+                    <div class="channel-stat">
+                        <div class="channel-stat-number">${channel.subscribers.length}</div>
+                        <div class="channel-stat-label">مشترك</div>
                     </div>
                 </div>
-            </div>
-            <div class="channel-actions">
-                ${isSubscribed ? `
-                    <button class="btn btn-outline btn-sm" onclick="app.unsubscribeChannel('${channel._id}')">
-                        <i class="fas fa-bell-slash"></i> إلغاء الاشتراك
-                    </button>
-                ` : `
-                    <button class="btn btn-primary btn-sm" onclick="app.subscribeChannel('${channel._id}')">
-                        <i class="fas fa-bell"></i> اشتراك
-                    </button>
-                `}
-                ${isCreator ? `
-                    <button class="btn btn-outline btn-sm" onclick="app.manageChannel('${channel._id}')">
-                        <i class="fas fa-cog"></i> إدارة
-                    </button>
-                ` : ''}
+                <button class="btn btn-primary btn-block mt-3 subscribe-channel-btn" data-channel-id="${channel._id}">
+                    <i class="fas fa-bell"></i>
+                    ${isSubscribed ? 'مشترك' : 'اشترك'}
+                </button>
             </div>
         `;
 
+        div.querySelector('.subscribe-channel-btn').addEventListener('click', () => {
+            if (isSubscribed) {
+                this.enterChannel(channel._id);
+            } else {
+                this.subscribeChannel(channel._id);
+            }
+        });
         return div;
-    }
-
-    showCreateChannelModal() {
-        document.getElementById('createChannelModal').style.display = 'flex';
-    }
-
-    hideCreateChannelModal() {
-        document.getElementById('createChannelModal').style.display = 'none';
-    }
-
-    async createChannel(e) {
-        e.preventDefault();
-        
-        const formData = new FormData(e.target);
-        const name = formData.get('name');
-        const description = formData.get('description');
-
-        if (!name) {
-            this.showNotification('يرجى إدخال اسم القناة', 'error');
-            return;
-        }
-
-        try {
-            const channel = {
-                _id: 'channel_' + Date.now(),
-                name: name,
-                description: description || '',
-                creatorId: this.currentUser._id,
-                subscribers: [this.currentUser._id],
-                isActive: false,
-                createdAt: new Date().toISOString()
-            };
-
-            // حفظ القناة
-            const channelsData = this.getLocalStorage('channels');
-            let channels = channelsData ? JSON.parse(channelsData) : [];
-            channels.push(channel);
-            this.setLocalStorage('channels', JSON.stringify(channels));
-
-            this.showNotification('تم إنشاء القناة بنجاح', 'success');
-            this.hideCreateChannelModal();
-            e.target.reset();
-            
-            await this.loadChannels();
-
-        } catch (error) {
-            console.error('خطأ في إنشاء القناة:', error);
-            this.showNotification('خطأ في إنشاء القناة', 'error');
-        }
     }
 
     async subscribeChannel(channelId) {
@@ -1344,31 +1075,8 @@ class EducationalPlatform {
         }
     }
 
-    async unsubscribeChannel(channelId) {
-        try {
-            const channelsData = this.getLocalStorage('channels');
-            if (!channelsData) return;
-            
-            let channels = JSON.parse(channelsData);
-            const channelIndex = channels.findIndex(c => c._id === channelId);
-            
-            if (channelIndex !== -1) {
-                channels[channelIndex].subscribers = channels[channelIndex].subscribers.filter(
-                    id => id !== this.currentUser._id
-                );
-                this.setLocalStorage('channels', JSON.stringify(channels));
-                
-                this.showNotification('تم إلغاء الاشتراك من القناة', 'success');
-                await this.loadChannels();
-            }
-        } catch (error) {
-            console.error('خطأ في إلغاء الاشتراك:', error);
-            this.showNotification('خطأ في إلغاء الاشتراك', 'error');
-        }
-    }
-
-    manageChannel(channelId) {
-        this.showNotification('صفحة إدارة القناة قريباً', 'info');
+    enterChannel(channelId) {
+        this.showNotification('تم الدخول إلى القناة', 'success');
     }
 
     // ============ إدارة الوسائط ============
@@ -1380,7 +1088,6 @@ class EducationalPlatform {
             if (mediaData) {
                 media = JSON.parse(mediaData);
             } else {
-                // إنشاء وسائط تجريبية
                 media = [
                     {
                         _id: 'media1',
@@ -1396,7 +1103,7 @@ class EducationalPlatform {
                         name: 'ملخص النحو',
                         type: 'document',
                         url: 'https://example.com/doc1.pdf',
-                        uploadedBy: this.currentUser._id,
+                        uploadedBy: this.currentUser?._id || 'user_1',
                         size: '2.5 MB',
                         uploadedAt: new Date().toISOString()
                     }
@@ -1417,7 +1124,7 @@ class EducationalPlatform {
         container.innerHTML = '';
 
         if (media.length === 0) {
-            container.innerHTML = '<div class="text-center" style="padding: 2rem; color: #666;">لا توجد وسائط</div>';
+            container.innerHTML = '<div class="text-center" style="padding: 2rem; color: rgba(255,255,255,0.7);">لا توجد وسائط</div>';
             return;
         }
 
@@ -1479,11 +1186,9 @@ class EducationalPlatform {
     // ============ لوحة التحكم ============
     async loadDashboard() {
         try {
-            // تحميل الإحصائيات
             const stats = await this.getDashboardStats();
             this.renderDashboardStats(stats);
             
-            // تحميل النشاطات الحديثة
             const activities = await this.getRecentActivities();
             this.renderRecentActivities(activities);
             
@@ -1508,7 +1213,7 @@ class EducationalPlatform {
             groups: groups.length,
             channels: channels.length,
             media: media.length,
-            unreadMessages: 0 // يمكن إضافة منطق لحساب الرسائل غير المقروءة
+            unreadMessages: 0
         };
     }
 
@@ -1518,46 +1223,45 @@ class EducationalPlatform {
 
         statsContainer.innerHTML = `
             <div class="stat-card">
-                <div class="stat-icon" style="background: rgba(67, 97, 238, 0.1);">
-                    <i class="fas fa-comments" style="color: #4361ee;"></i>
+                <div class="stat-icon">
+                    <i class="fas fa-comments"></i>
                 </div>
                 <div class="stat-info">
-                    <h3>${stats.conversations}</h3>
-                    <p>محادثة</p>
+                    <div class="stat-number">${stats.conversations}</div>
+                    <div class="stat-label">محادثة</div>
                 </div>
             </div>
             <div class="stat-card">
-                <div class="stat-icon" style="background: rgba(247, 37, 133, 0.1);">
-                    <i class="fas fa-users" style="color: #f72585;"></i>
+                <div class="stat-icon">
+                    <i class="fas fa-users"></i>
                 </div>
                 <div class="stat-info">
-                    <h3>${stats.groups}</h3>
-                    <p>مجموعة</p>
+                    <div class="stat-number">${stats.groups}</div>
+                    <div class="stat-label">مجموعة</div>
                 </div>
             </div>
             <div class="stat-card">
-                <div class="stat-icon" style="background: rgba(76, 201, 240, 0.1);">
-                    <i class="fas fa-satellite-dish" style="color: #4cc9f0;"></i>
+                <div class="stat-icon">
+                    <i class="fas fa-broadcast-tower"></i>
                 </div>
                 <div class="stat-info">
-                    <h3>${stats.channels}</h3>
-                    <p>قناة</p>
+                    <div class="stat-number">${stats.channels}</div>
+                    <div class="stat-label">قناة</div>
                 </div>
             </div>
             <div class="stat-card">
-                <div class="stat-icon" style="background: rgba(106, 76, 147, 0.1);">
-                    <i class="fas fa-file" style="color: #6a4c93;"></i>
+                <div class="stat-icon">
+                    <i class="fas fa-file"></i>
                 </div>
                 <div class="stat-info">
-                    <h3>${stats.media}</h3>
-                    <p>ملف وسائط</p>
+                    <div class="stat-number">${stats.media}</div>
+                    <div class="stat-label">ملف وسائط</div>
                 </div>
             </div>
         `;
     }
 
     async getRecentActivities() {
-        // جمع النشاطات من مختلف المصادر
         const conversationsData = this.getLocalStorage('conversations');
         const groupsData = this.getLocalStorage('groups');
         const channelsData = this.getLocalStorage('channels');
@@ -1568,7 +1272,6 @@ class EducationalPlatform {
         
         let activities = [];
         
-        // إضافة آخر المحادثات النشطة
         conversations.slice(0, 5).forEach(conv => {
             if (conv.lastMessage) {
                 activities.push({
@@ -1580,7 +1283,6 @@ class EducationalPlatform {
             }
         });
         
-        // إضافة المجموعات المنشأة حديثاً
         groups.slice(0, 3).forEach(group => {
             activities.push({
                 type: 'group',
@@ -1590,17 +1292,15 @@ class EducationalPlatform {
             });
         });
         
-        // إضافة القنوات المنشأة حديثاً
         channels.slice(0, 2).forEach(channel => {
             activities.push({
                 type: 'channel',
                 content: `تم إنشاء قناة ${channel.name}`,
                 time: channel.createdAt,
-                icon: 'fas fa-satellite-dish'
+                icon: 'fas fa-broadcast-tower'
             });
         });
         
-        // ترتيب حسب الوقت
         return activities.sort((a, b) => new Date(b.time) - new Date(a.time)).slice(0, 10);
     }
 
@@ -1611,7 +1311,7 @@ class EducationalPlatform {
         container.innerHTML = '';
 
         if (activities.length === 0) {
-            container.innerHTML = '<div class="text-center" style="padding: 2rem; color: #666;">لا توجد نشاطات حديثة</div>';
+            container.innerHTML = '<div class="text-center" style="padding: 2rem; color: rgba(255,255,255,0.7);">لا توجد نشاطات حديثة</div>';
             return;
         }
 
@@ -1639,6 +1339,20 @@ class EducationalPlatform {
     }
 
     // ============ المصادقة ============
+    setupLoginForm() {
+        const loginForm = document.getElementById('loginForm');
+        if (loginForm) {
+            loginForm.addEventListener('submit', (e) => this.handleLogin(e));
+        }
+    }
+
+    setupRegisterForm() {
+        const registerForm = document.getElementById('registerForm');
+        if (registerForm) {
+            registerForm.addEventListener('submit', (e) => this.handleRegister(e));
+        }
+    }
+
     async handleLogin(e) {
         e.preventDefault();
         
@@ -1666,7 +1380,6 @@ class EducationalPlatform {
                 return;
             }
 
-            // تسجيل الدخول الناجح
             this.currentUser = user;
             this.setLocalStorage('authToken', 'local-token-' + Date.now());
             this.setLocalStorage('currentUser', JSON.stringify(user));
@@ -1675,7 +1388,6 @@ class EducationalPlatform {
             this.showAuthenticatedUI();
             this.navigateToPage('dashboard');
             
-            // إعادة تحميل البيانات
             await this.loadInitialData();
 
         } catch (error) {
@@ -1702,14 +1414,12 @@ class EducationalPlatform {
             const usersData = this.getLocalStorage('users');
             const users = usersData ? JSON.parse(usersData) : [];
 
-            // التحقق من وجود المستخدم مسبقاً
             const existingUser = users.find(u => u.email === email);
             if (existingUser) {
                 this.showNotification('البريد الإلكتروني مستخدم مسبقاً', 'error');
                 return;
             }
 
-            // إنشاء مستخدم جديد
             const newUser = {
                 _id: 'user_' + Date.now(),
                 fullName: fullName,
@@ -1723,7 +1433,6 @@ class EducationalPlatform {
             users.push(newUser);
             this.setLocalStorage('users', JSON.stringify(users));
 
-            // تسجيل الدخول تلقائياً
             this.currentUser = newUser;
             this.setLocalStorage('authToken', 'local-token-' + Date.now());
             this.setLocalStorage('currentUser', JSON.stringify(newUser));
@@ -1732,7 +1441,6 @@ class EducationalPlatform {
             this.showAuthenticatedUI();
             this.navigateToPage('dashboard');
             
-            // إعادة تحميل البيانات
             await this.loadInitialData();
 
         } catch (error) {
@@ -1763,14 +1471,71 @@ class EducationalPlatform {
             <button class="notification-close">&times;</button>
         `;
 
+        // إضافة الأنماط إذا لم تكن موجودة
+        if (!document.getElementById('notification-styles')) {
+            const styles = document.createElement('style');
+            styles.id = 'notification-styles';
+            styles.textContent = `
+                .notification {
+                    position: fixed;
+                    top: 100px;
+                    right: 20px;
+                    background: white;
+                    border-radius: 12px;
+                    padding: 20px 25px;
+                    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+                    z-index: 10000;
+                    animation: slideInRight 0.3s ease;
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    min-width: 300px;
+                    max-width: 400px;
+                    border-left: 4px solid #4361ee;
+                }
+                .notification.success {
+                    border-left-color: #4caf50;
+                }
+                .notification.error {
+                    border-left-color: #f44336;
+                }
+                .notification.warning {
+                    border-left-color: #ff9800;
+                }
+                .notification-content {
+                    display: flex;
+                    align-items: center;
+                    gap: 12px;
+                }
+                .notification-close {
+                    background: none;
+                    border: none;
+                    font-size: 18px;
+                    cursor: pointer;
+                    color: #666;
+                    padding: 5px;
+                    border-radius: 50%;
+                }
+                @keyframes slideInRight {
+                    from {
+                        transform: translateX(100%);
+                        opacity: 0;
+                    }
+                    to {
+                        transform: translateX(0);
+                        opacity: 1;
+                    }
+                }
+            `;
+            document.head.appendChild(styles);
+        }
+
         document.body.appendChild(notification);
 
-        // إضافة مستمعي الأحداث
         notification.querySelector('.notification-close').addEventListener('click', () => {
             notification.remove();
         });
 
-        // إزالة تلقائية بعد 5 ثواني
         setTimeout(() => {
             if (notification.parentNode) {
                 notification.remove();
@@ -1816,54 +1581,6 @@ class EducationalPlatform {
         div.textContent = text;
         return div.innerHTML;
     }
-
-    toggleEmojiPicker() {
-        const emojiContainer = document.getElementById('emojiPickerContainer');
-        if (!emojiContainer) return;
-
-        emojiContainer.classList.toggle('active');
-        
-        if (emojiContainer.classList.contains('active')) {
-            this.loadEmojiPicker();
-        }
-    }
-
-    loadEmojiPicker() {
-        const emojiContainer = document.getElementById('emojiPickerContainer');
-        if (!emojiContainer) return;
-
-        // إيموجيات بسيطة
-        const emojis = ['😀', '😂', '🥰', '😎', '🤔', '👍', '❤️', '🔥', '✨', '🎉'];
-        
-        emojiContainer.innerHTML = emojis.map(emoji => `
-            <span class="emoji" onclick="app.insertEmoji('${emoji}')">${emoji}</span>
-        `).join('');
-    }
-
-    insertEmoji(emoji) {
-        const input = document.getElementById('chatInput');
-        if (input) {
-            input.value += emoji;
-            input.focus();
-        }
-        
-        document.getElementById('emojiPickerContainer').classList.remove('active');
-    }
-
-    triggerFileInput() {
-        document.getElementById('fileInput').click();
-    }
-
-    handleFileUpload(e) {
-        const file = e.target.files[0];
-        if (!file) return;
-
-        // هنا يمكن إضافة منطق رفع الملفات
-        this.showNotification(`تم اختيار الملف: ${file.name}`, 'info');
-        
-        // إعادة تعيين المدخل
-        e.target.value = '';
-    }
 }
 
 // تهيئة التطبيق عند تحميل الصفحة
@@ -1871,66 +1588,3 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('📄 تم تحميل DOM، بدء التطبيق...');
     window.app = new EducationalPlatform();
 });
-
-// إضافة الأنماط الأساسية للإشعارات
-const notificationStyles = `
-.notification {
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    background: white;
-    border-radius: 8px;
-    padding: 15px 20px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-    border-left: 4px solid #4361ee;
-    z-index: 10000;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    min-width: 300px;
-    max-width: 400px;
-    animation: slideInRight 0.3s ease;
-}
-
-.notification.success {
-    border-left-color: #4caf50;
-}
-
-.notification.error {
-    border-left-color: #f44336;
-}
-
-.notification.warning {
-    border-left-color: #ff9800;
-}
-
-.notification-content {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.notification-close {
-    background: none;
-    border: none;
-    font-size: 18px;
-    cursor: pointer;
-    color: #666;
-}
-
-@keyframes slideInRight {
-    from {
-        transform: translateX(100%);
-        opacity: 0;
-    }
-    to {
-        transform: translateX(0);
-        opacity: 1;
-    }
-}
-`;
-
-// إضافة الأنماط للصفحة
-const styleSheet = document.createElement('style');
-styleSheet.textContent = notificationStyles;
-document.head.appendChild(styleSheet);
