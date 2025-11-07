@@ -1074,4 +1074,449 @@ class EducationalPlatform {
                                                 <th>الدور</th>
                                                 <th>الحالة</th>
                                                 <th>آخر نشاط</th>
-                                                <
+                                                <th>الإجراءات</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="usersTableBody">
+                                            <!-- سيتم ملء الجدول ديناميكياً -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="tab-pane" id="reports-tab">
+                            <div class="admin-section">
+                                <h3>تقارير النظام</h3>
+                                <div class="reports-grid">
+                                    <div class="report-card">
+                                        <h4>نظرة عامة</h4>
+                                        <div class="report-stats">
+                                            <div class="report-stat">
+                                                <span>المستخدمين النشطين</span>
+                                                <strong id="activeUsersCount">0</strong>
+                                            </div>
+                                            <div class="report-stat">
+                                                <span>المحادثات النشطة</span>
+                                                <strong id="activeConversationsCount">0</strong>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    async loadAdminPage() {
+        if (this.currentUser.role !== 'admin') return;
+
+        await this.loadAdminStats();
+        await this.loadAdminUsers();
+        this.setupAdminEventListeners();
+    }
+
+    async loadAdminStats() {
+        try {
+            const token = localStorage.getItem('authToken');
+            const response = await fetch('/api/admin/stats', {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                this.renderAdminStats(data.data);
+            }
+        } catch (error) {
+            console.error('خطأ في تحميل إحصائيات المدير:', error);
+        }
+    }
+
+    renderAdminStats(stats) {
+        const container = document.getElementById('adminStats');
+        if (!container) return;
+
+        container.innerHTML = `
+            <div class="stat-card">
+                <div class="stat-icon admin">
+                    <i class="fas fa-users"></i>
+                </div>
+                <div class="stat-info">
+                    <div class="stat-number">${stats.totalUsers}</div>
+                    <div class="stat-label">إجمالي المستخدمين</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon admin">
+                    <i class="fas fa-user-check"></i>
+                </div>
+                <div class="stat-info">
+                    <div class="stat-number">${stats.onlineUsers}</div>
+                    <div class="stat-label">المستخدمين النشطين</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon admin">
+                    <i class="fas fa-history"></i>
+                </div>
+                <div class="stat-info">
+                    <div class="stat-number">${stats.activeStories}</div>
+                    <div class="stat-label">القصص النشطة</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon admin">
+                    <i class="fas fa-chart-line"></i>
+                </div>
+                <div class="stat-info">
+                    <div class="stat-number">${stats.totalGroups}</div>
+                    <div class="stat-label">المجموعات</div>
+                </div>
+            </div>
+        `;
+    }
+
+    async loadAdminUsers() {
+        try {
+            const tbody = document.getElementById('usersTableBody');
+            if (!tbody) return;
+
+            tbody.innerHTML = this.allUsers.map(user => `
+                <tr>
+                    <td>
+                        <div class="user-cell">
+                            <div class="user-avatar-small">
+                                ${user.fullName.charAt(0)}
+                            </div>
+                            <div class="user-info">
+                                <div class="user-name">${this.escapeHtml(user.fullName)}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td>${this.escapeHtml(user.email)}</td>
+                    <td>
+                        <span class="role-badge ${user.role}">
+                            ${this.getRoleText(user.role)}
+                        </span>
+                    </td>
+                    <td>
+                        <span class="status-badge ${user.isOnline ? 'online' : 'offline'}">
+                            <i class="fas fa-circle"></i>
+                            ${user.isOnline ? 'نشط' : 'غير نشط'}
+                        </span>
+                    </td>
+                    <td>${this.formatTime(user.lastSeen)}</td>
+                    <td>
+                        <div class="action-buttons">
+                            ${user._id !== this.currentUser._id ? `
+                                <button class="btn-icon danger" onclick="educationalPlatform.toggleUserStatus('${user._id}')" title="تعطيل">
+                                    <i class="fas fa-user-slash"></i>
+                                </button>
+                            ` : ''}
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+        } catch (error) {
+            console.error('خطأ في تحميل مستخدمي المدير:', error);
+        }
+    }
+
+    setupAdminEventListeners() {
+        // تبويبات المدير
+        document.addEventListener('click', (e) => {
+            const tabBtn = e.target.closest('.tab-btn');
+            if (tabBtn) {
+                const tabName = tabBtn.dataset.tab;
+                this.switchAdminTab(tabName);
+            }
+        });
+
+        // زر إنشاء مستخدم
+        document.getElementById('createUserBtn')?.addEventListener('click', () => {
+            this.showCreateUserModal();
+        });
+    }
+
+    switchAdminTab(tabName) {
+        document.querySelectorAll('.tab-pane').forEach(pane => {
+            pane.classList.remove('active');
+        });
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.classList.remove('active');
+        });
+
+        document.getElementById(`${tabName}-tab`)?.classList.add('active');
+        document.querySelector(`[data-tab="${tabName}"]`)?.classList.add('active');
+    }
+
+    showCreateUserModal() {
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.style.display = 'flex';
+        modal.innerHTML = `
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>إنشاء مستخدم جديد</h3>
+                    <button class="modal-close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <form id="createUserForm">
+                        <div class="form-group">
+                            <label for="newUserName">الاسم الكامل</label>
+                            <input type="text" id="newUserName" required class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <label for="newUserEmail">البريد الإلكتروني</label>
+                            <input type="email" id="newUserEmail" required class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <label for="newUserPassword">كلمة المرور</label>
+                            <input type="password" id="newUserPassword" required class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <label for="newUserRole">الدور</label>
+                            <select id="newUserRole" required class="form-control">
+                                <option value="student">طالب</option>
+                                <option value="teacher">معلم</option>
+                                <option value="admin">مدير</option>
+                            </select>
+                        </div>
+                        <div class="modal-actions">
+                            <button type="button" class="btn btn-outline" id="cancelCreateUser">إلغاء</button>
+                            <button type="submit" class="btn btn-primary">إنشاء المستخدم</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        modal.querySelector('.modal-close').addEventListener('click', () => modal.remove());
+        modal.querySelector('#cancelCreateUser').addEventListener('click', () => modal.remove());
+
+        modal.querySelector('#createUserForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const userData = {
+                fullName: document.getElementById('newUserName').value,
+                email: document.getElementById('newUserEmail').value,
+                password: document.getElementById('newUserPassword').value,
+                role: document.getElementById('newUserRole').value
+            };
+
+            await this.createUser(userData);
+            modal.remove();
+        });
+
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) modal.remove();
+        });
+    }
+
+    async createUser(userData) {
+        try {
+            const token = localStorage.getItem('authToken');
+            const response = await fetch('/api/auth/register', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(userData)
+            });
+
+            if (response.ok) {
+                this.showNotification('تم إنشاء المستخدم بنجاح', 'success');
+                this.loadAdminUsers();
+                this.loadUsers();
+            } else {
+                const data = await response.json();
+                this.showNotification(data.message || 'فشل في إنشاء المستخدم', 'error');
+            }
+        } catch (error) {
+            console.error('خطأ في إنشاء المستخدم:', error);
+            this.showNotification('فشل في إنشاء المستخدم', 'error');
+        }
+    }
+
+    async toggleUserStatus(userId) {
+        if (!confirm('هل أنت متأكد من تعطيل هذا المستخدم؟')) return;
+
+        try {
+            const token = localStorage.getItem('authToken');
+            const response = await fetch(`/api/admin/users/${userId}/toggle`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (response.ok) {
+                this.showNotification('تم تعطيل المستخدم بنجاح', 'success');
+                this.loadAdminUsers();
+                this.loadUsers();
+            }
+        } catch (error) {
+            console.error('خطأ في تعطيل المستخدم:', error);
+            this.showNotification('فشل في تعطيل المستخدم', 'error');
+        }
+    }
+
+    // ============ إدارة المصادقة ============
+    async handleLogin(event) {
+        event.preventDefault();
+        
+        const email = document.getElementById('loginEmail').value;
+        const password = document.getElementById('loginPassword').value;
+
+        if (!email || !password) {
+            this.showNotification('يرجى ملء جميع الحقول', 'error');
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/auth/login', {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json' 
+                },
+                body: JSON.stringify({
+                    email: email,
+                    password: password
+                })
+            });
+
+            const data = await response.json();
+
+            if (response.ok && data.success) {
+                this.handleAuthSuccess(data);
+            } else {
+                this.showNotification(data.message || 'فشل تسجيل الدخول', 'error');
+            }
+        } catch (error) {
+            console.error('خطأ في تسجيل الدخول:', error);
+            this.showNotification('خطأ في الاتصال بالخادم', 'error');
+        }
+    }
+
+    async handleRegister(event) {
+        event.preventDefault();
+        
+        const formData = new FormData(event.target);
+        const userData = {
+            fullName: formData.get('name'),
+            email: formData.get('email'),
+            password: formData.get('password'),
+            role: formData.get('role') || 'student'
+        };
+
+        if (!userData.fullName || !userData.email || !userData.password) {
+            this.showNotification('يرجى ملء جميع الحقول', 'error');
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/auth/register', {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json' 
+                },
+                body: JSON.stringify(userData)
+            });
+
+            const data = await response.json();
+
+            if (response.ok && data.success) {
+                this.handleAuthSuccess(data);
+            } else {
+                this.showNotification(data.message || 'فشل إنشاء الحساب', 'error');
+            }
+        } catch (error) {
+            console.error('خطأ في إنشاء الحساب:', error);
+            this.showNotification('خطأ في الاتصال بالخادم', 'error');
+        }
+    }
+
+    handleAuthSuccess(data) {
+        localStorage.setItem('authToken', data.data.token);
+        localStorage.setItem('currentUser', JSON.stringify(data.data.user));
+        
+        this.currentUser = data.data.user;
+        this.showAuthenticatedUI();
+        this.navigateToPage('dashboard');
+        this.showNotification(`مرحباً ${data.data.user.fullName}!`, 'success');
+        
+        this.initializeSocket();
+        this.loadInitialData();
+    }
+
+    handleLogout() {
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('currentUser');
+        
+        if (this.socket) {
+            this.socket.disconnect();
+        }
+        
+        this.currentUser = null;
+        this.showUnauthenticatedUI();
+        this.navigateToPage('home');
+        this.showNotification('تم تسجيل الخروج', 'info');
+    }
+
+    // ============ دوال مساعدة ============
+    formatTime(timestamp) {
+        if (!timestamp) return 'الآن';
+        
+        const date = new Date(timestamp);
+        const now = new Date();
+        const diff = now - date;
+        
+        if (diff < 60000) return 'الآن';
+        if (diff < 3600000) return `${Math.floor(diff / 60000)} د`;
+        if (diff < 86400000) return `${Math.floor(diff / 3600000)} س`;
+        
+        return date.toLocaleDateString('ar-EG');
+    }
+
+    truncateText(text, maxLength) {
+        if (!text) return '';
+        if (text.length <= maxLength) return text;
+        return text.substring(0, maxLength) + '...';
+    }
+
+    escapeHtml(unsafe) {
+        if (!unsafe) return '';
+        return unsafe
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
+    showNotification(message, type = 'info') {
+        // تنفيذ بسيط للإشعارات
+        console.log(`[${type.toUpperCase()}] ${message}`);
+        alert(message); // يمكن استبدال هذا بتنفيذ أفضل للإشعارات
+    }
+
+    updateUserStatus(data) {
+        console.log('تحديث حالة المستخدم:', data);
+    }
+}
+
+// تهيئة التطبيق عند تحميل الصفحة
+document.addEventListener('DOMContentLoaded', () => {
+    console.log('📄 تم تحميل DOM بنجاح، بدء التطبيق...');
+    window.educationalPlatform = new EducationalPlatform();
+});
