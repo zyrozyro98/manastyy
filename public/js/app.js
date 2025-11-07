@@ -1,19 +1,14 @@
-// app.js - المنصة التعليمية المتكاملة - الإصدار النهائي
+// public/js/app.js - الملف الرئيسي الكامل
 class EducationalPlatform {
     constructor() {
         this.currentUser = null;
         this.socket = null;
         this.currentChat = null;
         this.conversations = new Map();
-        this.emojiPicker = null;
-        this.stories = [];
-        this.currentStoryIndex = 0;
-        this.storyInterval = null;
-        this.isInitialized = false;
         this.allUsers = [];
+        this.stories = [];
         this.groups = [];
         this.channels = [];
-        this.media = [];
         
         this.init();
     }
@@ -24,61 +19,29 @@ class EducationalPlatform {
         try {
             this.setupEventListeners();
             await this.checkAuthentication();
-            this.initializeSocket();
-            await this.loadInitialData();
             
-            this.isInitialized = true;
+            if (this.currentUser) {
+                this.initializeSocket();
+                await this.loadInitialData();
+                this.setupAdminFeatures();
+            }
+            
             console.log('✅ تم تهيئة المنصة التعليمية بنجاح');
         } catch (error) {
             console.error('❌ خطأ في تهيئة التطبيق:', error);
         }
     }
 
-    // ============ إدارة التخزين المحلي ============
-    getLocalStorage(key) {
-        try {
-            return localStorage.getItem(key);
-        } catch (error) {
-            console.error('خطأ في قراءة التخزين المحلي:', error);
-            return null;
-        }
-    }
-
-    setLocalStorage(key, value) {
-        try {
-            localStorage.setItem(key, value);
-            return true;
-        } catch (error) {
-            console.error('خطأ في كتابة التخزين المحلي:', error);
-            return false;
-        }
-    }
-
-    removeLocalStorage(key) {
-        try {
-            localStorage.removeItem(key);
-            return true;
-        } catch (error) {
-            console.error('خطأ في حذف من التخزين المحلي:', error);
-            return false;
-        }
-    }
-
     // ============ إدارة المصادقة ============
     async checkAuthentication() {
-        const token = this.getLocalStorage('authToken');
-        const userData = this.getLocalStorage('currentUser');
+        const token = localStorage.getItem('authToken');
+        const userData = localStorage.getItem('currentUser');
 
         if (token && userData) {
             try {
                 this.currentUser = JSON.parse(userData);
                 this.showAuthenticatedUI();
                 this.navigateToPage('dashboard');
-                
-                const isValid = await this.validateToken(token);
-                if (!isValid) {
-                    this.handleLogout();
-                }
             } catch (error) {
                 console.error('خطأ في تحميل بيانات المستخدم:', error);
                 this.handleLogout();
@@ -89,44 +52,58 @@ class EducationalPlatform {
         }
     }
 
-    async validateToken(token) {
-        try {
-            const users = this.getLocalStorage('users') || [];
-            const currentUser = this.getLocalStorage('currentUser');
-            
-            if (!currentUser) return false;
-            
-            const user = JSON.parse(currentUser);
-            const userExists = users.find(u => u._id === user._id && u.email === user.email);
-            
-            return !!userExists;
-        } catch (error) {
-            console.error('خطأ في التحقق من التوكن:', error);
-            return false;
-        }
-    }
-
-    // ============ إدارة الواجهة ============
     showAuthenticatedUI() {
-        document.getElementById('userInfo').classList.remove('hidden');
-        document.getElementById('logoutBtn').classList.remove('hidden');
-        document.getElementById('loginBtn').classList.add('hidden');
-        document.getElementById('registerBtn').classList.add('hidden');
+        document.getElementById('header').style.display = 'block';
+        document.getElementById('main-content').style.display = 'block';
+        document.getElementById('welcomeScreen').style.display = 'none';
+
+        const userInfo = document.getElementById('userInfo');
+        const logoutBtn = document.getElementById('logoutBtn');
+        const loginBtn = document.getElementById('loginBtn');
+        const registerBtn = document.getElementById('registerBtn');
+
+        if (userInfo) userInfo.classList.remove('hidden');
+        if (logoutBtn) logoutBtn.classList.remove('hidden');
+        if (loginBtn) loginBtn.classList.add('hidden');
+        if (registerBtn) registerBtn.classList.add('hidden');
         
         if (this.currentUser) {
-            document.getElementById('userNameDisplay').textContent = this.currentUser.fullName || 'مستخدم';
-            document.getElementById('userRoleDisplay').textContent = this.currentUser.role || 'طالب';
-            document.getElementById('userAvatarText').textContent = (this.currentUser.fullName || 'م').charAt(0);
+            const userNameDisplay = document.getElementById('userNameDisplay');
+            const userRoleDisplay = document.getElementById('userRoleDisplay');
+            const userAvatarText = document.getElementById('userAvatarText');
+            
+            if (userNameDisplay) userNameDisplay.textContent = this.currentUser.fullName;
+            if (userRoleDisplay) userRoleDisplay.textContent = this.getRoleText(this.currentUser.role);
+            if (userAvatarText) userAvatarText.textContent = this.currentUser.fullName.charAt(0);
         }
     }
 
     showUnauthenticatedUI() {
-        document.getElementById('userInfo').classList.add('hidden');
-        document.getElementById('logoutBtn').classList.add('hidden');
-        document.getElementById('loginBtn').classList.remove('hidden');
-        document.getElementById('registerBtn').classList.remove('hidden');
+        document.getElementById('header').style.display = 'block';
+        document.getElementById('main-content').style.display = 'block';
+        document.getElementById('welcomeScreen').style.display = 'none';
+
+        const userInfo = document.getElementById('userInfo');
+        const logoutBtn = document.getElementById('logoutBtn');
+        const loginBtn = document.getElementById('loginBtn');
+        const registerBtn = document.getElementById('registerBtn');
+
+        if (userInfo) userInfo.classList.add('hidden');
+        if (logoutBtn) logoutBtn.classList.add('hidden');
+        if (loginBtn) loginBtn.classList.remove('hidden');
+        if (registerBtn) registerBtn.classList.remove('hidden');
     }
 
+    getRoleText(role) {
+        const roles = {
+            'admin': 'مدير',
+            'teacher': 'معلم',
+            'student': 'طالب'
+        };
+        return roles[role] || role;
+    }
+
+    // ============ إدارة الواجهة ============
     navigateToPage(pageName) {
         console.log(`🔄 الانتقال إلى صفحة: ${pageName}`);
         
@@ -141,7 +118,6 @@ class EducationalPlatform {
         }
 
         this.updateNavigationState(pageName);
-        this.closeMobileMenu();
     }
 
     updateNavigationState(pageName) {
@@ -155,9 +131,11 @@ class EducationalPlatform {
 
     async loadPageContent(pageName) {
         switch (pageName) {
+            case 'dashboard':
+                await this.loadDashboard();
+                break;
             case 'chat':
                 await this.loadConversations();
-                this.setupNewChatButton();
                 break;
             case 'stories':
                 await this.loadStories();
@@ -168,17 +146,8 @@ class EducationalPlatform {
             case 'channels':
                 await this.loadChannels();
                 break;
-            case 'media':
-                await this.loadMedia();
-                break;
-            case 'dashboard':
-                await this.loadDashboard();
-                break;
-            case 'login':
-                this.setupLoginForm();
-                break;
-            case 'register':
-                this.setupRegisterForm();
+            case 'admin':
+                await this.loadAdminPage();
                 break;
         }
     }
@@ -188,174 +157,137 @@ class EducationalPlatform {
         console.log('🔧 إعداد مستمعي الأحداث...');
         
         // زر ابدأ الآن
-        document.getElementById('startAppBtn').addEventListener('click', () => this.startApp());
-
-        // التنقل بين الصفحات
-        document.querySelectorAll('[data-page]').forEach(element => {
-            element.addEventListener('click', (e) => {
-                e.preventDefault();
-                const pageName = element.getAttribute('data-page');
-                this.navigateToPage(pageName);
-            });
+        document.getElementById('startAppBtn').addEventListener('click', () => {
+            this.startApp();
         });
 
-        // القائمة المتنقلة
-        document.getElementById('mobileMenuBtn').addEventListener('click', () => this.toggleMobileMenu());
-        document.getElementById('overlay').addEventListener('click', () => this.closeMobileMenu());
+        // التنقل بين الصفحات
+        document.addEventListener('click', (e) => {
+            const target = e.target.closest('[data-page]');
+            if (target) {
+                e.preventDefault();
+                const pageName = target.getAttribute('data-page');
+                this.navigateToPage(pageName);
+            }
+        });
 
-        // الزر العائم
-        document.getElementById('floatingActionBtn').addEventListener('click', () => this.toggleQuickActions());
-
-        // تسجيل الخروج
+        // المصادقة
+        document.getElementById('loginForm').addEventListener('submit', (e) => this.handleLogin(e));
+        document.getElementById('registerForm').addEventListener('submit', (e) => this.handleRegister(e));
         document.getElementById('logoutBtn').addEventListener('click', (e) => {
             e.preventDefault();
             this.handleLogout();
         });
 
-        console.log('✅ تم إعداد مستمعي الأحداث بنجاح');
+        // الدردشة
+        document.getElementById('sendMessageBtn').addEventListener('click', () => this.sendMessage());
+        document.getElementById('chatInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') this.sendMessage();
+        });
+        document.getElementById('newChatBtn').addEventListener('click', () => this.showNewChatModal());
+
+        // القصص
+        document.getElementById('createStoryBtn').addEventListener('click', () => this.showCreateStoryModal());
+
+        // المجموعات والقنوات
+        document.getElementById('createGroupBtn').addEventListener('click', () => this.showCreateGroupModal());
+        document.getElementById('createChannelBtn').addEventListener('click', () => this.showCreateChannelModal());
     }
 
-    // ============ دوال التطبيق الرئيسية ============
+    // ============ بدء التطبيق ============
     startApp() {
         console.log('🎬 بدء التطبيق...');
-        const welcomeScreen = document.getElementById('welcomeScreen');
-        const appContainer = document.getElementById('appContainer');
-        
-        welcomeScreen.style.display = 'none';
-        appContainer.classList.add('active');
-        
+        document.getElementById('welcomeScreen').style.display = 'none';
+        document.getElementById('header').style.display = 'block';
+        document.getElementById('main-content').style.display = 'block';
         this.navigateToPage('home');
         this.showNotification('مرحباً بك في المنصة التعليمية!', 'success');
     }
 
-    toggleMobileMenu() {
-        const mobileMenu = document.getElementById('mobileMenu');
-        const overlay = document.getElementById('overlay');
-        
-        mobileMenu.classList.toggle('active');
-        overlay.classList.toggle('active');
-    }
-
-    closeMobileMenu() {
-        const mobileMenu = document.getElementById('mobileMenu');
-        const overlay = document.getElementById('overlay');
-        
-        mobileMenu.classList.remove('active');
-        overlay.classList.remove('active');
-    }
-
-    toggleQuickActions() {
-        const quickActions = document.getElementById('quickActionsBar');
-        quickActions.classList.toggle('active');
-    }
-
-    // ============ نظام الدردشة ============
+    // ============ نظام السوكت ============
     initializeSocket() {
-        console.log('🔌 تهيئة نظام الاتصال المحلي...');
-        this.updateConnectionStatus(true);
-    }
+        const token = localStorage.getItem('authToken');
+        if (!token) return;
 
-    updateConnectionStatus(isConnected) {
-        const statusElement = document.getElementById('connectionStatus');
-        if (statusElement) {
-            if (isConnected) {
-                statusElement.innerHTML = '<i class="fas fa-wifi"></i><span>متصل بالإنترنت</span>';
-                statusElement.style.background = 'rgba(76, 201, 240, 0.9)';
-            } else {
-                statusElement.innerHTML = '<i class="fas fa-wifi-slash"></i><span>غير متصل</span>';
-                statusElement.style.background = 'rgba(247, 37, 133, 0.9)';
-            }
+        try {
+            this.socket = io({
+                auth: {
+                    token: token
+                }
+            });
+
+            this.socket.on('connect', () => {
+                console.log('✅ متصل بالسيرفر');
+            });
+
+            this.socket.on('authenticated', (data) => {
+                console.log('🔓 تمت المصادقة عبر السوكت');
+            });
+
+            this.socket.on('new_message', (data) => {
+                this.receiveMessage(data);
+            });
+
+            this.socket.on('user_status_changed', (data) => {
+                this.updateUserStatus(data);
+            });
+
+        } catch (error) {
+            console.error('❌ خطأ في تهيئة السوكت:', error);
         }
     }
 
+    // ============ تحميل البيانات الأولية ============
     async loadInitialData() {
-        if (this.currentUser) {
-            await this.loadUsers();
-            await this.loadConversations();
-            await this.loadStories();
-            await this.loadGroups();
-            await this.loadChannels();
-            await this.loadMedia();
+        if (!this.currentUser) return;
+
+        try {
+            await Promise.all([
+                this.loadUsers(),
+                this.loadConversations(),
+                this.loadStories(),
+                this.loadGroups(),
+                this.loadChannels()
+            ]);
+        } catch (error) {
+            console.error('خطأ في تحميل البيانات الأولية:', error);
         }
     }
 
     async loadUsers() {
         try {
-            const usersData = this.getLocalStorage('users');
-            if (usersData) {
-                this.allUsers = JSON.parse(usersData);
-            } else {
-                // إنشاء بيانات تجريبية
-                this.allUsers = [
-                    {
-                        _id: '1',
-                        fullName: 'أحمد محمد',
-                        email: 'ahmed@example.com',
-                        role: 'teacher',
-                        isOnline: true
-                    },
-                    {
-                        _id: '2',
-                        fullName: 'فاطمة علي',
-                        email: 'fatima@example.com',
-                        role: 'student',
-                        isOnline: false
-                    },
-                    {
-                        _id: '3',
-                        fullName: 'خالد إبراهيم',
-                        email: 'khaled@example.com',
-                        role: 'student',
-                        isOnline: true
-                    }
-                ];
-                this.setLocalStorage('users', JSON.stringify(this.allUsers));
+            const token = localStorage.getItem('authToken');
+            const response = await fetch('/api/users', {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                this.allUsers = data.data.users;
             }
         } catch (error) {
             console.error('خطأ في تحميل المستخدمين:', error);
-            this.allUsers = [];
         }
     }
 
+    // ============ نظام الدردشة ============
     async loadConversations() {
         try {
-            const conversationsData = this.getLocalStorage('conversations');
-            let conversations = [];
+            const token = localStorage.getItem('authToken');
+            const response = await fetch('/api/chat/conversations', {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
             
-            if (conversationsData) {
-                conversations = JSON.parse(conversationsData);
-            } else {
-                // إنشاء محادثات تجريبية
-                conversations = [
-                    {
-                        _id: 'conv1',
-                        participants: [this.currentUser?._id || 'user_1', '1'],
-                        name: 'أحمد محمد',
-                        lastMessage: {
-                            content: 'مرحباً، كيف يمكنني مساعدتك؟',
-                            senderId: '1',
-                            createdAt: new Date().toISOString()
-                        },
-                        unreadCount: {},
-                        isGroup: false
-                    },
-                    {
-                        _id: 'conv2',
-                        participants: [this.currentUser?._id || 'user_1', '2'],
-                        name: 'فاطمة علي',
-                        lastMessage: {
-                            content: 'شكراً على المساعدة',
-                            senderId: this.currentUser?._id || 'user_1',
-                            createdAt: new Date().toISOString()
-                        },
-                        unreadCount: {},
-                        isGroup: false
-                    }
-                ];
-                this.setLocalStorage('conversations', JSON.stringify(conversations));
+            if (response.ok) {
+                const data = await response.json();
+                this.renderConversations(data.data.conversations);
             }
-
-            this.renderConversations(conversations);
         } catch (error) {
             console.error('خطأ في تحميل المحادثات:', error);
         }
@@ -368,7 +300,7 @@ class EducationalPlatform {
         container.innerHTML = '';
 
         if (!conversations || conversations.length === 0) {
-            container.innerHTML = '<div class="text-center" style="padding: 2rem; color: rgba(255,255,255,0.7);">لا توجد محادثات</div>';
+            container.innerHTML = '<div class="text-center" style="padding: 2rem; color: #666;">لا توجد محادثات</div>';
             return;
         }
 
@@ -385,10 +317,7 @@ class EducationalPlatform {
         div.dataset.conversationId = conversation._id;
         
         const lastMessage = conversation.lastMessage ? 
-            (conversation.lastMessage.content || 'ملف مرفق') : 'لا توجد رسائل';
-        const unreadCount = conversation.unreadCount && conversation.unreadCount[this.currentUser?._id] 
-            ? conversation.unreadCount[this.currentUser._id] 
-            : 0;
+            conversation.lastMessage.content : 'لا توجد رسائل';
 
         div.innerHTML = `
             <div class="conversation-avatar">
@@ -399,9 +328,7 @@ class EducationalPlatform {
                 <div class="conversation-last-message">${this.truncateText(lastMessage, 30)}</div>
             </div>
             <div class="conversation-meta">
-                <div class="conversation-time">${this.formatTime(conversation.lastMessage?.createdAt)}</div>
-                ${unreadCount > 0 ? 
-                    `<div class="conversation-unread">${unreadCount}</div>` : ''}
+                <div class="conversation-time">${this.formatTime(conversation.updatedAt)}</div>
             </div>
         `;
 
@@ -409,57 +336,35 @@ class EducationalPlatform {
         return div;
     }
 
-    setupNewChatButton() {
-        const chatHeader = document.querySelector('.chat-sidebar .chat-header');
-        if (!chatHeader) return;
-
-        const existingButton = document.getElementById('newChatBtn');
-        if (existingButton) {
-            existingButton.remove();
-        }
-
-        const newChatBtn = document.createElement('button');
-        newChatBtn.id = 'newChatBtn';
-        newChatBtn.className = 'btn btn-primary btn-sm';
-        newChatBtn.innerHTML = '<i class="fas fa-plus"></i> محادثة جديدة';
-        newChatBtn.style.marginRight = '10px';
-        
-        newChatBtn.addEventListener('click', () => this.showNewChatModal());
-        
-        chatHeader.appendChild(newChatBtn);
-    }
-
     showNewChatModal() {
         const modal = document.createElement('div');
         modal.className = 'modal';
         modal.style.display = 'flex';
         modal.innerHTML = `
-            <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-content">
                 <div class="modal-header">
                     <h3>بدء محادثة جديدة</h3>
                     <button class="modal-close">&times;</button>
                 </div>
                 <div class="modal-body">
-                    <div class="form-group">
-                        <label>اختر مستخدم للدردشة:</label>
-                        <div class="users-list" style="max-height: 300px; overflow-y: auto; margin-top: 1rem;">
-                            ${this.allUsers
-                                .filter(user => user._id !== this.currentUser?._id)
-                                .map(user => `
-                                <div class="user-item" data-user-id="${user._id}" style="display: flex; align-items: center; padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.2); cursor: pointer; color: white;">
-                                    <div class="user-avatar" style="width: 40px; height: 40px; background: #4361ee; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; margin-left: 10px;">
+                    <div class="users-list" style="max-height: 300px; overflow-y: auto;">
+                        ${this.allUsers
+                            .filter(user => user._id !== this.currentUser._id)
+                            .map(user => `
+                                <div class="user-item" data-user-id="${user._id}" 
+                                     style="display: flex; align-items: center; padding: 10px; border-bottom: 1px solid #eee; cursor: pointer;">
+                                    <div class="user-avatar" 
+                                         style="width: 40px; height: 40px; background: #4361ee; border-radius: 50%; 
+                                                display: flex; align-items: center; justify-content: center; 
+                                                color: white; font-weight: bold; margin-left: 10px;">
                                         ${user.fullName.charAt(0)}
                                     </div>
                                     <div>
                                         <div style="font-weight: bold;">${user.fullName}</div>
-                                        <div style="font-size: 0.8rem; color: rgba(255,255,255,0.7);">${user.role}</div>
+                                        <div style="font-size: 0.8rem; color: #666;">${this.getRoleText(user.role)}</div>
                                     </div>
                                 </div>
                             `).join('')}
-                        </div>
-                    </div>
-                    <div class="modal-actions" style="margin-top: 1rem;">
-                        <button type="button" class="btn btn-outline" id="cancelNewChat">إلغاء</button>
                     </div>
                 </div>
             </div>
@@ -468,7 +373,6 @@ class EducationalPlatform {
         document.body.appendChild(modal);
 
         modal.querySelector('.modal-close').addEventListener('click', () => modal.remove());
-        modal.querySelector('#cancelNewChat').addEventListener('click', () => modal.remove());
         
         modal.querySelectorAll('.user-item').forEach(item => {
             item.addEventListener('click', async () => {
@@ -479,40 +383,30 @@ class EducationalPlatform {
         });
 
         modal.addEventListener('click', (e) => {
-            if (e.target === modal) {
-                modal.remove();
-            }
+            if (e.target === modal) modal.remove();
         });
     }
 
     async startNewChat(userId) {
         try {
-            const user = this.allUsers.find(u => u._id === userId);
-            if (!user) {
-                this.showNotification('المستخدم غير موجود', 'error');
-                return;
+            const token = localStorage.getItem('authToken');
+            const response = await fetch('/api/chat/conversations', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    participantId: userId
+                })
+            });
+
+            if (response.ok) {
+                this.showNotification('تم بدء المحادثة بنجاح', 'success');
+                await this.loadConversations();
+            } else {
+                this.showNotification('فشل في بدء المحادثة', 'error');
             }
-
-            const conversationId = 'conv_' + Date.now();
-            const conversation = {
-                _id: conversationId,
-                participants: [this.currentUser._id, userId],
-                name: user.fullName,
-                lastMessage: null,
-                unreadCount: {},
-                isGroup: false,
-                createdAt: new Date().toISOString()
-            };
-
-            const conversationsData = this.getLocalStorage('conversations');
-            let conversations = conversationsData ? JSON.parse(conversationsData) : [];
-            conversations.push(conversation);
-            this.setLocalStorage('conversations', JSON.stringify(conversations));
-
-            this.showNotification('تم بدء المحادثة بنجاح', 'success');
-            await this.loadConversations();
-            this.selectConversation(conversationId);
-
         } catch (error) {
             console.error('خطأ في بدء المحادثة:', error);
             this.showNotification('خطأ في بدء المحادثة', 'error');
@@ -520,14 +414,11 @@ class EducationalPlatform {
     }
 
     selectConversation(conversationId) {
-        const conversation = Array.from(this.conversations.values()).find(conv => conv._id === conversationId);
-        if (!conversation) return;
-
-        this.currentChat = conversation;
+        this.currentChat = this.conversations.get(conversationId);
+        if (!this.currentChat) return;
 
         document.getElementById('activeChatName').textContent = this.currentChat.name;
         document.getElementById('activeChatAvatar').textContent = this.currentChat.name.charAt(0);
-        document.getElementById('activeChatStatus').textContent = 'متصل';
         
         const chatInputContainer = document.getElementById('chatInputContainer');
         const emptyChat = document.getElementById('emptyChat');
@@ -540,21 +431,23 @@ class EducationalPlatform {
         document.querySelectorAll('.conversation-item').forEach(item => {
             item.classList.remove('active');
         });
-        const activeConversation = document.querySelector(`[data-conversation-id="${conversationId}"]`);
-        if (activeConversation) {
-            activeConversation.classList.add('active');
-        }
-
-        this.markMessagesAsRead(conversationId);
+        document.querySelector(`[data-conversation-id="${conversationId}"]`).classList.add('active');
     }
 
     async loadMessages(conversationId) {
         try {
-            const messagesData = this.getLocalStorage('messages') || '{}';
-            const messages = JSON.parse(messagesData);
-            const conversationMessages = messages[conversationId] || [];
+            const token = localStorage.getItem('authToken');
+            const response = await fetch(`/api/chat/conversations/${conversationId}/messages?limit=50`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
             
-            this.renderMessages(conversationMessages);
+            if (response.ok) {
+                const data = await response.json();
+                this.renderMessages(data.data.messages);
+            }
         } catch (error) {
             console.error('خطأ في تحميل الرسائل:', error);
         }
@@ -567,13 +460,6 @@ class EducationalPlatform {
         container.innerHTML = '';
 
         if (!messages || messages.length === 0) {
-            container.innerHTML = `
-                <div class="empty-chat">
-                    <i class="fas fa-comments"></i>
-                    <h3>ابدأ المحادثة</h3>
-                    <p>ارسل رسالة لبدء المحادثة</p>
-                </div>
-            `;
             return;
         }
 
@@ -595,11 +481,6 @@ class EducationalPlatform {
                 <div class="message-text">${this.escapeHtml(message.content)}</div>
                 <div class="message-time">${this.formatTime(message.createdAt)}</div>
             </div>
-            ${isSent ? `
-                <div class="message-status">
-                    <i class="fas fa-check-double"></i>
-                </div>
-            ` : ''}
         `;
 
         return div;
@@ -612,30 +493,23 @@ class EducationalPlatform {
         if (!content || !this.currentChat) return;
 
         const messageData = {
-            _id: 'msg_' + Date.now(),
             content: content,
-            conversationId: this.currentChat._id,
-            senderId: this.currentUser._id,
-            type: 'text',
-            createdAt: new Date().toISOString(),
-            readBy: [this.currentUser._id]
+            conversationId: this.currentChat._id
         };
 
         try {
-            this.addMessageToUI(messageData, true);
+            this.addMessageToUI({
+                ...messageData,
+                _id: 'temp-' + Date.now(),
+                senderId: this.currentUser._id,
+                createdAt: new Date().toISOString()
+            }, true);
+
             input.value = '';
 
-            const messagesData = this.getLocalStorage('messages') || '{}';
-            const messages = JSON.parse(messagesData);
-            
-            if (!messages[this.currentChat._id]) {
-                messages[this.currentChat._id] = [];
+            if (this.socket) {
+                this.socket.emit('send_message', messageData);
             }
-            
-            messages[this.currentChat._id].push(messageData);
-            this.setLocalStorage('messages', JSON.stringify(messages));
-
-            this.updateConversationLastMessage(this.currentChat._id, messageData);
 
         } catch (error) {
             console.error('خطأ في إرسال الرسالة:', error);
@@ -643,31 +517,19 @@ class EducationalPlatform {
         }
     }
 
-    updateConversationLastMessage(conversationId, message) {
-        const conversationsData = this.getLocalStorage('conversations');
-        if (!conversationsData) return;
-        
-        let conversations = JSON.parse(conversationsData);
-        const conversationIndex = conversations.findIndex(conv => conv._id === conversationId);
-        
-        if (conversationIndex !== -1) {
-            conversations[conversationIndex].lastMessage = message;
-            conversations[conversationIndex].updatedAt = new Date().toISOString();
-            this.setLocalStorage('conversations', JSON.stringify(conversations));
-            this.loadConversations();
-        }
-    }
-
     addMessageToUI(message, isSent) {
         const container = document.getElementById('chatMessages');
         if (!container) return;
 
-        const emptyChat = document.getElementById('emptyChat');
-        if (emptyChat) emptyChat.style.display = 'none';
-
         const messageElement = this.createMessageElement(message);
         container.appendChild(messageElement);
         this.scrollToBottom();
+    }
+
+    receiveMessage(data) {
+        if (this.currentChat && data.conversationId === this.currentChat._id) {
+            this.addMessageToUI(data.message, false);
+        }
     }
 
     scrollToBottom() {
@@ -677,39 +539,22 @@ class EducationalPlatform {
         }
     }
 
-    async markMessagesAsRead(conversationId) {
-        console.log('تم تحديد الرسائل كمقروءة للمحادثة:', conversationId);
-    }
-
-    // ============ إدارة القصص ============
+    // ============ نظام القصص ============
     async loadStories() {
         try {
-            const storiesData = this.getLocalStorage('stories');
-            if (storiesData) {
-                this.stories = JSON.parse(storiesData);
-            } else {
-                this.stories = [
-                    {
-                        _id: 'story1',
-                        userId: '1',
-                        mediaUrl: 'https://via.placeholder.com/300x500/4361ee/ffffff?text=قصة+تعليمية',
-                        caption: 'درس جديد في الرياضيات',
-                        createdAt: new Date().toISOString(),
-                        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
-                    },
-                    {
-                        _id: 'story2',
-                        userId: '2',
-                        mediaUrl: 'https://via.placeholder.com/300x500/f72585/ffffff?text=نشاط+طلابي',
-                        caption: 'أنشطة اليوم الدراسي',
-                        createdAt: new Date().toISOString(),
-                        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
-                    }
-                ];
-                this.setLocalStorage('stories', JSON.stringify(this.stories));
-            }
+            const token = localStorage.getItem('authToken');
+            const response = await fetch('/api/stories', {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
             
-            this.renderStories();
+            if (response.ok) {
+                const data = await response.json();
+                this.stories = data.data.stories;
+                this.renderStories();
+            }
         } catch (error) {
             console.error('خطأ في تحميل القصص:', error);
         }
@@ -722,7 +567,7 @@ class EducationalPlatform {
         container.innerHTML = '';
 
         if (this.stories.length === 0) {
-            container.innerHTML = '<div class="text-center" style="padding: 2rem; color: rgba(255,255,255,0.7);">لا توجد قصص حالية</div>';
+            container.innerHTML = '<div class="text-center" style="padding: 2rem; color: #666;">لا توجد قصص حالية</div>';
             return;
         }
 
@@ -733,162 +578,63 @@ class EducationalPlatform {
     }
 
     createStoryElement(story, index) {
-        const user = this.allUsers.find(u => u._id === story.userId) || { fullName: 'مستخدم' };
         const div = document.createElement('div');
         div.className = 'story-item';
         
+        const storyUser = this.allUsers.find(user => user._id === story.userId) || { fullName: 'مستخدم' };
+        
         div.innerHTML = `
             <div class="story-avatar">
-                <span>${user.fullName.charAt(0)}</span>
+                <span>${storyUser.fullName.charAt(0)}</span>
             </div>
-            <div class="story-author">${user.fullName}</div>
+            <div class="story-author">${storyUser.fullName}</div>
         `;
 
-        div.addEventListener('click', () => this.openStoryViewer(index));
+        div.addEventListener('click', () => this.viewStory(story));
         return div;
     }
 
-    openStoryViewer(index) {
-        this.currentStoryIndex = index;
-        const story = this.stories[index];
-        
-        if (!story) return;
-
-        const user = this.allUsers.find(u => u._id === story.userId) || { fullName: 'مستخدم' };
-
-        document.getElementById('currentStoryImage').src = story.mediaUrl;
-        document.getElementById('storyAuthorName').textContent = user.fullName;
-        document.getElementById('storyAuthorAvatar').textContent = user.fullName.charAt(0);
-        document.getElementById('storyTime').textContent = this.formatTime(story.createdAt);
-        
-        document.getElementById('storyViewer').classList.add('active');
-        this.startStoryProgress();
-
-        this.recordStoryView(story._id);
+    viewStory(story) {
+        this.showNotification('عرض القصة: ' + (story.caption || 'بدون تعليق'), 'info');
     }
 
-    startStoryProgress() {
-        this.clearStoryProgress();
-        
-        const progressBars = document.getElementById('storyProgress');
-        if (!progressBars) return;
-
-        progressBars.innerHTML = '';
-        
-        this.stories.forEach((_, index) => {
-            const progressBar = document.createElement('div');
-            progressBar.className = 'story-progress-bar';
-            progressBar.innerHTML = `<div class="story-progress-fill" id="progress-${index}"></div>`;
-            progressBars.appendChild(progressBar);
-        });
-
-        this.animateProgressBar(this.currentStoryIndex);
-        this.storyInterval = setTimeout(() => this.showNextStory(), 5000);
+    showCreateStoryModal() {
+        this.showNotification('ميزة إنشاء القصص قريباً', 'info');
     }
 
-    animateProgressBar(index) {
-        const progressFill = document.getElementById(`progress-${index}`);
-        if (progressFill) {
-            progressFill.style.width = '100%';
-            progressFill.style.transition = 'width 5s linear';
-        }
-    }
-
-    clearStoryProgress() {
-        if (this.storyInterval) {
-            clearTimeout(this.storyInterval);
-        }
-        
-        document.querySelectorAll('.story-progress-fill').forEach(fill => {
-            fill.style.width = '0%';
-            fill.style.transition = 'none';
-        });
-    }
-
-    showNextStory() {
-        if (this.currentStoryIndex < this.stories.length - 1) {
-            this.currentStoryIndex++;
-            this.openStoryViewer(this.currentStoryIndex);
-        } else {
-            this.closeStoryViewer();
-        }
-    }
-
-    showPreviousStory() {
-        if (this.currentStoryIndex > 0) {
-            this.currentStoryIndex--;
-            this.openStoryViewer(this.currentStoryIndex);
-        }
-    }
-
-    closeStoryViewer() {
-        this.clearStoryProgress();
-        const storyViewer = document.getElementById('storyViewer');
-        if (storyViewer) {
-            storyViewer.classList.remove('active');
-        }
-    }
-
-    async recordStoryView(storyId) {
-        try {
-            console.log('تم تسجيل مشاهدة القصة:', storyId);
-        } catch (error) {
-            console.error('خطأ في تسجيل مشاهدة القصة:', error);
-        }
-    }
-
-    // ============ إدارة المجموعات ============
+    // ============ نظام المجموعات ============
     async loadGroups() {
         try {
-            const groupsData = this.getLocalStorage('groups');
-            let groups = [];
+            const token = localStorage.getItem('authToken');
+            const response = await fetch('/api/groups', {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
             
-            if (groupsData) {
-                groups = JSON.parse(groupsData);
-            } else {
-                groups = [
-                    {
-                        _id: 'group1',
-                        name: 'مجموعة الرياضيات',
-                        description: 'مجموعة مخصصة لدراسة الرياضيات وحل المسائل',
-                        creatorId: '1',
-                        members: [this.currentUser?._id || 'user_1', '1', '2', '3'],
-                        admins: ['1'],
-                        createdAt: new Date().toISOString(),
-                        isPublic: true
-                    },
-                    {
-                        _id: 'group2',
-                        name: 'مجموعة اللغة العربية',
-                        description: 'مجموعة لدراسة الأدب والنحو العربي',
-                        creatorId: this.currentUser?._id || 'user_1',
-                        members: [this.currentUser?._id || 'user_1', '2'],
-                        admins: [this.currentUser?._id || 'user_1'],
-                        createdAt: new Date().toISOString(),
-                        isPublic: false
-                    }
-                ];
-                this.setLocalStorage('groups', JSON.stringify(groups));
+            if (response.ok) {
+                const data = await response.json();
+                this.groups = data.data.groups;
+                this.renderGroups();
             }
-            
-            this.renderGroups(groups);
         } catch (error) {
             console.error('خطأ في تحميل المجموعات:', error);
         }
     }
 
-    renderGroups(groups) {
-        const container = document.getElementById('groupsContainer');
+    renderGroups() {
+        const container = document.getElementById('groupsGrid');
         if (!container) return;
 
         container.innerHTML = '';
 
-        if (groups.length === 0) {
-            container.innerHTML = '<div class="text-center" style="padding: 2rem; color: rgba(255,255,255,0.7);">لا توجد مجموعات</div>';
+        if (!this.groups || this.groups.length === 0) {
+            container.innerHTML = '<div class="text-center" style="padding: 2rem; color: #666;">لا توجد مجموعات</div>';
             return;
         }
 
-        groups.forEach(group => {
+        this.groups.forEach(group => {
             const groupElement = this.createGroupElement(group);
             container.appendChild(groupElement);
         });
@@ -898,25 +644,18 @@ class EducationalPlatform {
         const div = document.createElement('div');
         div.className = 'group-card';
         
-        const isMember = group.members.includes(this.currentUser?._id);
-        const memberCount = group.members.length;
-
+        const isMember = group.members.includes(this.currentUser._id);
+        
         div.innerHTML = `
             <div class="group-header">
                 <div class="group-avatar">
                     <i class="fas fa-users"></i>
                 </div>
                 <h3>${this.escapeHtml(group.name)}</h3>
-                <p>${memberCount} عضو</p>
+                <p>${group.members.length} عضو</p>
             </div>
             <div class="group-info">
                 <p>${this.escapeHtml(group.description || 'لا يوجد وصف')}</p>
-                <div class="group-stats">
-                    <div class="group-stat">
-                        <div class="group-stat-number">${group.members.length}</div>
-                        <div class="group-stat-label">عضو</div>
-                    </div>
-                </div>
                 <button class="btn btn-primary btn-block mt-3 join-group-btn" data-group-id="${group._id}">
                     <i class="fas fa-sign-in-alt"></i>
                     ${isMember ? 'الدخول' : 'الانضمام'}
@@ -936,22 +675,24 @@ class EducationalPlatform {
 
     async joinGroup(groupId) {
         try {
-            const groupsData = this.getLocalStorage('groups');
-            if (!groupsData) return;
-            
-            let groups = JSON.parse(groupsData);
-            const groupIndex = groups.findIndex(g => g._id === groupId);
-            
-            if (groupIndex !== -1 && !groups[groupIndex].members.includes(this.currentUser._id)) {
-                groups[groupIndex].members.push(this.currentUser._id);
-                this.setLocalStorage('groups', JSON.stringify(groups));
-                
+            const token = localStorage.getItem('authToken');
+            const response = await fetch(`/api/groups/${groupId}/join`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (response.ok) {
                 this.showNotification('تم الانضمام للمجموعة بنجاح', 'success');
-                await this.loadGroups();
+                this.loadGroups();
+            } else {
+                this.showNotification('فشل في الانضمام للمجموعة', 'error');
             }
         } catch (error) {
             console.error('خطأ في الانضمام للمجموعة:', error);
-            this.showNotification('خطأ في الانضمام للمجموعة', 'error');
+            this.showNotification('فشل في الانضمام للمجموعة', 'error');
         }
     }
 
@@ -959,56 +700,114 @@ class EducationalPlatform {
         this.showNotification('تم الدخول إلى المجموعة', 'success');
     }
 
-    // ============ إدارة القنوات ============
+    showCreateGroupModal() {
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.style.display = 'flex';
+        modal.innerHTML = `
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>إنشاء مجموعة جديدة</h3>
+                    <button class="modal-close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <form id="createGroupForm">
+                        <div class="form-group">
+                            <label for="groupName">اسم المجموعة</label>
+                            <input type="text" id="groupName" required class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <label for="groupDescription">وصف المجموعة</label>
+                            <textarea id="groupDescription" rows="3" class="form-control"></textarea>
+                        </div>
+                        <div class="modal-actions">
+                            <button type="button" class="btn btn-outline" id="cancelGroupBtn">إلغاء</button>
+                            <button type="submit" class="btn btn-primary">إنشاء المجموعة</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        modal.querySelector('.modal-close').addEventListener('click', () => modal.remove());
+        modal.querySelector('#cancelGroupBtn').addEventListener('click', () => modal.remove());
+
+        modal.querySelector('#createGroupForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const groupData = {
+                name: document.getElementById('groupName').value,
+                description: document.getElementById('groupDescription').value
+            };
+
+            await this.createGroup(groupData);
+            modal.remove();
+        });
+
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) modal.remove();
+        });
+    }
+
+    async createGroup(groupData) {
+        try {
+            const token = localStorage.getItem('authToken');
+            const response = await fetch('/api/groups', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(groupData)
+            });
+
+            if (response.ok) {
+                this.showNotification('تم إنشاء المجموعة بنجاح', 'success');
+                this.loadGroups();
+            } else {
+                this.showNotification('فشل في إنشاء المجموعة', 'error');
+            }
+        } catch (error) {
+            console.error('خطأ في إنشاء المجموعة:', error);
+            this.showNotification('فشل في إنشاء المجموعة', 'error');
+        }
+    }
+
+    // ============ نظام القنوات ============
     async loadChannels() {
         try {
-            const channelsData = this.getLocalStorage('channels');
-            let channels = [];
+            const token = localStorage.getItem('authToken');
+            const response = await fetch('/api/channels', {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
             
-            if (channelsData) {
-                channels = JSON.parse(channelsData);
-            } else {
-                channels = [
-                    {
-                        _id: 'channel1',
-                        name: 'قناة العلوم',
-                        description: 'قناة لبث دروس العلوم والتجارب العملية',
-                        creatorId: '1',
-                        subscribers: [this.currentUser?._id || 'user_1', '1', '2'],
-                        isActive: true,
-                        createdAt: new Date().toISOString()
-                    },
-                    {
-                        _id: 'channel2',
-                        name: 'قناة التاريخ',
-                        description: 'قناة لبث محاضرات التاريخ والحضارات',
-                        creatorId: this.currentUser?._id || 'user_1',
-                        subscribers: [this.currentUser?._id || 'user_1', '3'],
-                        isActive: false,
-                        createdAt: new Date().toISOString()
-                    }
-                ];
-                this.setLocalStorage('channels', JSON.stringify(channels));
+            if (response.ok) {
+                const data = await response.json();
+                this.channels = data.data.channels;
+                this.renderChannels();
             }
-            
-            this.renderChannels(channels);
         } catch (error) {
             console.error('خطأ في تحميل القنوات:', error);
         }
     }
 
-    renderChannels(channels) {
-        const container = document.getElementById('channelsContainer');
+    renderChannels() {
+        const container = document.getElementById('channelsGrid');
         if (!container) return;
 
         container.innerHTML = '';
 
-        if (channels.length === 0) {
-            container.innerHTML = '<div class="text-center" style="padding: 2rem; color: rgba(255,255,255,0.7);">لا توجد قنوات</div>';
+        if (!this.channels || this.channels.length === 0) {
+            container.innerHTML = '<div class="text-center" style="padding: 2rem; color: #666;">لا توجد قنوات</div>';
             return;
         }
 
-        channels.forEach(channel => {
+        this.channels.forEach(channel => {
             const channelElement = this.createChannelElement(channel);
             container.appendChild(channelElement);
         });
@@ -1018,34 +817,27 @@ class EducationalPlatform {
         const div = document.createElement('div');
         div.className = 'channel-card';
         
-        const isSubscribed = channel.subscribers.includes(this.currentUser?._id);
-        const subscriberCount = channel.subscribers.length;
-
+        const isMember = channel.members.includes(this.currentUser._id);
+        
         div.innerHTML = `
             <div class="channel-header">
                 <div class="channel-avatar">
                     <i class="fas fa-broadcast-tower"></i>
                 </div>
                 <h3>${this.escapeHtml(channel.name)}</h3>
-                <p>${subscriberCount} مشترك</p>
+                <p>${channel.members.length} مشترك</p>
             </div>
             <div class="channel-info">
                 <p>${this.escapeHtml(channel.description || 'لا يوجد وصف')}</p>
-                <div class="channel-stats">
-                    <div class="channel-stat">
-                        <div class="channel-stat-number">${channel.subscribers.length}</div>
-                        <div class="channel-stat-label">مشترك</div>
-                    </div>
-                </div>
                 <button class="btn btn-primary btn-block mt-3 subscribe-channel-btn" data-channel-id="${channel._id}">
                     <i class="fas fa-bell"></i>
-                    ${isSubscribed ? 'مشترك' : 'اشترك'}
+                    ${isMember ? 'مشترك' : 'اشترك'}
                 </button>
             </div>
         `;
 
         div.querySelector('.subscribe-channel-btn').addEventListener('click', () => {
-            if (isSubscribed) {
+            if (isMember) {
                 this.enterChannel(channel._id);
             } else {
                 this.subscribeChannel(channel._id);
@@ -1056,22 +848,24 @@ class EducationalPlatform {
 
     async subscribeChannel(channelId) {
         try {
-            const channelsData = this.getLocalStorage('channels');
-            if (!channelsData) return;
-            
-            let channels = JSON.parse(channelsData);
-            const channelIndex = channels.findIndex(c => c._id === channelId);
-            
-            if (channelIndex !== -1 && !channels[channelIndex].subscribers.includes(this.currentUser._id)) {
-                channels[channelIndex].subscribers.push(this.currentUser._id);
-                this.setLocalStorage('channels', JSON.stringify(channels));
-                
+            const token = localStorage.getItem('authToken');
+            const response = await fetch(`/api/channels/${channelId}/join`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (response.ok) {
                 this.showNotification('تم الاشتراك في القناة بنجاح', 'success');
-                await this.loadChannels();
+                this.loadChannels();
+            } else {
+                this.showNotification('فشل في الاشتراك بالقناة', 'error');
             }
         } catch (error) {
             console.error('خطأ في الاشتراك بالقناة:', error);
-            this.showNotification('خطأ في الاشتراك بالقناة', 'error');
+            this.showNotification('فشل في الاشتراك بالقناة', 'error');
         }
     }
 
@@ -1079,512 +873,205 @@ class EducationalPlatform {
         this.showNotification('تم الدخول إلى القناة', 'success');
     }
 
-    // ============ إدارة الوسائط ============
-    async loadMedia() {
-        try {
-            const mediaData = this.getLocalStorage('media');
-            let media = [];
-            
-            if (mediaData) {
-                media = JSON.parse(mediaData);
-            } else {
-                media = [
-                    {
-                        _id: 'media1',
-                        name: 'درس الرياضيات',
-                        type: 'video',
-                        url: 'https://example.com/video1.mp4',
-                        uploadedBy: '1',
-                        size: '150 MB',
-                        uploadedAt: new Date().toISOString()
-                    },
-                    {
-                        _id: 'media2',
-                        name: 'ملخص النحو',
-                        type: 'document',
-                        url: 'https://example.com/doc1.pdf',
-                        uploadedBy: this.currentUser?._id || 'user_1',
-                        size: '2.5 MB',
-                        uploadedAt: new Date().toISOString()
-                    }
-                ];
-                this.setLocalStorage('media', JSON.stringify(media));
-            }
-            
-            this.renderMedia(media);
-        } catch (error) {
-            console.error('خطأ في تحميل الوسائط:', error);
-        }
-    }
-
-    renderMedia(media) {
-        const container = document.getElementById('mediaContainer');
-        if (!container) return;
-
-        container.innerHTML = '';
-
-        if (media.length === 0) {
-            container.innerHTML = '<div class="text-center" style="padding: 2rem; color: rgba(255,255,255,0.7);">لا توجد وسائط</div>';
-            return;
-        }
-
-        media.forEach(item => {
-            const mediaElement = this.createMediaElement(item);
-            container.appendChild(mediaElement);
-        });
-    }
-
-    createMediaElement(media) {
-        const div = document.createElement('div');
-        div.className = 'media-item';
-        
-        const icon = this.getMediaIcon(media.type);
-        const uploadedBy = this.allUsers.find(u => u._id === media.uploadedBy)?.fullName || 'مستخدم';
-
-        div.innerHTML = `
-            <div class="media-icon">
-                <i class="${icon}"></i>
-            </div>
-            <div class="media-info">
-                <h4 class="media-name">${media.name}</h4>
-                <p class="media-meta">
-                    <span>تم الرفع بواسطة: ${uploadedBy}</span>
-                    <span>الحجم: ${media.size}</span>
-                </p>
-                <div class="media-actions">
-                    <button class="btn btn-primary btn-sm" onclick="app.downloadMedia('${media._id}')">
-                        <i class="fas fa-download"></i> تحميل
-                    </button>
-                    <button class="btn btn-outline btn-sm" onclick="app.shareMedia('${media._id}')">
-                        <i class="fas fa-share"></i> مشاركة
-                    </button>
+    showCreateChannelModal() {
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.style.display = 'flex';
+        modal.innerHTML = `
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>إنشاء قناة جديدة</h3>
+                    <button class="modal-close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <form id="createChannelForm">
+                        <div class="form-group">
+                            <label for="channelName">اسم القناة</label>
+                            <input type="text" id="channelName" required class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <label for="channelDescription">وصف القناة</label>
+                            <textarea id="channelDescription" rows="3" class="form-control"></textarea>
+                        </div>
+                        <div class="modal-actions">
+                            <button type="button" class="btn btn-outline" id="cancelChannelBtn">إلغاء</button>
+                            <button type="submit" class="btn btn-primary">إنشاء القناة</button>
+                        </div>
+                    </form>
                 </div>
             </div>
         `;
 
-        return div;
+        document.body.appendChild(modal);
+
+        modal.querySelector('.modal-close').addEventListener('click', () => modal.remove());
+        modal.querySelector('#cancelChannelBtn').addEventListener('click', () => modal.remove());
+
+        modal.querySelector('#createChannelForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const channelData = {
+                name: document.getElementById('channelName').value,
+                description: document.getElementById('channelDescription').value
+            };
+
+            await this.createChannel(channelData);
+            modal.remove();
+        });
+
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) modal.remove();
+        });
     }
 
-    getMediaIcon(type) {
-        const icons = {
-            'video': 'fas fa-video',
-            'document': 'fas fa-file-pdf',
-            'image': 'fas fa-image',
-            'audio': 'fas fa-music'
-        };
-        return icons[type] || 'fas fa-file';
-    }
+    async createChannel(channelData) {
+        try {
+            const token = localStorage.getItem('authToken');
+            const response = await fetch('/api/channels', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(channelData)
+            });
 
-    downloadMedia(mediaId) {
-        this.showNotification('جاري تحميل الملف...', 'info');
-    }
-
-    shareMedia(mediaId) {
-        this.showNotification('ميزة المشاركة قريباً', 'info');
+            if (response.ok) {
+                this.showNotification('تم إنشاء القناة بنجاح', 'success');
+                this.loadChannels();
+            } else {
+                this.showNotification('فشل في إنشاء القناة', 'error');
+            }
+        } catch (error) {
+            console.error('خطأ في إنشاء القناة:', error);
+            this.showNotification('فشل في إنشاء القناة', 'error');
+        }
     }
 
     // ============ لوحة التحكم ============
     async loadDashboard() {
         try {
-            const stats = await this.getDashboardStats();
-            this.renderDashboardStats(stats);
-            
-            const activities = await this.getRecentActivities();
-            this.renderRecentActivities(activities);
-            
+            const dashboardPage = document.getElementById('dashboard-page');
+            if (dashboardPage) {
+                dashboardPage.innerHTML = `
+                    <div class="dashboard-header">
+                        <h1 class="section-title">
+                            <i class="fas fa-tachometer-alt"></i>
+                            لوحة التحكم
+                        </h1>
+                        <p>مرحباً بك ${this.currentUser.fullName} في المنصة التعليمية</p>
+                    </div>
+                    
+                    <div class="dashboard-stats">
+                        <div class="stat-card">
+                            <div class="stat-icon">
+                                <i class="fas fa-users"></i>
+                            </div>
+                            <div class="stat-info">
+                                <div class="stat-number">${this.allUsers.length}</div>
+                                <div class="stat-label">إجمالي المستخدمين</div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">
+                                <i class="fas fa-comments"></i>
+                            </div>
+                            <div class="stat-info">
+                                <div class="stat-number">${this.conversations.size}</div>
+                                <div class="stat-label">المحادثات</div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">
+                                <i class="fas fa-history"></i>
+                            </div>
+                            <div class="stat-info">
+                                <div class="stat-number">${this.stories.length}</div>
+                                <div class="stat-label">القصص النشطة</div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">
+                                <i class="fas fa-broadcast-tower"></i>
+                            </div>
+                            <div class="stat-info">
+                                <div class="stat-number">${this.channels.length}</div>
+                                <div class="stat-label">القنوات</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
         } catch (error) {
             console.error('خطأ في تحميل لوحة التحكم:', error);
         }
     }
 
-    async getDashboardStats() {
-        const conversationsData = this.getLocalStorage('conversations');
-        const groupsData = this.getLocalStorage('groups');
-        const channelsData = this.getLocalStorage('channels');
-        const mediaData = this.getLocalStorage('media');
-        
-        const conversations = conversationsData ? JSON.parse(conversationsData) : [];
-        const groups = groupsData ? JSON.parse(groupsData) : [];
-        const channels = channelsData ? JSON.parse(channelsData) : [];
-        const media = mediaData ? JSON.parse(mediaData) : [];
-        
-        return {
-            conversations: conversations.length,
-            groups: groups.length,
-            channels: channels.length,
-            media: media.length,
-            unreadMessages: 0
-        };
+    // ============ الميزات الإدارية ============
+    setupAdminFeatures() {
+        if (this.currentUser.role === 'admin') {
+            this.addAdminNavigation();
+            this.setupAdminPage();
+        }
     }
 
-    renderDashboardStats(stats) {
-        const statsContainer = document.getElementById('dashboardStats');
-        if (!statsContainer) return;
-
-        statsContainer.innerHTML = `
-            <div class="stat-card">
-                <div class="stat-icon">
-                    <i class="fas fa-comments"></i>
-                </div>
-                <div class="stat-info">
-                    <div class="stat-number">${stats.conversations}</div>
-                    <div class="stat-label">محادثة</div>
-                </div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon">
-                    <i class="fas fa-users"></i>
-                </div>
-                <div class="stat-info">
-                    <div class="stat-number">${stats.groups}</div>
-                    <div class="stat-label">مجموعة</div>
-                </div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon">
-                    <i class="fas fa-broadcast-tower"></i>
-                </div>
-                <div class="stat-info">
-                    <div class="stat-number">${stats.channels}</div>
-                    <div class="stat-label">قناة</div>
-                </div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon">
-                    <i class="fas fa-file"></i>
-                </div>
-                <div class="stat-info">
-                    <div class="stat-number">${stats.media}</div>
-                    <div class="stat-label">ملف وسائط</div>
-                </div>
-            </div>
+    addAdminNavigation() {
+        const nav = document.querySelector('.nav');
+        const adminNavItem = document.createElement('a');
+        adminNavItem.href = '#';
+        adminNavItem.className = 'nav-item';
+        adminNavItem.dataset.page = 'admin';
+        adminNavItem.innerHTML = `
+            <i class="fas fa-crown"></i>
+            لوحة المدير
         `;
+        nav.insertBefore(adminNavItem, nav.querySelector('[data-page="chat"]'));
     }
 
-    async getRecentActivities() {
-        const conversationsData = this.getLocalStorage('conversations');
-        const groupsData = this.getLocalStorage('groups');
-        const channelsData = this.getLocalStorage('channels');
-        
-        const conversations = conversationsData ? JSON.parse(conversationsData) : [];
-        const groups = groupsData ? JSON.parse(groupsData) : [];
-        const channels = channelsData ? JSON.parse(channelsData) : [];
-        
-        let activities = [];
-        
-        conversations.slice(0, 5).forEach(conv => {
-            if (conv.lastMessage) {
-                activities.push({
-                    type: 'message',
-                    content: `رسالة جديدة في محادثة ${conv.name}`,
-                    time: conv.lastMessage.createdAt,
-                    icon: 'fas fa-comment'
-                });
-            }
-        });
-        
-        groups.slice(0, 3).forEach(group => {
-            activities.push({
-                type: 'group',
-                content: `تم إنشاء مجموعة ${group.name}`,
-                time: group.createdAt,
-                icon: 'fas fa-users'
-            });
-        });
-        
-        channels.slice(0, 2).forEach(channel => {
-            activities.push({
-                type: 'channel',
-                content: `تم إنشاء قناة ${channel.name}`,
-                time: channel.createdAt,
-                icon: 'fas fa-broadcast-tower'
-            });
-        });
-        
-        return activities.sort((a, b) => new Date(b.time) - new Date(a.time)).slice(0, 10);
+    setupAdminPage() {
+        const mainContent = document.querySelector('.main-content');
+        const adminPage = document.createElement('div');
+        adminPage.className = 'page';
+        adminPage.id = 'admin-page';
+        adminPage.innerHTML = this.getAdminPageHTML();
+        mainContent.appendChild(adminPage);
     }
 
-    renderRecentActivities(activities) {
-        const container = document.getElementById('recentActivities');
-        if (!container) return;
+    getAdminPageHTML() {
+        return `
+            <div class="admin-dashboard">
+                <h1 class="section-title">
+                    <i class="fas fa-crown"></i>
+                    لوحة إدارة المنصة
+                </h1>
+                
+                <div class="admin-stats" id="adminStats">
+                    <!-- سيتم ملء الإحصائيات ديناميكياً -->
+                </div>
 
-        container.innerHTML = '';
-
-        if (activities.length === 0) {
-            container.innerHTML = '<div class="text-center" style="padding: 2rem; color: rgba(255,255,255,0.7);">لا توجد نشاطات حديثة</div>';
-            return;
-        }
-
-        activities.forEach(activity => {
-            const activityElement = this.createActivityElement(activity);
-            container.appendChild(activityElement);
-        });
-    }
-
-    createActivityElement(activity) {
-        const div = document.createElement('div');
-        div.className = 'activity-item';
-        
-        div.innerHTML = `
-            <div class="activity-icon">
-                <i class="${activity.icon}"></i>
-            </div>
-            <div class="activity-content">
-                <p>${activity.content}</p>
-                <span class="activity-time">${this.formatTime(activity.time)}</span>
-            </div>
-        `;
-
-        return div;
-    }
-
-    // ============ المصادقة ============
-    setupLoginForm() {
-        const loginForm = document.getElementById('loginForm');
-        if (loginForm) {
-            loginForm.addEventListener('submit', (e) => this.handleLogin(e));
-        }
-    }
-
-    setupRegisterForm() {
-        const registerForm = document.getElementById('registerForm');
-        if (registerForm) {
-            registerForm.addEventListener('submit', (e) => this.handleRegister(e));
-        }
-    }
-
-    async handleLogin(e) {
-        e.preventDefault();
-        
-        const formData = new FormData(e.target);
-        const email = formData.get('email');
-        const password = formData.get('password');
-
-        if (!email || !password) {
-            this.showNotification('يرجى ملء جميع الحقول', 'error');
-            return;
-        }
-
-        try {
-            const usersData = this.getLocalStorage('users');
-            if (!usersData) {
-                this.showNotification('البريد الإلكتروني أو كلمة المرور غير صحيحة', 'error');
-                return;
-            }
-
-            const users = JSON.parse(usersData);
-            const user = users.find(u => u.email === email && u.password === password);
-            
-            if (!user) {
-                this.showNotification('البريد الإلكتروني أو كلمة المرور غير صحيحة', 'error');
-                return;
-            }
-
-            this.currentUser = user;
-            this.setLocalStorage('authToken', 'local-token-' + Date.now());
-            this.setLocalStorage('currentUser', JSON.stringify(user));
-
-            this.showNotification('تم تسجيل الدخول بنجاح!', 'success');
-            this.showAuthenticatedUI();
-            this.navigateToPage('dashboard');
-            
-            await this.loadInitialData();
-
-        } catch (error) {
-            console.error('خطأ في تسجيل الدخول:', error);
-            this.showNotification('حدث خطأ أثناء تسجيل الدخول', 'error');
-        }
-    }
-
-    async handleRegister(e) {
-        e.preventDefault();
-        
-        const formData = new FormData(e.target);
-        const fullName = formData.get('fullName');
-        const email = formData.get('email');
-        const password = formData.get('password');
-        const role = formData.get('role');
-
-        if (!fullName || !email || !password) {
-            this.showNotification('يرجى ملء جميع الحقول', 'error');
-            return;
-        }
-
-        try {
-            const usersData = this.getLocalStorage('users');
-            const users = usersData ? JSON.parse(usersData) : [];
-
-            const existingUser = users.find(u => u.email === email);
-            if (existingUser) {
-                this.showNotification('البريد الإلكتروني مستخدم مسبقاً', 'error');
-                return;
-            }
-
-            const newUser = {
-                _id: 'user_' + Date.now(),
-                fullName: fullName,
-                email: email,
-                password: password,
-                role: role || 'student',
-                createdAt: new Date().toISOString(),
-                isOnline: true
-            };
-
-            users.push(newUser);
-            this.setLocalStorage('users', JSON.stringify(users));
-
-            this.currentUser = newUser;
-            this.setLocalStorage('authToken', 'local-token-' + Date.now());
-            this.setLocalStorage('currentUser', JSON.stringify(newUser));
-
-            this.showNotification('تم إنشاء الحساب بنجاح!', 'success');
-            this.showAuthenticatedUI();
-            this.navigateToPage('dashboard');
-            
-            await this.loadInitialData();
-
-        } catch (error) {
-            console.error('خطأ في إنشاء الحساب:', error);
-            this.showNotification('حدث خطأ أثناء إنشاء الحساب', 'error');
-        }
-    }
-
-    handleLogout() {
-        this.currentUser = null;
-        this.removeLocalStorage('authToken');
-        this.removeLocalStorage('currentUser');
-        
-        this.showUnauthenticatedUI();
-        this.navigateToPage('home');
-        this.showNotification('تم تسجيل الخروج بنجاح', 'success');
-    }
-
-    // ============ أدوات مساعدة ============
-    showNotification(message, type = 'info') {
-        const notification = document.createElement('div');
-        notification.className = `notification ${type}`;
-        notification.innerHTML = `
-            <div class="notification-content">
-                <i class="fas fa-${this.getNotificationIcon(type)}"></i>
-                <span>${message}</span>
-            </div>
-            <button class="notification-close">&times;</button>
-        `;
-
-        // إضافة الأنماط إذا لم تكن موجودة
-        if (!document.getElementById('notification-styles')) {
-            const styles = document.createElement('style');
-            styles.id = 'notification-styles';
-            styles.textContent = `
-                .notification {
-                    position: fixed;
-                    top: 100px;
-                    right: 20px;
-                    background: white;
-                    border-radius: 12px;
-                    padding: 20px 25px;
-                    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-                    z-index: 10000;
-                    animation: slideInRight 0.3s ease;
-                    display: flex;
-                    align-items: center;
-                    justify-content: space-between;
-                    min-width: 300px;
-                    max-width: 400px;
-                    border-left: 4px solid #4361ee;
-                }
-                .notification.success {
-                    border-left-color: #4caf50;
-                }
-                .notification.error {
-                    border-left-color: #f44336;
-                }
-                .notification.warning {
-                    border-left-color: #ff9800;
-                }
-                .notification-content {
-                    display: flex;
-                    align-items: center;
-                    gap: 12px;
-                }
-                .notification-close {
-                    background: none;
-                    border: none;
-                    font-size: 18px;
-                    cursor: pointer;
-                    color: #666;
-                    padding: 5px;
-                    border-radius: 50%;
-                }
-                @keyframes slideInRight {
-                    from {
-                        transform: translateX(100%);
-                        opacity: 0;
-                    }
-                    to {
-                        transform: translateX(0);
-                        opacity: 1;
-                    }
-                }
-            `;
-            document.head.appendChild(styles);
-        }
-
-        document.body.appendChild(notification);
-
-        notification.querySelector('.notification-close').addEventListener('click', () => {
-            notification.remove();
-        });
-
-        setTimeout(() => {
-            if (notification.parentNode) {
-                notification.remove();
-            }
-        }, 5000);
-    }
-
-    getNotificationIcon(type) {
-        const icons = {
-            'success': 'check-circle',
-            'error': 'exclamation-circle',
-            'warning': 'exclamation-triangle',
-            'info': 'info-circle'
-        };
-        return icons[type] || 'info-circle';
-    }
-
-    formatTime(timestamp) {
-        if (!timestamp) return '';
-        
-        const date = new Date(timestamp);
-        const now = new Date();
-        const diffMs = now - date;
-        const diffMins = Math.floor(diffMs / 60000);
-        const diffHours = Math.floor(diffMs / 3600000);
-        const diffDays = Math.floor(diffMs / 86400000);
-
-        if (diffMins < 1) return 'الآن';
-        if (diffMins < 60) return `منذ ${diffMins} دقيقة`;
-        if (diffHours < 24) return `منذ ${diffHours} ساعة`;
-        if (diffDays < 7) return `منذ ${diffDays} يوم`;
-        
-        return date.toLocaleDateString('ar-SA');
-    }
-
-    truncateText(text, maxLength) {
-        if (!text) return '';
-        return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
-    }
-
-    escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
-}
-
-// تهيئة التطبيق عند تحميل الصفحة
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('📄 تم تحميل DOM، بدء التطبيق...');
-    window.app = new EducationalPlatform();
-});
+                <div class="admin-tabs">
+                    <div class="tab-nav">
+                        <button class="tab-btn active" data-tab="users">إدارة المستخدمين</button>
+                        <button class="tab-btn" data-tab="reports">التقارير</button>
+                    </div>
+                    
+                    <div class="tab-content">
+                        <div class="tab-pane active" id="users-tab">
+                            <div class="admin-section">
+                                <h3>إدارة المستخدمين</h3>
+                                <div class="admin-actions">
+                                    <button class="btn btn-primary" id="createUserBtn">
+                                        <i class="fas fa-user-plus"></i>
+                                        إنشاء مستخدم
+                                    </button>
+                                </div>
+                                <div class="users-table-container">
+                                    <table class="admin-table">
+                                        <thead>
+                                            <tr>
+                                                <th>الاسم</th>
+                                                <th>البريد الإلكتروني</th>
+                                                <th>الدور</th>
+                                                <th>الحالة</th>
+                                                <th>آخر نشاط</th>
+                                                <
