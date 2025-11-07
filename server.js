@@ -1,350 +1,655 @@
-// server.js - سيرفر Node.js مع Express (محدث ومصلح)
-const express = require('express');
-const http = require('http');
-const socketIo = require('socket.io');
-const mongoose = require('mongoose');
-const cors = require('cors');
-const jwt = require('jsonwebtoken');
-const bcrypt = require('bcryptjs');
-const path = require('path');
-const multer = require('multer');
-const fs = require('fs');
+// server.js - الخادم الكامل مع التخزين المحلي
+import express from 'express';
+import http from 'http';
+import { Server } from 'socket.io';
+import cors from 'cors';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
+import { v4 as uuidv4 } from 'uuid';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 const server = http.createServer(app);
-const io = socketIo(server, {
+const io = new Server(server, {
     cors: {
         origin: "*",
         methods: ["GET", "POST"]
     }
 });
 
-// تكوين middleware
-app.use(cors());
-app.use(express.json());
-app.use(express.static('public'));
+const PORT = process.env.PORT || 3000;
+const JWT_SECRET = process.env.JWT_SECRET || 'educational-platform-secret-key-2024';
+const UPLOAD_DIR = path.join(__dirname, 'uploads');
 
-// تكوين multer لرفع الملفات
+// إنشاء المجلدات اللازمة
+if (!fs.existsSync(UPLOAD_DIR)) {
+    fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+}
+
+// إعداد multer للتحميلات
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
-        const uploadDir = 'uploads/';
-        if (!fs.existsSync(uploadDir)) {
-            fs.mkdirSync(uploadDir, { recursive: true });
-        }
-        cb(null, uploadDir);
+        cb(null, UPLOAD_DIR);
     },
     filename: function (req, file, cb) {
-        cb(null, Date.now() + '-' + file.originalname);
+        const fileExt = path.extname(file.originalname);
+        const fileName = `${Date.now()}-${Math.round(Math.random() * 1E9)}${fileExt}`;
+        cb(null, fileName);
     }
 });
 
 const upload = multer({ 
     storage: storage,
-    limits: {
-        fileSize: 10 * 1024 * 1024 // 10MB
-    }
+    limits: { fileSize: 50 * 1024 * 1024 } // 50MB
 });
 
-// نماذج MongoDB
-const userSchema = new mongoose.Schema({
-    fullName: { type: String, required: true },
-    email: { type: String, required: true, unique: true },
-    password: { type: String, required: true },
-    role: { type: String, enum: ['student', 'teacher', 'admin'], default: 'student' },
-    avatar: String,
-    isOnline: { type: Boolean, default: false },
-    lastSeen: Date
-}, { timestamps: true });
+// middleware
+app.use(cors());
+app.use(express.json());
+app.use(express.static(path.join(__dirname, 'public')));
+app.use('/uploads', express.static(UPLOAD_DIR));
 
-const conversationSchema = new mongoose.Schema({
-    name: String,
-    participants: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
-    isGroup: { type: Boolean, default: false },
-    groupAdmin: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-    lastMessage: { type: mongoose.Schema.Types.ObjectId, ref: 'Message' },
-    unreadCount: Map
-}, { timestamps: true });
-
-const messageSchema = new mongoose.Schema({
-    conversationId: { type: mongoose.Schema.Types.ObjectId, ref: 'Conversation', required: true },
-    senderId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-    content: String,
-    type: { type: String, enum: ['text', 'image', 'file', 'video'], default: 'text' },
-    mediaUrl: String,
-    readBy: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
-    reactions: Map
-}, { timestamps: true });
-
-const storySchema = new mongoose.Schema({
-    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-    mediaUrl: { type: String, required: true },
-    type: { type: String, enum: ['image', 'video'], required: true },
-    duration: { type: Number, default: 5 },
-    views: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
-    expiresAt: { type: Date, required: true }
-}, { timestamps: true });
-
-const groupSchema = new mongoose.Schema({
-    name: { type: String, required: true },
-    description: String,
-    avatar: String,
-    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-    members: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
-    admins: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
-    privacy: { type: String, enum: ['public', 'private'], default: 'public' },
-    stats: {
-        memberCount: { type: Number, default: 0 },
-        messageCount: { type: Number, default: 0 }
+// نظام التخزين المحلي
+class LocalStorageService {
+    constructor() {
+        this.dataFile = path.join(__dirname, 'data.json');
+        this.init();
     }
-}, { timestamps: true });
 
-const channelSchema = new mongoose.Schema({
-    name: { type: String, required: true },
-    description: String,
-    avatar: String,
-    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-    subscribers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
-    category: String,
-    privacy: { type: String, enum: ['public', 'private'], default: 'public' },
-    stats: {
-        subscriberCount: { type: Number, default: 0 },
-        postCount: { type: Number, default: 0 }
+    init() {
+        if (!fs.existsSync(this.dataFile)) {
+            const defaultData = {
+                users: [],
+                conversations: [],
+                messages: [],
+                stories: [],
+                groups: [],
+                channels: [],
+                notifications: []
+            };
+            this.saveData(defaultData);
+            
+            // إنشاء مدير افتراضي
+            this.createDefaultAdmin();
+        }
     }
-}, { timestamps: true });
 
-const mediaSchema = new mongoose.Schema({
-    name: { type: String, required: true },
-    url: { type: String, required: true },
-    thumbnailUrl: String,
-    type: { type: String, enum: ['image', 'video', 'document', 'audio'], required: true },
-    size: Number,
-    uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-    conversationId: { type: mongoose.Schema.Types.ObjectId, ref: 'Conversation' },
-    groupId: { type: mongoose.Schema.Types.ObjectId, ref: 'Group' },
-    channelId: { type: mongoose.Schema.Types.ObjectId, ref: 'Channel' }
-}, { timestamps: true });
+    async createDefaultAdmin() {
+        const hashedPassword = await bcrypt.hash('77007700', 12);
+        const adminUser = {
+            _id: uuidv4(),
+            fullName: 'مدير النظام',
+            email: 'admin@platform.edu',
+            password: hashedPassword,
+            role: 'admin',
+            isOnline: false,
+            isActive: true,
+            createdAt: new Date().toISOString(),
+            lastSeen: new Date().toISOString()
+        };
+        
+        const data = this.loadData();
+        data.users.push(adminUser);
+        this.saveData(data);
+        
+        console.log('✅ تم إنشاء حساب المدير الافتراضي');
+        console.log('📧 admin@platform.edu');
+        console.log('🔑 77007700');
+    }
 
-const activitySchema = new mongoose.Schema({
-    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-    type: { type: String, enum: ['message', 'group', 'channel', 'media', 'story'], required: true },
-    description: { type: String, required: true },
-    targetId: mongoose.Schema.Types.ObjectId
-}, { timestamps: true });
+    loadData() {
+        try {
+            if (!fs.existsSync(this.dataFile)) {
+                return this.getDefaultData();
+            }
+            const data = fs.readFileSync(this.dataFile, 'utf8');
+            return JSON.parse(data);
+        } catch (error) {
+            console.error('❌ خطأ في تحميل البيانات:', error);
+            return this.getDefaultData();
+        }
+    }
 
-// إنشاء النماذج
-const User = mongoose.model('User', userSchema);
-const Conversation = mongoose.model('Conversation', conversationSchema);
-const Message = mongoose.model('Message', messageSchema);
-const Story = mongoose.model('Story', storySchema);
-const Group = mongoose.model('Group', groupSchema);
-const Channel = mongoose.model('Channel', channelSchema);
-const Media = mongoose.model('Media', mediaSchema);
-const Activity = mongoose.model('Activity', activitySchema);
+    saveData(data) {
+        try {
+            fs.writeFileSync(this.dataFile, JSON.stringify(data, null, 2));
+            return true;
+        } catch (error) {
+            console.error('❌ خطأ في حفظ البيانات:', error);
+            return false;
+        }
+    }
 
-// Middleware للمصادقة
+    getDefaultData() {
+        return {
+            users: [],
+            conversations: [],
+            messages: [],
+            stories: [],
+            groups: [],
+            channels: [],
+            notifications: []
+        };
+    }
+
+    // دوال المستخدمين
+    async createUser(userData) {
+        const data = this.loadData();
+        const user = {
+            _id: uuidv4(),
+            ...userData,
+            isOnline: false,
+            isActive: true,
+            createdAt: new Date().toISOString(),
+            lastSeen: new Date().toISOString()
+        };
+        
+        data.users.push(user);
+        this.saveData(data);
+        return user;
+    }
+
+    async findUserByEmail(email) {
+        const data = this.loadData();
+        return data.users.find(user => user.email === email && user.isActive);
+    }
+
+    async findUserById(userId) {
+        const data = this.loadData();
+        return data.users.find(user => user._id === userId && user.isActive);
+    }
+
+    async getAllUsers() {
+        const data = this.loadData();
+        return data.users.filter(user => user.isActive);
+    }
+
+    async updateUser(userId, updates) {
+        const data = this.loadData();
+        const userIndex = data.users.findIndex(user => user._id === userId);
+        
+        if (userIndex !== -1) {
+            data.users[userIndex] = {
+                ...data.users[userIndex],
+                ...updates,
+                updatedAt: new Date().toISOString()
+            };
+            this.saveData(data);
+            return data.users[userIndex];
+        }
+        return null;
+    }
+
+    // دوال المحادثات
+    async createConversation(participants, name = null, isGroup = false) {
+        const data = this.loadData();
+        const conversation = {
+            _id: uuidv4(),
+            participants,
+            name: name || `محادثة ${participants.length} أشخاص`,
+            isGroup,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            lastMessage: null,
+            unreadCount: {}
+        };
+        
+        data.conversations.push(conversation);
+        this.saveData(data);
+        return conversation;
+    }
+
+    async getConversationsByUserId(userId) {
+        const data = this.loadData();
+        return data.conversations.filter(conv => 
+            conv.participants.includes(userId)
+        );
+    }
+
+    async getConversationById(conversationId) {
+        const data = this.loadData();
+        return data.conversations.find(conv => conv._id === conversationId);
+    }
+
+    async getOrCreateConversation(user1, user2) {
+        const data = this.loadData();
+        const existingConversation = data.conversations.find(conv => 
+            conv.participants.includes(user1) && 
+            conv.participants.includes(user2) &&
+            conv.participants.length === 2 &&
+            !conv.isGroup
+        );
+        
+        if (existingConversation) {
+            return existingConversation;
+        }
+        
+        return await this.createConversation([user1, user2]);
+    }
+
+    // دوال الرسائل
+    async createMessage(messageData) {
+        const data = this.loadData();
+        const message = {
+            _id: uuidv4(),
+            ...messageData,
+            createdAt: new Date().toISOString(),
+            readBy: [messageData.senderId]
+        };
+        
+        data.messages.push(message);
+        
+        // تحديث المحادثة الأخيرة
+        const convIndex = data.conversations.findIndex(conv => conv._id === messageData.conversationId);
+        if (convIndex !== -1) {
+            data.conversations[convIndex].lastMessage = message;
+            data.conversations[convIndex].updatedAt = new Date().toISOString();
+            
+            // تحديث الرسائل غير المقروءة
+            data.conversations[convIndex].participants.forEach(participantId => {
+                if (participantId !== messageData.senderId) {
+                    data.conversations[convIndex].unreadCount[participantId] = 
+                        (data.conversations[convIndex].unreadCount[participantId] || 0) + 1;
+                }
+            });
+        }
+        
+        this.saveData(data);
+        return message;
+    }
+
+    async getMessagesByConversation(conversationId, limit = 50) {
+        const data = this.loadData();
+        return data.messages
+            .filter(msg => msg.conversationId === conversationId)
+            .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
+            .slice(-limit);
+    }
+
+    async markMessagesAsRead(conversationId, userId) {
+        const data = this.loadData();
+        const convIndex = data.conversations.findIndex(conv => conv._id === conversationId);
+        
+        if (convIndex !== -1) {
+            data.conversations[convIndex].unreadCount[userId] = 0;
+            this.saveData(data);
+        }
+        
+        return true;
+    }
+
+    // دوال القصص
+    async createStory(storyData) {
+        const data = this.loadData();
+        const story = {
+            _id: uuidv4(),
+            ...storyData,
+            expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+            views: [],
+            reactions: []
+        };
+        
+        data.stories.push(story);
+        this.saveData(data);
+        return story;
+    }
+
+    async getActiveStories() {
+        const data = this.loadData();
+        const now = new Date().toISOString();
+        return data.stories.filter(story => story.expiresAt > now);
+    }
+
+    async addStoryView(storyId, userId) {
+        const data = this.loadData();
+        const storyIndex = data.stories.findIndex(story => story._id === storyId);
+        
+        if (storyIndex !== -1 && !data.stories[storyIndex].views.includes(userId)) {
+            data.stories[storyIndex].views.push(userId);
+            this.saveData(data);
+            return true;
+        }
+        return false;
+    }
+
+    // دوال المجموعات
+    async createGroup(groupData) {
+        const data = this.loadData();
+        const group = {
+            _id: uuidv4(),
+            ...groupData,
+            createdAt: new Date().toISOString(),
+            members: groupData.members || [groupData.creatorId],
+            isActive: true
+        };
+        
+        data.groups.push(group);
+        this.saveData(data);
+        return group;
+    }
+
+    async getAllGroups() {
+        const data = this.loadData();
+        return data.groups.filter(group => group.isActive);
+    }
+
+    async addMemberToGroup(groupId, userId) {
+        const data = this.loadData();
+        const groupIndex = data.groups.findIndex(group => group._id === groupId);
+        
+        if (groupIndex !== -1 && !data.groups[groupIndex].members.includes(userId)) {
+            data.groups[groupIndex].members.push(userId);
+            this.saveData(data);
+            return true;
+        }
+        return false;
+    }
+
+    // دوال القنوات
+    async createChannel(channelData) {
+        const data = this.loadData();
+        const channel = {
+            _id: uuidv4(),
+            ...channelData,
+            createdAt: new Date().toISOString(),
+            members: channelData.members || [channelData.creatorId],
+            isActive: true
+        };
+        
+        data.channels.push(channel);
+        this.saveData(data);
+        return channel;
+    }
+
+    async getAllChannels() {
+        const data = this.loadData();
+        return data.channels.filter(channel => channel.isActive);
+    }
+
+    async addMemberToChannel(channelId, userId) {
+        const data = this.loadData();
+        const channelIndex = data.channels.findIndex(channel => channel._id === channelId);
+        
+        if (channelIndex !== -1 && !data.channels[channelIndex].members.includes(userId)) {
+            data.channels[channelIndex].members.push(userId);
+            this.saveData(data);
+            return true;
+        }
+        return false;
+    }
+}
+
+const localStorageService = new LocalStorageService();
+
+// middleware المصادقة
 const authenticateToken = async (req, res, next) => {
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
-
-    if (!token) {
-        return res.status(401).json({ 
-            success: false, 
-            message: 'رمز الوصول مطلوب' 
-        });
-    }
-
     try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
-        const user = await User.findById(decoded.userId).select('-password');
+        const authHeader = req.headers['authorization'];
+        const token = authHeader && authHeader.split(' ')[1];
+
+        if (!token) {
+            return res.status(401).json({ 
+                success: false, 
+                message: 'رمز الوصول مطلوب'
+            });
+        }
+
+        const decoded = jwt.verify(token, JWT_SECRET);
+        const user = await localStorageService.findUserById(decoded.userId);
         
         if (!user) {
             return res.status(401).json({ 
                 success: false, 
-                message: 'المستخدم غير موجود' 
+                message: 'المستخدم غير موجود'
             });
         }
 
         req.user = user;
         next();
     } catch (error) {
+        return res.status(401).json({ 
+            success: false, 
+            message: 'رمز وصول غير صالح'
+        });
+    }
+};
+
+const requireAdmin = (req, res, next) => {
+    if (req.user.role !== 'admin') {
         return res.status(403).json({ 
             success: false, 
-            message: 'رمز وصول غير صالح' 
+            message: 'صلاحيات مدير مطلوبة'
         });
     }
+    next();
 };
 
-// Middleware للتحقق من ملكية المحتوى
-const checkOwnership = (model) => async (req, res, next) => {
+// دوال مساعدة
+const generateToken = (userId) => {
+    return jwt.sign({ userId }, JWT_SECRET, { expiresIn: '30d' });
+};
+
+// ==================== مسارات API ====================
+
+// مسار رئيسي
+app.get('/', (req, res) => {
+    res.json({
+        success: true,
+        message: '🚀 خادم المنصة التعليمية يعمل بنجاح!',
+        version: '1.0.0',
+        timestamp: new Date().toISOString()
+    });
+});
+
+// مسارات المصادقة
+app.post('/api/auth/register', async (req, res) => {
     try {
-        const resource = await model.findById(req.params.id);
-        
-        if (!resource) {
-            return res.status(404).json({ 
-                success: false, 
-                message: 'المورد غير موجود' 
+        const { fullName, email, password, role = 'student' } = req.body;
+
+        if (!fullName || !email || !password) {
+            return res.status(400).json({
+                success: false,
+                message: 'جميع الحقول مطلوبة'
             });
         }
 
-        if (resource.createdBy && resource.createdBy.toString() !== req.user._id.toString() && 
-            req.user.role !== 'admin') {
-            return res.status(403).json({ 
-                success: false, 
-                message: 'غير مصرح لك بتنفيذ هذا الإجراء' 
-            });
-        }
-
-        req.resource = resource;
-        next();
-    } catch (error) {
-        res.status(500).json({ 
-            success: false, 
-            message: 'خطأ في الخادم' 
-        });
-    }
-};
-
-// ============ Routes ============
-
-// مسارات المستخدمين
-app.post('/api/users/register', async (req, res) => {
-    try {
-        const { fullName, email, password, role } = req.body;
-
-        // التحقق من وجود المستخدم
-        const existingUser = await User.findOne({ email });
+        const existingUser = await localStorageService.findUserByEmail(email);
         if (existingUser) {
             return res.status(400).json({
                 success: false,
-                message: 'البريد الإلكتروني مستخدم بالفعل'
+                message: 'البريد الإلكتروني مسجل مسبقاً'
             });
         }
 
-        // تشفير كلمة المرور
         const hashedPassword = await bcrypt.hash(password, 12);
-
-        // إنشاء المستخدم
-        const user = new User({
+        const user = await localStorageService.createUser({
             fullName,
             email,
             password: hashedPassword,
-            role: role || 'student'
+            role
         });
 
-        await user.save();
+        const token = generateToken(user._id);
 
         res.status(201).json({
             success: true,
             message: 'تم إنشاء الحساب بنجاح',
-            data: { user: { ...user._doc, password: undefined } }
+            data: {
+                user: {
+                    _id: user._id,
+                    fullName: user.fullName,
+                    email: user.email,
+                    role: user.role
+                },
+                token
+            }
         });
 
     } catch (error) {
-        console.error('خطأ في التسجيل:', error);
+        console.error('❌ خطأ في التسجيل:', error);
         res.status(500).json({
             success: false,
-            message: 'خطأ في الخادم'
+            message: 'حدث خطأ في الخادم'
         });
     }
 });
 
-app.post('/api/users/login', async (req, res) => {
+app.post('/api/auth/login', async (req, res) => {
     try {
         const { email, password } = req.body;
 
-        // البحث عن المستخدم
-        const user = await User.findOne({ email });
+        if (!email || !password) {
+            return res.status(400).json({
+                success: false,
+                message: 'البريد الإلكتروني وكلمة المرور مطلوبان'
+            });
+        }
+
+        const user = await localStorageService.findUserByEmail(email);
+        
         if (!user) {
-            return res.status(400).json({
+            return res.status(401).json({
                 success: false,
                 message: 'البريد الإلكتروني أو كلمة المرور غير صحيحة'
             });
         }
 
-        // التحقق من كلمة المرور
         const isPasswordValid = await bcrypt.compare(password, user.password);
+
         if (!isPasswordValid) {
-            return res.status(400).json({
+            return res.status(401).json({
                 success: false,
                 message: 'البريد الإلكتروني أو كلمة المرور غير صحيحة'
             });
         }
 
-        // تحديث حالة المستخدم
-        user.isOnline = true;
-        user.lastSeen = new Date();
-        await user.save();
+        await localStorageService.updateUser(user._id, {
+            isOnline: true,
+            lastSeen: new Date().toISOString()
+        });
 
-        // إنشاء التوكن
-        const token = jwt.sign(
-            { userId: user._id }, 
-            process.env.JWT_SECRET || 'your-secret-key',
-            { expiresIn: '7d' }
-        );
+        const token = generateToken(user._id);
 
         res.json({
             success: true,
             message: 'تم تسجيل الدخول بنجاح',
             data: {
-                token,
-                user: { ...user._doc, password: undefined }
+                user: {
+                    _id: user._id,
+                    fullName: user.fullName,
+                    email: user.email,
+                    role: user.role,
+                    isOnline: true
+                },
+                token
             }
         });
 
     } catch (error) {
-        console.error('خطأ في تسجيل الدخول:', error);
+        console.error('❌ خطأ في تسجيل الدخول:', error);
         res.status(500).json({
             success: false,
-            message: 'خطأ في الخادم'
+            message: 'حدث خطأ في الخادم'
         });
     }
 });
 
+app.post('/api/auth/logout', authenticateToken, async (req, res) => {
+    try {
+        await localStorageService.updateUser(req.user._id, {
+            isOnline: false,
+            lastSeen: new Date().toISOString()
+        });
+
+        res.json({
+            success: true,
+            message: 'تم تسجيل الخروج بنجاح'
+        });
+
+    } catch (error) {
+        console.error('❌ خطأ في تسجيل الخروج:', error);
+        res.status(500).json({
+            success: false,
+            message: 'حدث خطأ في الخادم'
+        });
+    }
+});
+
+// مسارات المستخدمين
 app.get('/api/users/me', authenticateToken, async (req, res) => {
-    res.json({
-        success: true,
-        data: { user: req.user }
-    });
+    try {
+        res.json({
+            success: true,
+            data: {
+                user: req.user
+            }
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'حدث خطأ في الخادم'
+        });
+    }
 });
 
 app.get('/api/users', authenticateToken, async (req, res) => {
     try {
-        const users = await User.find({ _id: { $ne: req.user._id } })
-            .select('-password')
-            .sort({ isOnline: -1, fullName: 1 });
-
+        const users = await localStorageService.getAllUsers();
+        const usersWithoutPasswords = users.map(user => ({
+            _id: user._id,
+            fullName: user.fullName,
+            email: user.email,
+            role: user.role,
+            isOnline: user.isOnline,
+            lastSeen: user.lastSeen
+        }));
+        
         res.json({
             success: true,
-            data: { users }
+            data: {
+                users: usersWithoutPasswords
+            }
         });
     } catch (error) {
-        console.error('خطأ في جلب المستخدمين:', error);
         res.status(500).json({
             success: false,
-            message: 'خطأ في الخادم'
+            message: 'حدث خطأ في الخادم'
         });
     }
 });
 
-// مسارات المحادثات
+// مسارات الدردشة
 app.get('/api/chat/conversations', authenticateToken, async (req, res) => {
     try {
-        const conversations = await Conversation.find({
-            participants: req.user._id
-        })
-        .populate('participants', 'fullName email avatar isOnline lastSeen')
-        .populate('lastMessage')
-        .sort({ updatedAt: -1 });
+        const conversations = await localStorageService.getConversationsByUserId(req.user._id);
+        
+        const conversationsWithDetails = await Promise.all(
+            conversations.map(async (conv) => {
+                const messages = await localStorageService.getMessagesByConversation(conv._id, 1);
+                const lastMessage = messages[messages.length - 1];
+                return {
+                    ...conv,
+                    lastMessage: lastMessage || null
+                };
+            })
+        );
 
         res.json({
             success: true,
-            data: { conversations }
+            data: {
+                conversations: conversationsWithDetails
+            }
         });
     } catch (error) {
-        console.error('خطأ في جلب المحادثات:', error);
         res.status(500).json({
             success: false,
-            message: 'خطأ في الخادم'
+            message: 'حدث خطأ في الخادم'
         });
     }
 });
@@ -352,66 +657,60 @@ app.get('/api/chat/conversations', authenticateToken, async (req, res) => {
 app.post('/api/chat/conversations', authenticateToken, async (req, res) => {
     try {
         const { participantId } = req.body;
-
-        // التحقق من وجود محادثة مسبقة
-        let conversation = await Conversation.findOne({
-            participants: { $all: [req.user._id, participantId] },
-            isGroup: false
-        })
-        .populate('participants', 'fullName email avatar isOnline lastSeen');
-
-        if (!conversation) {
-            // إنشاء محادثة جديدة
-            const otherUser = await User.findById(participantId);
-            
-            conversation = new Conversation({
-                name: otherUser.fullName,
-                participants: [req.user._id, participantId],
-                isGroup: false
+        
+        if (!participantId) {
+            return res.status(400).json({
+                success: false,
+                message: 'معرف المشارك مطلوب'
             });
-
-            await conversation.save();
-            await conversation.populate('participants', 'fullName email avatar isOnline lastSeen');
         }
 
-        res.status(201).json({
+        const participant = await localStorageService.findUserById(participantId);
+        if (!participant) {
+            return res.status(404).json({
+                success: false,
+                message: 'المستخدم غير موجود'
+            });
+        }
+
+        const conversation = await localStorageService.getOrCreateConversation(
+            req.user._id,
+            participantId
+        );
+
+        res.json({
             success: true,
-            data: { conversation }
+            data: {
+                conversation
+            }
         });
     } catch (error) {
-        console.error('خطأ في إنشاء المحادثة:', error);
         res.status(500).json({
             success: false,
-            message: 'خطأ في الخادم'
+            message: 'حدث خطأ في الخادم'
         });
     }
 });
 
-app.get('/api/chat/conversations/:id/messages', authenticateToken, async (req, res) => {
+app.get('/api/chat/conversations/:conversationId/messages', authenticateToken, async (req, res) => {
     try {
-        const { id } = req.params;
-        const { limit = 50, before } = req.query;
-
-        let query = { conversationId: id };
-        if (before) {
-            query._id = { $lt: before };
-        }
-
-        const messages = await Message.find(query)
-            .populate('senderId', 'fullName avatar')
-            .sort({ createdAt: -1 })
-            .limit(parseInt(limit))
-            .sort({ createdAt: 1 });
+        const { conversationId } = req.params;
+        const { limit = 50 } = req.query;
+        
+        const messages = await localStorageService.getMessagesByConversation(conversationId, parseInt(limit));
+        
+        await localStorageService.markMessagesAsRead(conversationId, req.user._id);
 
         res.json({
             success: true,
-            data: { messages }
+            data: {
+                messages
+            }
         });
     } catch (error) {
-        console.error('خطأ في جلب الرسائل:', error);
         res.status(500).json({
             success: false,
-            message: 'خطأ في الخادم'
+            message: 'حدث خطأ في الخادم'
         });
     }
 });
@@ -419,28 +718,24 @@ app.get('/api/chat/conversations/:id/messages', authenticateToken, async (req, r
 // مسارات القصص
 app.get('/api/stories', authenticateToken, async (req, res) => {
     try {
-        const stories = await Story.find({
-            expiresAt: { $gt: new Date() }
-        })
-        .populate('userId', 'fullName avatar')
-        .sort({ createdAt: -1 });
-
+        const stories = await localStorageService.getActiveStories();
         res.json({
             success: true,
-            data: { stories }
+            data: {
+                stories
+            }
         });
     } catch (error) {
-        console.error('خطأ في جلب القصص:', error);
         res.status(500).json({
             success: false,
-            message: 'خطأ في الخادم'
+            message: 'حدث خطأ في الخادم'
         });
     }
 });
 
 app.post('/api/stories', authenticateToken, upload.single('media'), async (req, res) => {
     try {
-        const { type, duration = 5 } = req.body;
+        const { caption } = req.body;
         
         if (!req.file) {
             return res.status(400).json({
@@ -449,58 +744,49 @@ app.post('/api/stories', authenticateToken, upload.single('media'), async (req, 
             });
         }
 
-        const story = new Story({
+        const story = await localStorageService.createStory({
             userId: req.user._id,
             mediaUrl: `/uploads/${req.file.filename}`,
-            type,
-            duration: parseInt(duration),
-            expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 ساعة
+            mediaType: req.file.mimetype.startsWith('image/') ? 'image' : 'video',
+            caption,
+            createdAt: new Date().toISOString()
         });
-
-        await story.save();
-        await story.populate('userId', 'fullName avatar');
-
-        // بث القصة الجديدة
-        io.emit('new_story', { story });
 
         res.status(201).json({
             success: true,
-            data: { story }
+            message: 'تم نشر القصة بنجاح',
+            data: {
+                story
+            }
         });
     } catch (error) {
-        console.error('خطأ في إنشاء القصة:', error);
         res.status(500).json({
             success: false,
-            message: 'خطأ في الخادم'
+            message: 'حدث خطأ في الخادم'
         });
     }
 });
 
-app.post('/api/stories/:id/view', authenticateToken, async (req, res) => {
+app.post('/api/stories/:storyId/view', authenticateToken, async (req, res) => {
     try {
-        const story = await Story.findById(req.params.id);
+        const { storyId } = req.params;
+        const success = await localStorageService.addStoryView(storyId, req.user._id);
         
-        if (!story) {
-            return res.status(404).json({
+        if (success) {
+            res.json({
+                success: true,
+                message: 'تم تسجيل المشاهدة'
+            });
+        } else {
+            res.status(400).json({
                 success: false,
-                message: 'القصة غير موجودة'
+                message: 'لم يتم تسجيل المشاهدة'
             });
         }
-
-        if (!story.views.includes(req.user._id)) {
-            story.views.push(req.user._id);
-            await story.save();
-        }
-
-        res.json({
-            success: true,
-            message: 'تم تسجيل المشاهدة'
-        });
     } catch (error) {
-        console.error('خطأ في تسجيل المشاهدة:', error);
         res.status(500).json({
             success: false,
-            message: 'خطأ في الخادم'
+            message: 'حدث خطأ في الخادم'
         });
     }
 });
@@ -508,124 +794,73 @@ app.post('/api/stories/:id/view', authenticateToken, async (req, res) => {
 // مسارات المجموعات
 app.get('/api/groups', authenticateToken, async (req, res) => {
     try {
-        const groups = await Group.find({
-            $or: [
-                { privacy: 'public' },
-                { members: req.user._id }
-            ]
-        })
-        .populate('createdBy', 'fullName avatar')
-        .populate('members', 'fullName avatar')
-        .sort({ createdAt: -1 });
-
+        const groups = await localStorageService.getAllGroups();
         res.json({
             success: true,
-            data: { groups }
+            data: {
+                groups
+            }
         });
     } catch (error) {
-        console.error('خطأ في جلب المجموعات:', error);
         res.status(500).json({
             success: false,
-            message: 'خطأ في الخادم'
+            message: 'حدث خطأ في الخادم'
         });
     }
 });
 
 app.post('/api/groups', authenticateToken, async (req, res) => {
     try {
-        const { name, description, privacy = 'public' } = req.body;
+        const { name, description } = req.body;
+        
+        if (!name) {
+            return res.status(400).json({
+                success: false,
+                message: 'اسم المجموعة مطلوب'
+            });
+        }
 
-        const group = new Group({
+        const group = await localStorageService.createGroup({
             name,
             description,
-            privacy,
-            createdBy: req.user._id,
-            members: [req.user._id],
-            admins: [req.user._id]
+            creatorId: req.user._id
         });
-
-        await group.save();
-        await group.populate('createdBy', 'fullName avatar');
-        await group.populate('members', 'fullName avatar');
 
         res.status(201).json({
             success: true,
-            data: { group }
+            message: 'تم إنشاء المجموعة بنجاح',
+            data: {
+                group
+            }
         });
     } catch (error) {
-        console.error('خطأ في إنشاء المجموعة:', error);
         res.status(500).json({
             success: false,
-            message: 'خطأ في الخادم'
+            message: 'حدث خطأ في الخادم'
         });
     }
 });
 
-app.post('/api/groups/:id/members', authenticateToken, async (req, res) => {
+app.post('/api/groups/:groupId/join', authenticateToken, async (req, res) => {
     try {
-        const group = await Group.findById(req.params.id);
+        const { groupId } = req.params;
+        const success = await localStorageService.addMemberToGroup(groupId, req.user._id);
         
-        if (!group) {
-            return res.status(404).json({
+        if (success) {
+            res.json({
+                success: true,
+                message: 'تم الانضمام إلى المجموعة بنجاح'
+            });
+        } else {
+            res.status(400).json({
                 success: false,
-                message: 'المجموعة غير موجودة'
+                message: 'لم يتمكن من الانضمام إلى المجموعة'
             });
         }
-
-        if (group.members.includes(req.user._id)) {
-            return res.status(400).json({
-                success: false,
-                message: 'أنت بالفعل عضو في هذه المجموعة'
-            });
-        }
-
-        group.members.push(req.user._id);
-        await group.save();
-
-        res.json({
-            success: true,
-            message: 'تم الانضمام للمجموعة'
-        });
     } catch (error) {
-        console.error('خطأ في الانضمام للمجموعة:', error);
         res.status(500).json({
             success: false,
-            message: 'خطأ في الخادم'
-        });
-    }
-});
-
-app.delete('/api/groups/:id/members', authenticateToken, async (req, res) => {
-    try {
-        const group = await Group.findById(req.params.id);
-        
-        if (!group) {
-            return res.status(404).json({
-                success: false,
-                message: 'المجموعة غير موجودة'
-            });
-        }
-
-        group.members = group.members.filter(memberId => 
-            memberId.toString() !== req.user._id.toString()
-        );
-
-        // إذا كان المستخدم مشرفاً، إزالته من المشرفين أيضاً
-        group.admins = group.admins.filter(adminId => 
-            adminId.toString() !== req.user._id.toString()
-        );
-
-        await group.save();
-
-        res.json({
-            success: true,
-            message: 'تم مغادرة المجموعة'
-        });
-    } catch (error) {
-        console.error('خطأ في مغادرة المجموعة:', error);
-        res.status(500).json({
-            success: false,
-            message: 'خطأ في الخادم'
+            message: 'حدث خطأ في الخادم'
         });
     }
 });
@@ -633,418 +868,249 @@ app.delete('/api/groups/:id/members', authenticateToken, async (req, res) => {
 // مسارات القنوات
 app.get('/api/channels', authenticateToken, async (req, res) => {
     try {
-        const channels = await Channel.find({
-            $or: [
-                { privacy: 'public' },
-                { subscribers: req.user._id }
-            ]
-        })
-        .populate('createdBy', 'fullName avatar')
-        .populate('subscribers', 'fullName avatar')
-        .sort({ createdAt: -1 });
-
+        const channels = await localStorageService.getAllChannels();
         res.json({
             success: true,
-            data: { channels }
+            data: {
+                channels
+            }
         });
     } catch (error) {
-        console.error('خطأ في جلب القنوات:', error);
         res.status(500).json({
             success: false,
-            message: 'خطأ في الخادم'
+            message: 'حدث خطأ في الخادم'
         });
     }
 });
 
 app.post('/api/channels', authenticateToken, async (req, res) => {
     try {
-        const { name, description, category, privacy = 'public' } = req.body;
+        const { name, description } = req.body;
+        
+        if (!name) {
+            return res.status(400).json({
+                success: false,
+                message: 'اسم القناة مطلوب'
+            });
+        }
 
-        const channel = new Channel({
+        const channel = await localStorageService.createChannel({
             name,
             description,
-            category,
-            privacy,
-            createdBy: req.user._id,
-            subscribers: [req.user._id]
+            creatorId: req.user._id
         });
-
-        await channel.save();
-        await channel.populate('createdBy', 'fullName avatar');
-        await channel.populate('subscribers', 'fullName avatar');
 
         res.status(201).json({
             success: true,
-            data: { channel }
-        });
-    } catch (error) {
-        console.error('خطأ في إنشاء القناة:', error);
-        res.status(500).json({
-            success: false,
-            message: 'خطأ في الخادم'
-        });
-    }
-});
-
-app.post('/api/channels/:id/subscriptions', authenticateToken, async (req, res) => {
-    try {
-        const channel = await Channel.findById(req.params.id);
-        
-        if (!channel) {
-            return res.status(404).json({
-                success: false,
-                message: 'القناة غير موجودة'
-            });
-        }
-
-        if (channel.subscribers.includes(req.user._id)) {
-            return res.status(400).json({
-                success: false,
-                message: 'أنت مشترك بالفعل في هذه القناة'
-            });
-        }
-
-        channel.subscribers.push(req.user._id);
-        await channel.save();
-
-        res.json({
-            success: true,
-            message: 'تم الاشتراك في القناة'
-        });
-    } catch (error) {
-        console.error('خطأ في الاشتراك بالقناة:', error);
-        res.status(500).json({
-            success: false,
-            message: 'خطأ في الخادم'
-        });
-    }
-});
-
-app.delete('/api/channels/:id/subscriptions', authenticateToken, async (req, res) => {
-    try {
-        const channel = await Channel.findById(req.params.id);
-        
-        if (!channel) {
-            return res.status(404).json({
-                success: false,
-                message: 'القناة غير موجودة'
-            });
-        }
-
-        channel.subscribers = channel.subscribers.filter(subscriberId => 
-            subscriberId.toString() !== req.user._id.toString()
-        );
-
-        await channel.save();
-
-        res.json({
-            success: true,
-            message: 'تم إلغاء الاشتراك في القناة'
-        });
-    } catch (error) {
-        console.error('خطأ في إلغاء الاشتراك:', error);
-        res.status(500).json({
-            success: false,
-            message: 'خطأ في الخادم'
-        });
-    }
-});
-
-// مسارات الوسائط
-app.get('/api/media', authenticateToken, async (req, res) => {
-    try {
-        const media = await Media.find({
-            $or: [
-                { uploadedBy: req.user._id },
-                { privacy: 'public' }
-            ]
-        })
-        .populate('uploadedBy', 'fullName avatar')
-        .sort({ createdAt: -1 });
-
-        res.json({
-            success: true,
-            data: { media }
-        });
-    } catch (error) {
-        console.error('خطأ في جلب الوسائط:', error);
-        res.status(500).json({
-            success: false,
-            message: 'خطأ في الخادم'
-        });
-    }
-});
-
-app.post('/api/media', authenticateToken, upload.single('file'), async (req, res) => {
-    try {
-        const { name, type, conversationId, groupId, channelId } = req.body;
-        
-        if (!req.file) {
-            return res.status(400).json({
-                success: false,
-                message: 'الملف مطلوب'
-            });
-        }
-
-        const media = new Media({
-            name: name || req.file.originalname,
-            url: `/uploads/${req.file.filename}`,
-            type,
-            size: req.file.size,
-            uploadedBy: req.user._id,
-            conversationId,
-            groupId,
-            channelId
-        });
-
-        await media.save();
-        await media.populate('uploadedBy', 'fullName avatar');
-
-        res.status(201).json({
-            success: true,
-            data: { media }
-        });
-    } catch (error) {
-        console.error('خطأ في رفع الوسائط:', error);
-        res.status(500).json({
-            success: false,
-            message: 'خطأ في الخادم'
-        });
-    }
-});
-
-// مسارات لوحة التحكم
-app.get('/api/dashboard', authenticateToken, async (req, res) => {
-    try {
-        const userId = req.user._id;
-
-        // إحصائيات
-        const totalMessages = await Message.countDocuments();
-        const totalGroups = await Group.countDocuments({ members: userId });
-        const totalChannels = await Channel.countDocuments({ subscribers: userId });
-        const totalMedia = await Media.countDocuments({ uploadedBy: userId });
-
-        // النشاط الأخير
-        const recentActivity = await Activity.find({ userId })
-            .sort({ createdAt: -1 })
-            .limit(10);
-
-        res.json({
-            success: true,
+            message: 'تم إنشاء القناة بنجاح',
             data: {
-                stats: {
-                    totalMessages,
-                    totalGroups,
-                    totalChannels,
-                    totalMedia
-                },
-                recentActivity
+                channel
             }
         });
     } catch (error) {
-        console.error('خطأ في جلب بيانات لوحة التحكم:', error);
         res.status(500).json({
             success: false,
-            message: 'خطأ في الخادم'
+            message: 'حدث خطأ في الخادم'
         });
     }
 });
 
-// ============ Socket.IO ============
-io.use(async (socket, next) => {
+app.post('/api/channels/:channelId/join', authenticateToken, async (req, res) => {
     try {
-        const token = socket.handshake.auth.token;
+        const { channelId } = req.params;
+        const success = await localStorageService.addMemberToChannel(channelId, req.user._id);
         
-        if (!token) {
-            return next(new Error('رمز المصادقة مطلوب'));
+        if (success) {
+            res.json({
+                success: true,
+                message: 'تم الانضمام إلى القناة بنجاح'
+            });
+        } else {
+            res.status(400).json({
+                success: false,
+                message: 'لم يتمكن من الانضمام إلى القناة'
+            });
         }
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'حدث خطأ في الخادم'
+        });
+    }
+});
 
-        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
-        const user = await User.findById(decoded.userId);
+// مسارات الإدارة
+app.get('/api/admin/stats', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const users = await localStorageService.getAllUsers();
+        const stories = await localStorageService.getActiveStories();
+        const groups = await localStorageService.getAllGroups();
+        const channels = await localStorageService.getAllChannels();
+        
+        const stats = {
+            totalUsers: users.length,
+            onlineUsers: users.filter(u => u.isOnline).length,
+            activeStories: stories.length,
+            totalGroups: groups.length,
+            totalChannels: channels.length
+        };
+
+        res.json({
+            success: true,
+            data: stats
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'حدث خطأ في الخادم'
+        });
+    }
+});
+
+app.post('/api/admin/users/:userId/toggle', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const user = await localStorageService.findUserById(userId);
         
         if (!user) {
-            return next(new Error('المستخدم غير موجود'));
+            return res.status(404).json({
+                success: false,
+                message: 'المستخدم غير موجود'
+            });
         }
 
-        socket.userId = user._id;
-        socket.user = user;
-        next();
+        const updatedUser = await localStorageService.updateUser(userId, {
+            isActive: !user.isActive
+        });
+
+        res.json({
+            success: true,
+            message: `تم ${updatedUser.isActive ? 'تفعيل' : 'تعطيل'} المستخدم بنجاح`,
+            data: {
+                user: updatedUser
+            }
+        });
     } catch (error) {
-        next(new Error('رمز مصادقة غير صالح'));
+        res.status(500).json({
+            success: false,
+            message: 'حدث خطأ في الخادم'
+        });
     }
 });
 
+// ==================== نظام السوكت ====================
+
+const connectedUsers = new Map();
+
 io.on('connection', (socket) => {
-    console.log(`✅ مستخدم متصل: ${socket.user.fullName}`);
+    console.log('🔌 مستخدم متصل:', socket.id);
 
-    // تحديث حالة المستخدم
-    User.findByIdAndUpdate(socket.userId, {
-        isOnline: true,
-        lastSeen: new Date()
-    }).exec();
+    socket.on('authenticate', async (data) => {
+        try {
+            const { token } = data;
+            if (!token) return;
 
-    // انضمام إلى غرف المستخدم
-    socket.join(socket.userId);
+            const decoded = jwt.verify(token, JWT_SECRET);
+            const user = await localStorageService.findUserById(decoded.userId);
+            
+            if (!user) return;
 
-    // إعلام المستخدمين الآخرين
-    socket.broadcast.emit('user_online', {
-        userId: socket.userId,
-        user: socket.user
+            socket.userId = user._id;
+            connectedUsers.set(user._id, {
+                socketId: socket.id,
+                user: user
+            });
+
+            await localStorageService.updateUser(user._id, {
+                isOnline: true
+            });
+
+            socket.join(`user:${user._id}`);
+            
+            io.emit('user_status_changed', {
+                userId: user._id,
+                isOnline: true
+            });
+
+            socket.emit('authenticated', { 
+                user: user,
+                message: 'تم المصادقة بنجاح'
+            });
+
+        } catch (error) {
+            console.error('❌ خطأ في مصادقة السوكت:', error);
+        }
     });
 
-    // إرسال حدث المصادقة الناجحة
-    socket.emit('authenticated', {
-        message: 'تمت المصادقة بنجاح',
-        user: socket.user
-    });
-
-    // استقبال الرسائل
     socket.on('send_message', async (data) => {
         try {
-            const { conversationId, content, type = 'text', mediaUrl } = data;
+            if (!socket.userId) return;
 
-            // التحقق من أن المستخدم مشارك في المحادثة
-            const conversation = await Conversation.findById(conversationId);
-            if (!conversation || !conversation.participants.includes(socket.userId)) {
-                socket.emit('error', { message: 'غير مصرح لك بإرسال رسائل في هذه المحادثة' });
-                return;
-            }
+            const { conversationId, content } = data;
+            
+            if (!conversationId || !content) return;
 
-            // إنشاء الرسالة
-            const message = new Message({
+            const message = await localStorageService.createMessage({
                 conversationId,
                 senderId: socket.userId,
                 content,
-                type,
-                mediaUrl,
-                readBy: [socket.userId]
+                type: 'text'
             });
 
-            await message.save();
-            await message.populate('senderId', 'fullName avatar');
+            const conversation = await localStorageService.getConversationById(conversationId);
+            if (!conversation) return;
 
-            // تحديث المحادثة
-            conversation.lastMessage = message._id;
-            conversation.updatedAt = new Date();
-            
-            // زيادة عدد الرسائل غير المقروءة للمشاركين الآخرين
+            // إرسال الرسالة لجميع المشاركين
             conversation.participants.forEach(participantId => {
-                if (participantId.toString() !== socket.userId.toString()) {
-                    const currentCount = conversation.unreadCount.get(participantId.toString()) || 0;
-                    conversation.unreadCount.set(participantId.toString(), currentCount + 1);
-                }
-            });
-
-            await conversation.save();
-
-            // بث الرسالة للمشاركين
-            conversation.participants.forEach(participantId => {
-                io.to(participantId.toString()).emit('new_message', {
+                io.to(`user:${participantId}`).emit('new_message', {
                     conversationId,
                     message
                 });
             });
 
         } catch (error) {
-            console.error('خطأ في إرسال الرسالة:', error);
-            socket.emit('error', { message: 'فشل في إرسال الرسالة' });
+            console.error('❌ خطأ في إرسال الرسالة:', error);
         }
     });
 
-    // بدء الكتابة
-    socket.on('typing_start', (data) => {
-        const { conversationId } = data;
-        
-        socket.to(conversationId).emit('user_typing', {
-            conversationId,
-            userId: socket.userId,
-            userName: socket.user.fullName
-        });
-    });
-
-    // إيقاف الكتابة
-    socket.on('typing_stop', (data) => {
-        const { conversationId } = data;
-        
-        socket.to(conversationId).emit('user_stop_typing', {
-            conversationId,
-            userId: socket.userId
-        });
-    });
-
-    // تعليم الرسائل كمقروءة
-    socket.on('mark_messages_read', async (data) => {
-        try {
-            const { conversationId } = data;
-
-            await Message.updateMany(
-                {
-                    conversationId,
-                    senderId: { $ne: socket.userId },
-                    readBy: { $ne: socket.userId }
-                },
-                { $addToSet: { readBy: socket.userId } }
-            );
-
-            // تحديث عدد الرسائل غير المقروءة
-            const conversation = await Conversation.findById(conversationId);
-            if (conversation) {
-                conversation.unreadCount.set(socket.userId.toString(), 0);
-                await conversation.save();
-            }
-
-        } catch (error) {
-            console.error('خطأ في تعليم الرسائل كمقروءة:', error);
-        }
-    });
-
-    // فصل الاتصال
     socket.on('disconnect', async () => {
-        console.log(`❌ مستخدم منفصل: ${socket.user.fullName}`);
+        console.log('🔌 مستخدم منفصل:', socket.id);
+        
+        const userId = socket.userId;
+        if (userId) {
+            await localStorageService.updateUser(userId, {
+                isOnline: false,
+                lastSeen: new Date().toISOString()
+            });
 
-        // تحديث حالة المستخدم
-        await User.findByIdAndUpdate(socket.userId, {
-            isOnline: false,
-            lastSeen: new Date()
-        });
+            connectedUsers.delete(userId);
 
-        // إعلام المستخدمين الآخرين
-        socket.broadcast.emit('user_offline', {
-            userId: socket.userId
-        });
+            io.emit('user_status_changed', {
+                userId,
+                isOnline: false
+            });
+        }
     });
 });
 
-// مسار رئيسي
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+// بدء الخادم
+server.listen(PORT, () => {
+    console.log(`
+🚀 خادم المنصة التعليمية يعمل بنجاح!
+📍 العنوان: http://localhost:${PORT}
+⏰ الوقت: ${new Date().toLocaleString('ar-SA')}
+
+🔐 حساب المدير الافتراضي:
+   📧 البريد الإلكتروني: admin@platform.edu
+   🔑 كلمة المرور: 77007700
+
+✨ المميزات المتاحة:
+   💬 دردشة فورية
+   📖 قصص تفاعلية
+   👥 مجموعات وقنوات
+   👑 لوحة إدارة متكاملة
+   📱 واجهة مستخدم متجاوبة
+    `);
 });
 
-// معالجة الأخطاء
-app.use((err, req, res, next) => {
-    console.error('خطأ غير متوقع:', err);
-    res.status(500).json({
-        success: false,
-        message: 'حدث خطأ غير متوقع في الخادم'
-    });
-});
-
-// تشغيل السيرفر
-const PORT = process.env.PORT || 3000;
-
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/educational-platform', {
-    useNewUrlParser: true,
-    useUnifiedTopology: true
-})
-.then(() => {
-    console.log('✅ تم الاتصال بقاعدة البيانات');
-    server.listen(PORT, () => {
-        console.log(`🚀 السيرفر يعمل على المنفذ ${PORT}`);
-    });
-})
-.catch(err => {
-    console.error('❌ فشل في الاتصال بقاعدة البيانات:', err);
-    process.exit(1);
-});
-
-module.exports = app;
+export default app;
