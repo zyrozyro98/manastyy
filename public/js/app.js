@@ -1,4 +1,4 @@
-// public/js/app.js - التطبيق الكامل مع نظام دردشة متكامل
+// public/js/app.js - التطبيق الأمامي الكامل
 class EducationalPlatform {
     constructor() {
         this.currentUser = null;
@@ -106,9 +106,6 @@ class EducationalPlatform {
                 break;
             case 'dashboard':
                 await this.loadDashboard();
-                break;
-            case 'notifications':
-                await this.loadNotifications();
                 break;
         }
     }
@@ -257,8 +254,7 @@ class EducationalPlatform {
                 this.loadUsers(),
                 this.loadConversations(),
                 this.loadGroups(),
-                this.loadStories(),
-                this.loadNotifications()
+                this.loadStories()
             ]);
         }
     }
@@ -325,23 +321,6 @@ class EducationalPlatform {
             }
         } catch (error) {
             console.error('خطأ في تحميل القصص:', error);
-        }
-    }
-
-    async loadNotifications() {
-        try {
-            const token = localStorage.getItem('authToken');
-            const response = await fetch('/api/notifications', {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            
-            if (response.ok) {
-                const data = await response.json();
-                this.notifications = data.data.notifications || [];
-                this.renderNotifications();
-            }
-        } catch (error) {
-            console.error('خطأ في تحميل الإشعارات:', error);
         }
     }
 
@@ -787,11 +766,20 @@ class EducationalPlatform {
 
     shareGroup(group) {
         const inviteLink = `${window.location.origin}/groups/join?code=${group.inviteCode}`;
-        navigator.clipboard.writeText(inviteLink).then(() => {
+        if (navigator.clipboard) {
+            navigator.clipboard.writeText(inviteLink).then(() => {
+                this.showNotification('تم نسخ رابط الدعوة', 'success');
+            });
+        } else {
+            // Fallback for browsers that don't support clipboard API
+            const textArea = document.createElement('textarea');
+            textArea.value = inviteLink;
+            document.body.appendChild(textArea);
+            textArea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textArea);
             this.showNotification('تم نسخ رابط الدعوة', 'success');
-        }).catch(() => {
-            prompt('انسخ رابط الدعوة:', inviteLink);
-        });
+        }
     }
 
     async createGroup(event) {
@@ -886,16 +874,25 @@ class EducationalPlatform {
         this.showNotification('مشاهدة القصص قريباً', 'info');
     }
 
-    // ============ إدارة الإشعارات ============
-    renderNotifications() {
-        // تنفيذ عرض الإشعارات
-        console.log('الإشعارات:', this.notifications);
-    }
-
     // ============ لوحة التحكم ============
     async loadDashboard() {
         const dashboardPage = document.getElementById('dashboard-page');
         if (dashboardPage) {
+            // جلب الإحصائيات
+            let stats = { totalUsers: 0, totalConversations: 0, totalGroups: 0, totalStories: 0 };
+            try {
+                const token = localStorage.getItem('authToken');
+                const response = await fetch('/api/stats', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    stats = data.data.stats;
+                }
+            } catch (error) {
+                console.error('خطأ في جلب الإحصائيات:', error);
+            }
+
             dashboardPage.innerHTML = `
                 <div class="dashboard-header">
                     <h1 class="section-title">
@@ -911,7 +908,7 @@ class EducationalPlatform {
                             <i class="fas fa-users"></i>
                         </div>
                         <div class="stat-info">
-                            <div class="stat-number">${this.allUsers.length}</div>
+                            <div class="stat-number">${stats.totalUsers}</div>
                             <div class="stat-label">إجمالي المستخدمين</div>
                         </div>
                     </div>
@@ -920,7 +917,7 @@ class EducationalPlatform {
                             <i class="fas fa-comments"></i>
                         </div>
                         <div class="stat-info">
-                            <div class="stat-number">${this.conversations.size}</div>
+                            <div class="stat-number">${stats.totalConversations}</div>
                             <div class="stat-label">المحادثات</div>
                         </div>
                     </div>
@@ -929,7 +926,7 @@ class EducationalPlatform {
                             <i class="fas fa-users"></i>
                         </div>
                         <div class="stat-info">
-                            <div class="stat-number">${this.groups.size}</div>
+                            <div class="stat-number">${stats.totalGroups}</div>
                             <div class="stat-label">المجموعات</div>
                         </div>
                     </div>
@@ -938,7 +935,7 @@ class EducationalPlatform {
                             <i class="fas fa-history"></i>
                         </div>
                         <div class="stat-info">
-                            <div class="stat-number">${this.stories.length}</div>
+                            <div class="stat-number">${stats.totalStories}</div>
                             <div class="stat-label">القصص النشطة</div>
                         </div>
                     </div>
@@ -961,6 +958,15 @@ class EducationalPlatform {
                                 <span class="activity-time">آخر تحديث: الآن</span>
                             </div>
                         </div>
+                        ${this.currentUser?.role === 'admin' ? `
+                        <div class="activity-item">
+                            <i class="fas fa-cog"></i>
+                            <div class="activity-content">
+                                <p>أنت مدير النظام - لديك صلاحيات كاملة</p>
+                                <span class="activity-time">آخر تحديث: الآن</span>
+                            </div>
+                        </div>
+                        ` : ''}
                     </div>
                 </div>
             `;
@@ -1102,6 +1108,7 @@ class EducationalPlatform {
             z-index: 10000;
             max-width: 300px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            font-family: 'Cairo', sans-serif;
         `;
         
         if (type === 'success') {
