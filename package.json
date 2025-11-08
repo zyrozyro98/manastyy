@@ -1,8 +1,8 @@
 {
   "name": "educational-platform",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "type": "module",
-  "description": "منصة تعليمية متكاملة مع نظام دردشة وإدارة",
+  "description": "منصة تعليمية متكاملة مع نظام دردشة متقدم",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -14,15 +14,10 @@
     "cors": "^2.8.5",
     "bcryptjs": "^2.4.3",
     "jsonwebtoken": "^9.0.2",
-    "multer": "^1.4.5-lts.1",
+    "multer": "^1.4.5",
     "uuid": "^9.0.1"
   },
-  "keywords": [
-    "educational",
-    "platform",
-    "chat",
-    "real-time"
-  ],
+  "keywords": ["educational", "platform", "chat", "real-time"],
   "author": "Educational Platform Team",
   "license": "MIT"
 }
