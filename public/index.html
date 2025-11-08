@@ -3,9 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>المنصة التعليمية المتكاملة</title>
-    <link rel="stylesheet" href="css.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <title>المنصة التعليمية المتطورة - نظام الإدارة المتكامل</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="css/style.css">
+    <script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
     <!-- شاشة الترحيب -->
@@ -29,12 +30,12 @@
                     <span>مجموعات تعليمية</span>
                 </div>
                 <div class="feature">
-                    <i class="fas fa-history"></i>
-                    <span>قصص تفاعلية</span>
+                    <i class="fas fa-broadcast-tower"></i>
+                    <span>قنوات بث</span>
                 </div>
                 <div class="feature">
-                    <i class="fas fa-crown"></i>
-                    <span>إدارة متكاملة</span>
+                    <i class="fas fa-chart-line"></i>
+                    <span>تتبع التقدم</span>
                 </div>
             </div>
             
@@ -45,8 +46,14 @@
         </div>
     </div>
 
+    <!-- حالة الاتصال -->
+    <div class="connection-status" id="connectionStatus">
+        <i class="fas fa-wifi"></i>
+        <span>متصل بالإنترنت</span>
+    </div>
+
     <!-- الهيدر -->
-    <header class="header" id="header" style="display: none;">
+    <header class="header" id="header">
         <div class="header-content">
             <a href="#" class="logo" data-page="home">
                 <div class="logo-icon">
@@ -72,17 +79,13 @@
                     الدردشة
                     <span class="nav-item-badge" id="unreadMessagesCount">0</span>
                 </a>
-                <a href="#" class="nav-item" data-page="stories">
-                    <i class="fas fa-history"></i>
-                    القصص
-                </a>
                 <a href="#" class="nav-item" data-page="groups">
                     <i class="fas fa-users"></i>
                     المجموعات
                 </a>
-                <a href="#" class="nav-item" data-page="channels">
-                    <i class="fas fa-broadcast-tower"></i>
-                    القنوات
+                <a href="#" class="nav-item" data-page="stories">
+                    <i class="fas fa-history"></i>
+                    القصص
                 </a>
                 <a href="#" class="nav-item hidden" id="loginBtn" data-page="login">
                     <i class="fas fa-sign-in-alt"></i>
@@ -107,11 +110,56 @@
                     <div class="user-role" id="userRoleDisplay">طالب</div>
                 </div>
             </div>
+
+            <button class="mobile-menu-btn" id="mobileMenuBtn">
+                <i class="fas fa-bars"></i>
+            </button>
         </div>
     </header>
 
+    <!-- القائمة المتنقلة -->
+    <div class="mobile-menu" id="mobileMenu">
+        <nav class="mobile-nav">
+            <a href="#" class="nav-item" data-page="home">
+                <i class="fas fa-home"></i>
+                الرئيسية
+            </a>
+            <a href="#" class="nav-item" data-page="dashboard">
+                <i class="fas fa-tachometer-alt"></i>
+                لوحة التحكم
+            </a>
+            <a href="#" class="nav-item" data-page="chat">
+                <i class="fas fa-comments"></i>
+                الدردشة
+            </a>
+            <a href="#" class="nav-item" data-page="groups">
+                <i class="fas fa-users"></i>
+                المجموعات
+            </a>
+            <a href="#" class="nav-item" data-page="stories">
+                <i class="fas fa-history"></i>
+                القصص
+            </a>
+            <a href="#" class="nav-item hidden" id="loginBtnMobile" data-page="login">
+                <i class="fas fa-sign-in-alt"></i>
+                تسجيل الدخول
+            </a>
+            <a href="#" class="nav-item hidden" id="registerBtnMobile" data-page="register">
+                <i class="fas fa-user-plus"></i>
+                إنشاء حساب
+            </a>
+            <a href="#" class="nav-item hidden" id="logoutBtnMobile">
+                <i class="fas fa-sign-out-alt"></i>
+                تسجيل الخروج
+            </a>
+        </nav>
+    </div>
+
+    <!-- طبقة التعتيم -->
+    <div class="overlay" id="overlay"></div>
+
     <!-- المحتوى الرئيسي -->
-    <main class="main-content" style="display: none;">
+    <main class="main-content">
         <!-- الصفحة الرئيسية -->
         <div class="page active" id="home-page">
             <div class="home-hero">
@@ -131,6 +179,40 @@
                 </div>
                 <div class="hero-image">
                     <i class="fas fa-graduation-cap"></i>
+                </div>
+            </div>
+
+            <div class="features-section">
+                <h2 class="section-title">مميزات المنصة</h2>
+                <div class="features-grid">
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="fas fa-comments"></i>
+                        </div>
+                        <h3>دردشة مباشرة</h3>
+                        <p>تواصل فوري مع الزملاء والمعلمين عبر نظام دردشة متكامل</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="fas fa-users"></i>
+                        </div>
+                        <h3>مجموعات تعليمية</h3>
+                        <p>أنشئ مجموعات دراسية وناقش مواضيعك مع زملائك</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="fas fa-broadcast-tower"></i>
+                        </div>
+                        <h3>قنوات البث</h3>
+                        <p>انضم إلى قنوات تعليمية متخصصة واحصل على آخر المستجدات</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">
+                            <i class="fas fa-history"></i>
+                        </div>
+                        <h3>القصص التعليمية</h3>
+                        <p>شارك تجاربك التعليمية عبر القصص التفاعلية</p>
+                    </div>
                 </div>
             </div>
         </div>
@@ -216,10 +298,10 @@
                 <div class="chat-sidebar active" id="chatSidebar">
                     <div class="chat-header">
                         <h3>المحادثات</h3>
-                        <button class="btn btn-primary btn-sm" id="newChatBtn">
-                            <i class="fas fa-plus"></i>
-                            جديد
-                        </button>
+                    </div>
+                    
+                    <div class="chat-search">
+                        <input type="text" id="chatSearchInput" placeholder="بحث في المحادثات...">
                     </div>
                     
                     <div class="conversations-list" id="conversationsList">
@@ -261,24 +343,6 @@
             </div>
         </div>
 
-        <!-- صفحة القصص -->
-        <div class="page" id="stories-page">
-            <div class="stories-header">
-                <h1 class="section-title">
-                    <i class="fas fa-history"></i>
-                    القصص
-                </h1>
-                <button class="btn btn-primary" id="createStoryBtn">
-                    <i class="fas fa-plus"></i>
-                    إضافة قصة
-                </button>
-            </div>
-            
-            <div class="stories-container" id="storiesContainer">
-                <!-- سيتم ملء القصص ديناميكياً -->
-            </div>
-        </div>
-
         <!-- صفحة المجموعات -->
         <div class="page" id="groups-page">
             <div class="groups-header">
@@ -297,32 +361,72 @@
             </div>
         </div>
 
-        <!-- صفحة القنوات -->
-        <div class="page" id="channels-page">
-            <div class="channels-header">
+        <!-- صفحة القصص -->
+        <div class="page" id="stories-page">
+            <div class="stories-header">
                 <h1 class="section-title">
-                    <i class="fas fa-broadcast-tower"></i>
-                    القنوات التعليمية
+                    <i class="fas fa-history"></i>
+                    القصص
                 </h1>
-                <button class="btn btn-primary" id="createChannelBtn">
-                    <i class="fas fa-plus"></i>
-                    إنشاء قناة
-                </button>
             </div>
             
-            <div class="channels-grid" id="channelsGrid">
-                <!-- سيتم ملء القنوات ديناميكياً -->
+            <div class="stories-container" id="storiesContainer">
+                <!-- سيتم ملء القصص ديناميكياً -->
             </div>
-        </div>
-
-        <!-- صفحة الإدارة (للمدير فقط) -->
-        <div class="page" id="admin-page" style="display: none;">
-            <!-- سيتم تحميل المحتوى ديناميكياً -->
         </div>
     </main>
 
-    <!-- السكريبتات -->
-    <script src="/socket.io/socket.io.js"></script>
+    <!-- شريط الأدوات السريع -->
+    <div class="quick-actions-bar" id="quickActionsBar">
+        <button class="quick-action" data-page="chat" title="الدردشة">
+            <i class="fas fa-comments"></i>
+        </button>
+        <button class="quick-action" data-page="groups" title="المجموعات">
+            <i class="fas fa-users"></i>
+        </button>
+        <button class="quick-action" data-page="stories" title="القصص">
+            <i class="fas fa-history"></i>
+        </button>
+    </div>
+
+    <!-- الزر العائم -->
+    <button class="floating-action-btn" id="floatingActionBtn">
+        <i class="fas fa-plus"></i>
+    </button>
+
+    <!-- نافذة إنشاء مجموعة -->
+    <div class="modal" id="createGroupModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>إنشاء مجموعة جديدة</h3>
+                <button class="modal-close" id="closeGroupModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="createGroupForm">
+                    <div class="form-group">
+                        <label for="groupName">اسم المجموعة</label>
+                        <input type="text" id="groupName" name="groupName" required placeholder="ادخل اسم المجموعة">
+                    </div>
+                    <div class="form-group">
+                        <label for="groupDescription">وصف المجموعة</label>
+                        <textarea id="groupDescription" name="groupDescription" rows="3" placeholder="ادخل وصف المجموعة"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="groupPrivacy">خصوصية المجموعة</label>
+                        <select id="groupPrivacy" name="groupPrivacy">
+                            <option value="public">عامة</option>
+                            <option value="private">خاصة</option>
+                        </select>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" class="btn btn-outline" id="cancelGroupBtn">إلغاء</button>
+                        <button type="submit" class="btn btn-primary">إنشاء المجموعة</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <script src="js/app.js"></script>
 </body>
 </html>
