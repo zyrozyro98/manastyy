@@ -1,11 +1,10 @@
-// server.js - الخادم المحسن مع نظام دردشة كامل
+// server.js - الخادم الكامل للمنصة التعليمية
 import express from 'express';
 import http from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
@@ -26,10 +25,9 @@ const io = new Server(server, {
 
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'educational_platform_secret_2024';
-const UPLOAD_DIR = path.join(__dirname, 'uploads');
 
 // إنشاء المجلدات اللازمة
-const requiredDirs = [UPLOAD_DIR];
+const requiredDirs = [path.join(__dirname, 'public')];
 requiredDirs.forEach(dir => {
     if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true });
@@ -38,9 +36,8 @@ requiredDirs.forEach(dir => {
 
 // middleware
 app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-app.use('/uploads', express.static(UPLOAD_DIR));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // نظام التخزين المحلي المحسن
@@ -60,8 +57,11 @@ class DatabaseService {
 
     loadData() {
         try {
-            const data = fs.readFileSync(this.dataFile, 'utf8');
-            return JSON.parse(data);
+            if (fs.existsSync(this.dataFile)) {
+                const data = fs.readFileSync(this.dataFile, 'utf8');
+                return JSON.parse(data);
+            }
+            return this.getDefaultData();
         } catch (error) {
             console.error('❌ خطأ في تحميل البيانات:', error);
             return this.getDefaultData();
@@ -107,7 +107,8 @@ class DatabaseService {
             settings: {
                 notifications: true,
                 privacy: 'public'
-            }
+            },
+            isActive: true
         };
         
         data.users.push(user);
@@ -117,17 +118,17 @@ class DatabaseService {
 
     async findUserByEmail(email) {
         const data = this.loadData();
-        return data.users.find(user => user.email === email);
+        return data.users.find(user => user.email === email && user.isActive);
     }
 
     async findUserById(userId) {
         const data = this.loadData();
-        return data.users.find(user => user._id === userId);
+        return data.users.find(user => user._id === userId && user.isActive);
     }
 
     async getAllUsers() {
         const data = this.loadData();
-        return data.users.filter(user => user.isActive !== false);
+        return data.users.filter(user => user.isActive);
     }
 
     async updateUser(userId, updates) {
@@ -135,7 +136,11 @@ class DatabaseService {
         const userIndex = data.users.findIndex(user => user._id === userId);
         
         if (userIndex !== -1) {
-            data.users[userIndex] = { ...data.users[userIndex], ...updates };
+            data.users[userIndex] = { 
+                ...data.users[userIndex], 
+                ...updates,
+                updatedAt: new Date().toISOString()
+            };
             this.saveData(data);
             return data.users[userIndex];
         }
@@ -146,8 +151,10 @@ class DatabaseService {
         const data = this.loadData();
         const searchTerm = query.toLowerCase();
         return data.users.filter(user => 
-            user.fullName.toLowerCase().includes(searchTerm) || 
-            user.email.toLowerCase().includes(searchTerm)
+            user.isActive && (
+                user.fullName.toLowerCase().includes(searchTerm) || 
+                user.email.toLowerCase().includes(searchTerm)
+            )
         );
     }
 
@@ -426,6 +433,19 @@ class DatabaseService {
         }
         return false;
     }
+
+    // الحصول على إحصائيات النظام
+    async getSystemStats() {
+        const data = this.loadData();
+        return {
+            totalUsers: data.users.filter(u => u.isActive).length,
+            totalConversations: data.conversations.length,
+            totalMessages: data.messages.length,
+            totalGroups: data.groups.length,
+            totalStories: data.stories.length,
+            onlineUsers: data.users.filter(u => u.isOnline).length
+        };
+    }
 }
 
 const db = new DatabaseService();
@@ -446,7 +466,78 @@ async function createDefaultAdmin() {
     }
 }
 
-createDefaultAdmin();
+// إنشاء بيانات تجريبية
+async function createSampleData() {
+    try {
+        const users = [
+            {
+                fullName: 'أحمد محمد',
+                email: 'ahmed@example.com',
+                password: await bcrypt.hash('123456', 12),
+                role: 'teacher'
+            },
+            {
+                fullName: 'فاطمة علي',
+                email: 'fatima@example.com',
+                password: await bcrypt.hash('123456', 12),
+                role: 'student'
+            },
+            {
+                fullName: 'خالد إبراهيم',
+                email: 'khaled@example.com',
+                password: await bcrypt.hash('123456', 12),
+                role: 'student'
+            }
+        ];
+
+        for (const userData of users) {
+            const existingUser = await db.findUserByEmail(userData.email);
+            if (!existingUser) {
+                await db.createUser(userData);
+            }
+        }
+
+        // إنشاء مجموعات تجريبية
+        const allUsers = await db.getAllUsers();
+        const adminUser = allUsers.find(u => u.role === 'admin');
+        const teacherUser = allUsers.find(u => u.role === 'teacher');
+
+        if (adminUser && teacherUser) {
+            const groups = [
+                {
+                    name: 'مجموعة الرياضيات',
+                    description: 'مجموعة مخصصة لدروس الرياضيات والتمارين',
+                    creatorId: adminUser._id,
+                    members: allUsers.map(u => u._id),
+                    isPublic: true
+                },
+                {
+                    name: 'مجموعة العلوم',
+                    description: 'مناقشات وأخبار علمية',
+                    creatorId: teacherUser._id,
+                    members: allUsers.map(u => u._id),
+                    isPublic: true
+                }
+            ];
+
+            for (const groupData of groups) {
+                const existingGroups = await db.getAllGroups();
+                if (!existingGroups.find(g => g.name === groupData.name)) {
+                    await db.createGroup(groupData);
+                }
+            }
+        }
+
+        console.log('✅ تم إنشاء البيانات التجريبية بنجاح');
+    } catch (error) {
+        console.error('❌ خطأ في إنشاء البيانات التجريبية:', error);
+    }
+}
+
+// تهيئة البيانات
+createDefaultAdmin().then(() => {
+    setTimeout(createSampleData, 1000);
+});
 
 // middleware المصادقة
 const authenticateToken = async (req, res, next) => {
@@ -480,10 +571,15 @@ const generateToken = (userId) => {
 // ==================== مسارات API ====================
 
 app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+app.get('/api/health', (req, res) => {
     res.json({
         success: true,
         message: '🚀 خادم المنصة التعليمية يعمل بنجاح!',
-        version: '2.0.0'
+        version: '2.0.0',
+        timestamp: new Date().toISOString()
     });
 });
 
@@ -785,6 +881,16 @@ app.post('/api/notifications/:notificationId/read', authenticateToken, async (re
     }
 });
 
+// مسار الإحصائيات
+app.get('/api/stats', authenticateToken, async (req, res) => {
+    try {
+        const stats = await db.getSystemStats();
+        res.json({ success: true, data: { stats } });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'حدث خطأ في الخادم' });
+    }
+});
+
 // ==================== نظام السوكت ====================
 
 const connectedUsers = new Map();
@@ -829,6 +935,8 @@ io.on('connection', (socket) => {
                 user: { ...user, password: undefined }
             });
 
+            console.log(`✅ تم مصادقة المستخدم: ${user.fullName} (${socket.id})`);
+
         } catch (error) {
             console.error('❌ خطأ في مصادقة السوكت:', error);
         }
@@ -866,6 +974,8 @@ io.on('connection', (socket) => {
                 });
             });
 
+            console.log(`💬 رسالة جديدة في المحادثة ${conversationId}`);
+
         } catch (error) {
             console.error('❌ خطأ في إرسال الرسالة:', error);
         }
@@ -900,6 +1010,8 @@ io.on('connection', (socket) => {
                     sender: { ...sender, password: undefined }
                 }
             });
+
+            console.log(`👥 رسالة جديدة في المجموعة ${groupId}`);
 
         } catch (error) {
             console.error('❌ خطأ في إرسال رسالة المجموعة:', error);
@@ -956,6 +1068,8 @@ io.on('connection', (socket) => {
                         groupId,
                         userId: socket.userId
                     });
+
+                    console.log(`✅ المستخدم ${socket.userId} انضم إلى المجموعة ${groupId}`);
                 }
             }
         } catch (error) {
@@ -994,6 +1108,13 @@ server.listen(PORT, () => {
 🔐 حساب المدير الافتراضي:
    📧 البريد الإلكتروني: admin@platform.edu
    🔑 كلمة المرور: 77007700
+
+✨ المميزات المتوفرة:
+   💬 دردشة فورية مع الأصدقاء
+   👥 مجموعات دردشة جماعية
+   📱 تحديثات في الوقت الحقيقي
+   🔔 نظام إشعارات متكامل
+   📊 إحصائيات ونظام مراقبة
     `);
 });
 
